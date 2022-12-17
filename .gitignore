@@ -1,0 +1,7 @@
+Code/Labels/*
+Code/Images/*
+Code/Results/*
+Code/Models/*
+Code/Instance_Counts/*
+Code/Archive/*
+*.h5
