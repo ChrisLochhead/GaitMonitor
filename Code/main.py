@@ -4,6 +4,7 @@ import cv2
 from pynput.keyboard import Key, Listener, KeyCode
 import numpy as np
 import matplotlib.pyplot as MPL
+import datetime
 
 #Local files
 import init_directories
@@ -30,6 +31,8 @@ if sys.version_info[:3] > (3, 7, 0):
 #0 is main menu, 1 is second menu, 2 is verbosity selection menu
 current_menu = 0
 selected_function = None 
+capture_paused = False
+restart_time = None
 
 def clear_console():
     command = 'clear'
@@ -41,31 +44,60 @@ def run_camera(path="./Images/Instances/", v=0):
     #try:
     camera = capture.Camera()
 
-    camera.run(path="./Images/CameraTest/", verbose=v)
+    out_condition = camera.run(path="./Images/CameraTest/", verbose=v)
+
+    return out_condition
     #except:
     #    main("No camera detected, returning to main menu")
 
 def get_silhouettes(v =1):
     ImageProcessor.get_silhouettes('./Images/Instances', verbose=v)
     
+def reset_capture_timer():
+    print("empty")
+    now = datetime.datetime.now()
+    later = now + datetime.timedelta(seconds=5)
+    return later
+    print("now: ", now)
+    print("later: ", later)
+    #morning_limit = now.replace(hour=8, minute=0, second=0, microsecond=0)
+    #evening_limit = now.replace(hour=22, minute=37, second=0, microsecond=0)
+
 def on_press(key):
     global current_menu
     global selected_function
+    global capture_paused
+    global restart_time
 
     if hasattr(key, 'char'):
         if key.char == '1':
             if current_menu == 0:
-                selected_function = run_camera
+                selected_function = 0
                 verbosity_selection(max_verbose = 2)
             #elif current_menu == 1:
             #    extended_menu(3, page_3)
             elif current_menu == 2:
-                selected_function(v=0)
-                #main()
+                if selected_function == 0:
+                    out_condition = run_camera(v=0)
+
+                print("back in main menu, exit code: ", out_condition)
+                capture_paused = out_condition
+                if capture_paused:
+                    restart_time = reset_capture_timer()
+                    #capture_paused = False
+
+                main()
         if key.char == '2':
             if current_menu == 2:
-                selected_function(v=1)
-                #main()
+                if selected_function == 0:
+                    out_condition = run_camera(v=1)
+                    print("this one: ", out_condition)
+                    capture_paused = out_condition
+                    if capture_paused:
+                        restart_time = reset_capture_timer()
+                        #capture_paused = False
+                print("back in main menu, exit code: ", out_condition)
+                main()
         if key.char == '3':
             if current_menu == 2:
                 main()
@@ -105,8 +137,12 @@ REGULAR FUNCTIONS
 9. Quit"""
 
 
-def main(error_message = None, init = False):
+def main(error_message = None, init = False, repeat_loop = True):
     global current_menu
+    global restart_time
+    global capture_paused
+    main_loop = True
+
     current_menu = 0
     if error_message:
         print(error_message)
@@ -119,6 +155,32 @@ def main(error_message = None, init = False):
                 listener.join()
             except:
                 print("program ended, listener closing")
+
+    if repeat_loop == True:
+        while main_loop == True:
+            print("are we in here?")
+
+            if capture_paused == False:
+                print("capture paused false, going back to main menu")
+                main_loop = False
+                main(repeat_loop=False)
+
+            if restart_time != None:
+                print("time: ", restart_time, datetime.datetime.now(), "capture paused: ", capture_paused)
+                if restart_time < datetime.datetime.now():
+                    print("restarting camera capture")
+                    restart_time = None
+                    main_loop = False
+                    out_condition = run_camera(v=1)
+                    print("out condition in main loop: ", out_condition)
+                    capture_paused = out_condition
+                    if capture_paused:
+                        restart_time = reset_capture_timer()
+                        print("new restart timer set")
+                        #capture_paused = False
+                    main()
+
+
 
 if __name__ == '__main__':
     #Main menu

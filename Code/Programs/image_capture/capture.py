@@ -13,11 +13,17 @@ import copy
 import File_Decimation
 import datetime
 break_program = False
+pause_program = False 
 
 def on_press(key):
     global break_program
+    global pause_program
     if hasattr(key, 'char'):
         if key.char == 'q':
+            pause_program = False
+            break_program = True
+        if key.char == 'p':
+            pause_program = True
             break_program = True
         
 class Camera:
@@ -97,6 +103,7 @@ class Camera:
         frames_since_last = 0
 
         global break_program
+        global pause_program
 
         with Listener(on_press=on_press) as listener:
             while break_program == False:
@@ -106,6 +113,7 @@ class Camera:
                 morning_limit = now.replace(hour=8, minute=0, second=0, microsecond=0)
                 evening_limit = now.replace(hour=22, minute=37, second=0, microsecond=0)
                 if now < morning_limit or now > evening_limit:
+                    pause_program = True
                     break_program = True
 
                 #Check if data overloaded and if so conduct a purge
@@ -137,8 +145,10 @@ class Camera:
                         seen_human = False
 
                         #If a human found in the frame, notify of the detection and start the record timer
-                        if len(objs) > 1:
+                        if len(objs) > 0:
+                            print("human detected: ", objs_last_frame)
                             if objs_last_frame == 0:
+                                print("human detected")
                                 seen_human = True
                                 record_timer = time.time()
 
@@ -148,16 +158,20 @@ class Camera:
                       
                         #give a 20 frame delay before declaring no humans detected to account for temporary blips 
                         if len(objs) == 0:
+                            print("no human detected")
                             frames_since_last += 1
                             #If it's been more than 20 frames, it's not a blip, set human detection to 0
                             if frames_since_last > 20:
+                                print("pretending cant see: ", frames_since_last)
                                 objs_last_frame = 0
                             else:
+                                print("setting objs last frame to 1", frames_since_last)
                                 objs_last_frame = 1
 
                         #Recheck for existence of human after blips
                         if objs_last_frame == 0:
                             if len(objs) > 0:
+                                print("secondary person found after blip fix")
                                 seen_human = True
                                 record_timer = time.time()
                                 frames_since_last = 0
@@ -245,8 +259,16 @@ class Camera:
 
             try:
                 cv2.destroyAllWindows()
+                print("exiting here 1")
+                return pause_program
             except:
                 print("program ended, listener closing")
+                print("exiting here 2")
+                return pause_program
             finally:
-                quit()
+                print("exiting here 3", pause_program)
+                return pause_program
+                print("surely not making it here 3")
+            #    quit()
+        print("does it get here somehow? probs not")
   
