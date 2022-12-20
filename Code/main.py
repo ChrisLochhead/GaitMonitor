@@ -74,29 +74,21 @@ def on_press(key):
             if current_menu == 0:
                 selected_function = 0
                 verbosity_selection(max_verbose = 2)
-            #elif current_menu == 1:
-            #    extended_menu(3, page_3)
+
             elif current_menu == 2:
                 if selected_function == 0:
-                    out_condition = run_camera(v=0)
+                    capture_paused = run_camera(v=0)
 
-                print("back in main menu, exit code: ", out_condition)
-                capture_paused = out_condition
                 if capture_paused:
                     restart_time = reset_capture_timer()
-                    #capture_paused = False
-
                 main()
+
         if key.char == '2':
             if current_menu == 2:
                 if selected_function == 0:
-                    out_condition = run_camera(v=1)
-                    print("this one: ", out_condition)
-                    capture_paused = out_condition
+                    capture_paused = run_camera(v=1)
                     if capture_paused:
                         restart_time = reset_capture_timer()
-                        #capture_paused = False
-                print("back in main menu, exit code: ", out_condition)
                 main()
         if key.char == '3':
             if current_menu == 2:
@@ -156,28 +148,26 @@ def main(error_message = None, init = False, repeat_loop = True):
             except:
                 print("program ended, listener closing")
 
+    #Loop to check if the capture is delayed
     if repeat_loop == True:
         while main_loop == True:
-            print("are we in here?")
 
+            #Exit from the loop if this isnt a capture delay
             if capture_paused == False:
-                print("capture paused false, going back to main menu")
                 main_loop = False
                 main(repeat_loop=False)
 
             if restart_time != None:
-                print("time: ", restart_time, datetime.datetime.now(), "capture paused: ", capture_paused)
+                #Re-run capture once delay is completed.
                 if restart_time < datetime.datetime.now():
-                    print("restarting camera capture")
                     restart_time = None
                     main_loop = False
                     out_condition = run_camera(v=1)
-                    print("out condition in main loop: ", out_condition)
                     capture_paused = out_condition
+
+                    #Reset delay
                     if capture_paused:
                         restart_time = reset_capture_timer()
-                        print("new restart timer set")
-                        #capture_paused = False
                     main()
 
 
