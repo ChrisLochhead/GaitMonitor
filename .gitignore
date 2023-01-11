@@ -5,3 +5,4 @@ Code/Models/*
 Code/Instance_Counts/*
 Code/Archive/*
 *.h5
+*.pth
