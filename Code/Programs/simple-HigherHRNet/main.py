@@ -4,8 +4,9 @@ from SimpleHigherHRNet import SimpleHigherHRNet
 from misc.visualization import check_video_rotation, draw_points_and_skeleton
 import csv
 import os 
-
-
+import csv
+import copy 
+import pyrealsense2 as rs
 
 joint_connections = [[15, 13], [13, 11], [16, 14], [14, 12], [11, 12], [5, 11], [6, 12], [5, 6], [5, 7],
 [6, 8], [7, 9], [8, 10], [1, 2], [0, 1], [0, 2], [1, 3], [2, 4], [0, 5], [0, 6]]
@@ -83,11 +84,28 @@ def run_video():
 
 def blacken_frame(frame):
     dimensions = (len(frame), len(frame[0]))
-    print("type: ", type(frame))
-    print("dimensions: ", dimensions)
     blank_frame = np.zeros((dimensions[0],dimensions[1], 3), dtype= np.uint8)
-    print("type now: ", type(blank_frame))
     return blank_frame
+
+def get_3D_coords(coords_2d, dep_img, pts3d_net = True, dilate = True ):
+    pts_3D = []
+    orig_dep_img = copy.deepcopy(dep_img)
+    kernel = np.ones((6,6), np.uint8)
+    if dilate == True:
+        dep_img = cv2.dilate(dep_img, kernel, cv2.BORDER_REFLECT)
+
+    print(coords_2d)
+    print("Coord 1: ", coords_2d[3])
+    for i in range(3, len(coords_2d)):
+        
+        x = int(coords_2d[i][0]); y = int(coords_2d[i][1])
+        if pts3d_net == True:
+            result = rs.rs2_deproject_pixel_to_point(make_intrinsic(), [x, y], dep_img(y, x))
+            pts_3D.append([-result[0], -result[1], result[2]])
+        else:
+            pts_3D.append(x,y, dep_img[(y,x)])
+
+    return pts_3D
 
 def get_joints_from_frame(model, frame, anonymous = True):
     joints = model.predict(frame)
@@ -96,7 +114,6 @@ def get_joints_from_frame(model, frame, anonymous = True):
         frame = blacken_frame(frame)
 
     for person in joints:
-        print("number of joints: ", len(person))
 
         for joint_pair in joint_connections:
             #Draw links between joints
@@ -115,12 +132,12 @@ def get_joints_from_frame(model, frame, anonymous = True):
     return frame, joints
 
 def run_image(image_name, single = True, save = False, directory = None, model= None, image_no = 0):
-    print("initialising model")
+    #print("initialising model")
     if model == None:
         model = SimpleHigherHRNet(32, 17, "./weights/pose_higher_hrnet_w32_512.pth")
-        print("model built")
+        #print("model built")
     image = cv2.imread(image_name, cv2.IMREAD_COLOR)
-    print("image read")
+    #print("image read")
 
     #Test loading function
     #joints = load("image_data.csv")
@@ -131,37 +148,108 @@ def run_image(image_name, single = True, save = False, directory = None, model= 
 
     loop = True
     while loop == True:
-        cv2.imshow('Example', image)
         if single == True:
+            cv2.imshow('Example', image)
             cv2.waitKey(0) & 0xff
-        #print("saving: ")
-        #save(joints)
-        print("shutting program")
 
         loop = False
     
     if save and directory != None:
-        print("saving to: ", directory + "/" + str(image_no) + ".jpg")
+        #print("saving to: ", directory + "/" + str(image_no) + ".jpg")
         cv2.imwrite(directory + "/" + str(image_no) + ".jpg", image)
+
+    return image, joints
 
 def run_images(folder_name):
     directory = os.fsencode(folder_name)
-    print("initialising model")
-    model = SimpleHigherHRNet(32, 17, "./weights/pose_higher_hrnet_w32_512.pth")
-    print("model built")
-    iter = 0
-    for file in os.listdir(directory):
-        file_name = os.fsdecode(file)
-        print("filename: ", file_name)
-        out_directory = "./example_imgs/"
-        
-        os.makedirs(out_directory, exist_ok=True)
-        run_image(folder_name + "/" + file_name, single=False, save = True, directory=out_directory, model=model, image_no = iter)
-        iter += 1
+    #print("initialising model")
+    model = SimpleHigherHRNet(48, 17, "./weights/pose_higher_hrnet_w48_640.pth")
+    #print("model built")
+    file_iter = 0
+    subdir_iter = 0
+    data_class = 0
+    #Format for the joints file
+    #Instance Number: Sequence number: Class : Joint positions 1 - 17
+    joints_file = []
 
-#migrate this file into main project.
-#Add this as option for main functions
-#Done with setup :) 
+    for subdir, dirs, files in os.walk(directory):
+        #print("new subdir: ", subdir)
+        if subdir_iter % 10 == 0:
+            data_class += 1
+
+        first_depth = True
+        count_in_directory = 0
+
+        for file in files:
+
+            file_name = os.fsdecode(file)
+            sub_dir = os.fsdecode(subdir)
+            print("Sub directory: ", sub_dir, " Instance: ", file_iter - count_in_directory)
+
+            out_directory = "./example_imgs/"
+            
+            os.makedirs(out_directory, exist_ok=True)
+
+            if file_name[0] == 'd':
+                if first_depth == True:
+                    count_in_directory = file_iter
+                    first_depth = False
+                    
+                #Load depth image
+                dep_image = cv2.imread(sub_dir + "/" + file_name, cv2.IMREAD_ANYDEPTH)
+
+                #Find corresponding raw image and extract co-ordinates
+                joint_iter = 0
+
+                refined_joints = get_3D_coords(joints_file[file_iter - count_in_directory], dep_image)
+
+                for i, dep_joint in enumerate(refined_joints):
+                    if i >= 3:
+                        print("DEP JOINTs: ", dep_joint)
+                        if all(j == 0 for j in dep_joint) == False:
+
+                            #Make sure this isnt backwards during EDA
+                            if int(dep_joint[0]) >= 424:
+                                dep_joint[0] = 423
+                            if int(dep_joint[1]) >= 240:
+                                dep_joint[1] = 239
+
+                            zDepth = dep_image[int(dep_joint[1])][int(dep_joint[0])]
+                            print("Recorded coordinates: ", int(dep_joint[0]), int(dep_joint[1]), zDepth)
+
+                            #Fix this to record into the right place and then you are done
+                            dep_joint = [dep_joint[0], dep_joint[1], zDepth]#[int(dep_joint[0]), int(dep_joint[1]), int(zDepth)]
+                            joints_file[file_iter - count_in_directory][i] = dep_joint
+                        else:
+                            print("It's a float or an int: ", dep_joint)
+                            joints_file[file_iter - count_in_directory][i] = [0,0,0]
+
+
+            else:
+                image, joints = run_image(sub_dir + "/" + file_name, single=False, save = True, directory=out_directory + sub_dir, model=model, image_no = file_iter)
+                if len(joints) < 1:
+                    joints = [[ [0,0,0] for _ in range(17) ]]
+                
+                new_entry = [subdir_iter, file_iter, data_class]
+                # 0 is instance, 1 is num in sequence, 2 is class, 3 is array of joints
+                print("joints: ", joints)
+                for i, joint in enumerate(joints[0]):
+                    #Convert so it saves with comma delimiters within the joint-sets
+                    tmp = [joint[0], joint[1], joint[2]]
+                    new_entry.append(tmp)
+
+                print("New Entry: ", new_entry)
+                joints_file.append(new_entry)
+            file_iter += 1
+        subdir_iter +=1
+        file_iter = 0
+    #Save to .csv
+    print("SAVING")
+    with open("example_dataset.csv","w+", newline='') as my_csv:
+        csvWriter = csv.writer(my_csv,delimiter=',')
+        csvWriter.writerows(joints_file)
+
+
 def main():
     run_images("./Images")
     #run_video()

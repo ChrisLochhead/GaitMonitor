@@ -12,6 +12,8 @@ import os
 import copy
 import File_Decimation
 import datetime
+import csv
+
 break_program = False
 pause_program = False 
 
@@ -45,6 +47,7 @@ class Camera:
         # Start streaming
         print("where the camera starts")
         profile = self.pipeline.start(config)
+        self.dec_filter = rs.decimation_filter()
 
         # Create an align object
         # rs.align allows us to perform alignment of depth frames to others frames
@@ -54,12 +57,23 @@ class Camera:
     def retrieve_image(self):
         # Get frameset of color and depth
         frames = self.pipeline.wait_for_frames()
-
+    
         # Align the depth frame to color frame
         aligned_frames =  self.align.process(frames)
         # Get aligned frames
         depth_frame = aligned_frames.get_depth_frame()  # aligned_depth_frame is a 640x480 depth image
         color_frame = aligned_frames.get_color_frame()
+
+        processed_depth_frame = self.dec_filter.process(depth_frame)
+        depth_profile = processed_depth_frame.get_profile()
+        video_profile = depth_profile.as_video_stream_profile()
+        intr = video_profile.get_intrinsics()
+        print("these are the intrinsics: ", intr)
+
+        #Save intrinsics to a .csv file
+        with open("depth_intrinsics.csv","w+", newline='') as my_csv:
+            csvWriter = csv.writer(my_csv,delimiter=',')
+            csvWriter.writerows(intr)
 
         # Convert images to numpy arrays
         depth_img = np.asanyarray(depth_frame.get_data())
