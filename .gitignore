@@ -6,3 +6,7 @@ Code/Instance_Counts/*
 Code/Archive/*
 *.h5
 *.pth
+Code/Programs/simple-HigherHRNet/Images/*
+Code/Programs/simple-HigherHRNet/Archive/*
+Code/Programs/simple-HigherHRNet/example_imgs/*
+Code/Programs/DeepPrivacy/Images/*
