@@ -5,11 +5,13 @@ from misc.visualization import check_video_rotation, draw_points_and_skeleton
 import csv
 import os 
 import csv
-import copy 
+import copy
+from ast import literal_eval
 import pyrealsense2 as rs
 
 joint_connections = [[15, 13], [13, 11], [16, 14], [14, 12], [11, 12], [5, 11], [6, 12], [5, 6], [5, 7],
 [6, 8], [7, 9], [8, 10], [1, 2], [0, 1], [0, 2], [1, 3], [2, 4], [0, 5], [0, 6]]
+
 
 def save(joints):
     # open the file in the write mode
@@ -87,6 +89,35 @@ def blacken_frame(frame):
     blank_frame = np.zeros((dimensions[0],dimensions[1], 3), dtype= np.uint8)
     return blank_frame
 
+def make_intrinsics(intrinsics_file = "depth_intrinsics.csv"):
+        '''
+        Avoid having to read a bagfile to get the camera intrinsics
+        '''
+
+        with open(intrinsics_file, newline='') as csvfile:
+            data_struct = list(csv.reader(csvfile))
+
+        data = data_struct[0]
+        for i, d in enumerate(data):
+            print("on data point number ", i)
+            #avoid converting what is already in the correct format (distortion type)
+            if i != 6:
+                data[i] = literal_eval(data[i])
+
+
+        # Copied from a bagfile's intrinsics
+        intrinsics = rs.intrinsics()
+        intrinsics.coeffs = data[7]
+        intrinsics.fx = data[4]
+        intrinsics.fy = data[5]
+        intrinsics.height = data[1]
+        intrinsics.ppx = data[2]
+        intrinsics.ppy = data[3]
+        intrinsics.width=data[0]
+        return intrinsics
+
+loaded_intrinsics = make_intrinsics()
+
 def get_3D_coords(coords_2d, dep_img, pts3d_net = True, dilate = True ):
     pts_3D = []
     orig_dep_img = copy.deepcopy(dep_img)
@@ -99,8 +130,15 @@ def get_3D_coords(coords_2d, dep_img, pts3d_net = True, dilate = True ):
     for i in range(3, len(coords_2d)):
         
         x = int(coords_2d[i][0]); y = int(coords_2d[i][1])
+
+        #Deal with any cut-off joints from the frame
+        if y >= 424:
+            x = 423
+        if y >= 240:
+            y = 239
+
         if pts3d_net == True:
-            result = rs.rs2_deproject_pixel_to_point(make_intrinsic(), [x, y], dep_img(y, x))
+            result = rs.rs2_deproject_pixel_to_point(loaded_intrinsics, [x, y], dep_img[y, x])
             pts_3D.append([-result[0], -result[1], result[2]])
         else:
             pts_3D.append(x,y, dep_img[(y,x)])
@@ -203,42 +241,48 @@ def run_images(folder_name):
 
                 refined_joints = get_3D_coords(joints_file[file_iter - count_in_directory], dep_image)
 
+                print("what is joints file: ", joints_file[file_iter - count_in_directory])
                 for i, dep_joint in enumerate(refined_joints):
                     if i >= 3:
-                        print("DEP JOINTs: ", dep_joint)
-                        if all(j == 0 for j in dep_joint) == False:
+                        print("DEP JOINTs: ", dep_joint[0])
+                        #if all(j == 0 for j in dep_joint) == False:
 
-                            #Make sure this isnt backwards during EDA
-                            if int(dep_joint[0]) >= 424:
-                                dep_joint[0] = 423
-                            if int(dep_joint[1]) >= 240:
-                                dep_joint[1] = 239
+                        #Make sure this isnt backwards during EDA
+                        if int(dep_joint[0]) >= 424:
+                            dep_joint[0] = 423
+                        if int(dep_joint[1]) >= 240:
+                            dep_joint[1] = 239
 
-                            zDepth = dep_image[int(dep_joint[1])][int(dep_joint[0])]
-                            print("Recorded coordinates: ", int(dep_joint[0]), int(dep_joint[1]), zDepth)
+                        zDepth = dep_image[int(dep_joint[1])][int(dep_joint[0])]
+                        print("Recorded coordinates: ", dep_joint[0], dep_joint[1], zDepth)
 
-                            #Fix this to record into the right place and then you are done
-                            dep_joint = [dep_joint[0], dep_joint[1], zDepth]#[int(dep_joint[0]), int(dep_joint[1]), int(zDepth)]
-                            joints_file[file_iter - count_in_directory][i] = dep_joint
-                        else:
-                            print("It's a float or an int: ", dep_joint)
-                            joints_file[file_iter - count_in_directory][i] = [0,0,0]
+                        #Fix this to record into the right place and then you are done
+                        dep_joint = [dep_joint[0], dep_joint[1], zDepth]#[int(dep_joint[0]), int(dep_joint[1]), int(zDepth)]
+                        print("before: ", joints_file[file_iter - count_in_directory][i] )
+                        print("after: ", refined_joints[i])
+                        print("appending to: ", dep_joint)
+                        joints_file[file_iter - count_in_directory][i] = dep_joint
+
+                        #else:
+                        #    print("It's a float or an int: ", dep_joint)
+                        #    joints_file[file_iter - count_in_directory][i] = [0,0,0]
 
 
             else:
                 image, joints = run_image(sub_dir + "/" + file_name, single=False, save = True, directory=out_directory + sub_dir, model=model, image_no = file_iter)
+                print("joints returned: ", joints)
                 if len(joints) < 1:
                     joints = [[ [0,0,0] for _ in range(17) ]]
                 
                 new_entry = [subdir_iter, file_iter, data_class]
                 # 0 is instance, 1 is num in sequence, 2 is class, 3 is array of joints
-                print("joints: ", joints)
+                #print("joints: ", joints)
                 for i, joint in enumerate(joints[0]):
                     #Convert so it saves with comma delimiters within the joint-sets
                     tmp = [joint[0], joint[1], joint[2]]
                     new_entry.append(tmp)
 
-                print("New Entry: ", new_entry)
+                #print("New Entry: ", new_entry[0])
                 joints_file.append(new_entry)
             file_iter += 1
         subdir_iter +=1

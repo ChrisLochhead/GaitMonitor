@@ -16,6 +16,7 @@ import ImageProcessor
 #import Experiment_Functions
 #import File_Decimation
 #import Ensemble
+#import DeepPrivacy
 
 #Torch
 import torch
@@ -40,6 +41,7 @@ def clear_console():
         command = 'cls'
     os.system(command)
    
+
 def run_camera(path="./Images/Instances/", v=0):
     #try:
     camera = capture.Camera()

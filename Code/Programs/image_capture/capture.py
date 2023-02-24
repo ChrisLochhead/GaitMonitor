@@ -13,9 +13,11 @@ import copy
 import File_Decimation
 import datetime
 import csv
+import deep_privacy
 
 break_program = False
-pause_program = False 
+pause_program = False
+save_intrinsics = True 
 
 def on_press(key):
     global break_program
@@ -33,7 +35,6 @@ class Camera:
     def __init__(self, depth = True):
         global break_program
         break_program = False
-
         # Configure depth and color streams
         self.pipeline = rs.pipeline()
         self.file_count = 0
@@ -55,6 +56,7 @@ class Camera:
         self.align = rs.align(rs.stream.color)
 
     def retrieve_image(self):
+        global save_intrinsics
         # Get frameset of color and depth
         frames = self.pipeline.wait_for_frames()
     
@@ -64,16 +66,28 @@ class Camera:
         depth_frame = aligned_frames.get_depth_frame()  # aligned_depth_frame is a 640x480 depth image
         color_frame = aligned_frames.get_color_frame()
 
-        processed_depth_frame = self.dec_filter.process(depth_frame)
-        depth_profile = processed_depth_frame.get_profile()
-        video_profile = depth_profile.as_video_stream_profile()
-        intr = video_profile.get_intrinsics()
-        print("these are the intrinsics: ", intr)
+        if save_intrinsics == True:
+            processed_depth_frame = self.dec_filter.process(depth_frame)
+            depth_profile = processed_depth_frame.get_profile()
+            video_profile = depth_profile.as_video_stream_profile()
+            intr = video_profile.get_intrinsics()
+            print("these are the intrinsics: ", intr)
+            print(intr.width)
+            print(intr.height)
+            print(intr.ppx)
+            print(intr.ppy)
+            print(intr.fx)
+            print(intr.fy)
+            print(intr.model)
+            print(intr.coeffs)
 
-        #Save intrinsics to a .csv file
-        with open("depth_intrinsics.csv","w+", newline='') as my_csv:
-            csvWriter = csv.writer(my_csv,delimiter=',')
-            csvWriter.writerows(intr)
+            intrinsics_array = [intr.width, intr.height, intr.ppx, intr.ppy, intr.fx, intr.fy, intr.model, intr.coeffs]
+            #Save intrinsics to a .csv file
+            with open("depth_intrinsics.csv","w+", newline='') as my_csv:
+                csvWriter = csv.writer(my_csv,delimiter=',')
+                csvWriter.writerow(intrinsics_array)
+
+            save_intrinsics = False
 
         # Convert images to numpy arrays
         depth_img = np.asanyarray(depth_frame.get_data())
