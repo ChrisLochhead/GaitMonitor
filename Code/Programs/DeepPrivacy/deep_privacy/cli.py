@@ -26,7 +26,7 @@ def get_target_paths(source_paths: typing.List[pathlib.Path],
                      target_path: str,
                      default_dir: pathlib.Path):
     if not target_path is None:
-        print("PATH TYPE: ", target_path)
+
         target_path = pathlib.Path(target_path)
         print("PATH TYPE: ", type(target_path))
         if len(source_paths) > 1:
@@ -45,14 +45,14 @@ def get_target_paths(source_paths: typing.List[pathlib.Path],
     target_path = pathlib.Path(default_target_dir)
     target_path.mkdir(exist_ok=True, parents=True)
     target_paths = []
-    print("does it make it")
+
     for source_path in source_paths:
         if source_path.suffix in video_suffix:
             target_path = default_target_dir.joinpath("anonymized_videos")
         else:
             target_path = default_target_dir.joinpath("anonymized_images")
         target_path = target_path.joinpath(source_path.name)
-        print("final target path: ", target_path)
+
         os.makedirs(target_path.parent, exist_ok=True)
         target_paths.append(target_path)
     return target_paths
@@ -136,13 +136,12 @@ def main(source_path = None, output_path = None):
     video_target_paths = []
     if len(video_paths) > 0:
         video_target_paths = get_target_paths(video_paths, output_path,#args.target_path,
+
                                               output_dir)
     image_target_paths = []
     if len(image_paths) > 0:
         print("Getting Here??", len(image_paths))
-        image_target_paths = get_target_paths(
-            image_paths, output_path,#args.target_path,
-            output_dir)
+        image_target_paths = get_target_paths(image_paths, output_path)#args.target_path, output_dir)
     assert len(image_paths) == len(image_target_paths)
     assert len(video_target_paths) == len(video_paths)
     for video_path, video_target_path in zip(video_paths, video_target_paths):
@@ -153,6 +152,7 @@ def main(source_path = None, output_path = None):
     if len(image_paths) > 0:
         print("passing output path: ", pathlib.Path(output_path) )
         anonymizer.anonymize_image_paths(image_paths, [pathlib.Path(output_path)])# image_target_paths)
+
 
 
 if __name__ == "__main__":

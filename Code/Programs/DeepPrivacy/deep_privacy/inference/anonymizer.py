@@ -76,8 +76,7 @@ class Anonymizer:
                 annotation.bbox_XYXY,
                 annotation.keypoints
             )
-            print("making it here? 4", str(new_path))
-            print("save paths: ", save_paths)
+
             cv2.imwrite(str(new_path), anon_im[:, :, ::-1])
             print("Saving to:", new_path)
 

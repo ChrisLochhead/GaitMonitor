@@ -7,6 +7,7 @@ import os
 import csv
 import copy
 import pandas as pd
+
 from ast import literal_eval
 import pyrealsense2 as rs
 
@@ -120,6 +121,7 @@ def make_intrinsics(intrinsics_file = "depth_intrinsics.csv"):
 loaded_intrinsics = make_intrinsics()
 
 def get_3D_coords(coords_2d, dep_img, pts3d_net = True, dilate = True, excl_2D = False ):
+
     pts_3D = []
     orig_dep_img = copy.deepcopy(dep_img)
     kernel = np.ones((6,6), np.uint8)
@@ -145,6 +147,7 @@ def get_3D_coords(coords_2d, dep_img, pts3d_net = True, dilate = True, excl_2D =
             else:
                 pts_3D.append([x, y, result[2]])
             print("returning pts3d net")
+
         else:
             pts_3D.append([x,y, dep_img[(y,x)]])
 
