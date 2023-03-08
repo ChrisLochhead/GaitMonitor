@@ -285,6 +285,7 @@ def run_images(folder_name, exclude_2D = False):
     #Format for the joints file
     #Instance Number: Sequence number: Class : Joint positions 1 - 17
     joints_file = []
+    joints_file_metres = []
 
     for subdir, dirs, files in os.walk(directory):
         if subdir_iter % 5 == 0:
@@ -317,7 +318,8 @@ def run_images(folder_name, exclude_2D = False):
                 #Find corresponding raw image and extract co-ordinates
                 joint_iter = 0
 
-                refined_joints = get_3D_coords(joints_file[file_iter - count_in_directory], dep_image, excl_2D=exclude_2D)
+                refined_joints = get_3D_coords(joints_file[file_iter - count_in_directory], dep_image, excl_2D=False)
+                refined_joints_metres = get_3D_coords(joints_file_metres[file_iter - count_in_directory], dep_image, excl_2D=True)
 
                 #print("what is joints file: ", joints_file[file_iter - count_in_directory])
                 for i, dep_joint in enumerate(refined_joints):
@@ -334,6 +336,7 @@ def run_images(folder_name, exclude_2D = False):
                         #Fix this to record into the right place and then you are done
                         dep_joint = [dep_joint[0], dep_joint[1], zDepth]#[int(dep_joint[0]), int(dep_joint[1]), int(zDepth)]
                         joints_file[file_iter - count_in_directory][i] = dep_joint
+                        joints_file_metres[file_iter - count_in_directory][i] = refined_joints_metres[i]
 
 
             else:
@@ -350,6 +353,7 @@ def run_images(folder_name, exclude_2D = False):
                     new_entry.append(tmp)
 
                 joints_file.append(new_entry)
+                joints_file_metres.append(new_entry)
             file_iter += 1
         subdir_iter +=1
         file_iter = 0
@@ -362,7 +366,7 @@ def run_images(folder_name, exclude_2D = False):
     else:
         with open("gait_dataset_metres.csv","w+", newline='') as my_csv:
             csvWriter = csv.writer(my_csv,delimiter=',')
-            csvWriter.writerows(joints_file)
+            csvWriter.writerows(joints_file_metres)
 
 
 def main():
