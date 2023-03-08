@@ -27,13 +27,14 @@ def anonymize_images(input_folder = 'Images\\CameraTest', output_folder = 'Image
         dirs.sort(key=numericalSort)
         for file_iter, file in enumerate(sorted(files, key = numericalSort)):
             tmp = [input_folder, subdir, file]
-            #output_subfolder = subdir.split('\\')[-1]
-            #if os.path.exists(output_folder + "\\" + output_subfolder) == False:
-            #    print("Trying to make: ", output_folder + "\\" + output_subfolder)
-            #    os.makedirs(output_folder + "\\" + output_subfolder, exist_ok=True)
-            #    output_folder = output_folder + "\\" + output_subfolder
-            print("processing file: ", os.path.join(*tmp), "outputting to : ", output_folder)
-            cli.main(os.path.join(*tmp), output_folder)
+            output_subfolder = subdir.split('\\')[-1]
+            print("OUTPUT SUBFOLDER IS: ", output_folder)
+            if os.path.exists(output_folder + "\\" + output_subfolder) == False:
+                print("Trying to make: ", output_folder + "\\" + output_subfolder)
+                os.makedirs(output_folder + "\\" + output_subfolder, exist_ok=True)
+            file_destination = output_folder + "\\" + output_subfolder + "\\" + file
+            print("processing file: ", os.path.join(*tmp), "outputting to : ", file_destination)
+            cli.main(os.path.join(*tmp), file_destination)
 
 
     #cli.main(input_folder, output_folder)

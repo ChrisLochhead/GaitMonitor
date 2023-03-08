@@ -6,6 +6,7 @@ import csv
 import os 
 import csv
 import copy
+import pandas as pd
 from ast import literal_eval
 import pyrealsense2 as rs
 
@@ -118,7 +119,7 @@ def make_intrinsics(intrinsics_file = "depth_intrinsics.csv"):
 
 loaded_intrinsics = make_intrinsics()
 
-def get_3D_coords(coords_2d, dep_img, pts3d_net = True, dilate = True ):
+def get_3D_coords(coords_2d, dep_img, pts3d_net = True, dilate = True, excl_2D = False ):
     pts_3D = []
     orig_dep_img = copy.deepcopy(dep_img)
     kernel = np.ones((6,6), np.uint8)
@@ -139,9 +140,13 @@ def get_3D_coords(coords_2d, dep_img, pts3d_net = True, dilate = True ):
 
         if pts3d_net == True:
             result = rs.rs2_deproject_pixel_to_point(loaded_intrinsics, [x, y], dep_img[y, x])
-            pts_3D.append([-result[0], -result[1], result[2]])
+            if excl_2D == False:
+                pts_3D.append([-result[0], -result[1], result[2]])
+            else:
+                pts_3D.append([x, y, result[2]])
+            print("returning pts3d net")
         else:
-            pts_3D.append(x,y, dep_img[(y,x)])
+            pts_3D.append([x,y, dep_img[(y,x)]])
 
     return pts_3D
 
@@ -198,13 +203,66 @@ def run_image(image_name, single = True, save = False, directory = None, model= 
 
     return image, joints
 
+def draw_joints_on_frame(frame, joints, use_depth_as_colour = False):
+    for joint in joints:
+        #0 is X, Y is 1, 2 is confidence.
+        if use_depth_as_colour == False:
+            frame = cv2.circle(frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(0, 0, 255), thickness=4)
+        else:
+            frame = cv2.circle(frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(150, 100, joint[2]), thickness=4)
+    
+    return frame
+
+def run_depth_sample(folder_name, joints_info):
+    #get joints info: 
+    joint_dataframe = pd.read_csv(joints_info)
+    print(joint_dataframe.head())
+
+    #Transform into array 
+    depth_array = joint_dataframe.to_numpy()
+    
+
+    directory = os.fsencode(folder_name)
+    for subdir, dirs, files in os.walk(directory):
+    #print("new subdir: ", subdir)
+        for i, file in enumerate(files):
+            file_name = os.fsdecode(file)
+            sub_dir = os.fsdecode(subdir)
+            print("Sub directory: ", sub_dir, " Instance: ", i)
+            
+            #display with openCV original image, overlayed with corresponding joints
+            raw_image = cv2.imread(sub_dir + "/" + file_name, cv2.IMREAD_COLOR)
+            joint_set = depth_array[i]
+            initial_joint_image = draw_joints_on_frame(raw_image, joint_set)
+            cv2.imshow('image with raw joints',initial_joint_image)
+            cv2.waitKey(0) & 0xff
+
+            #Apply depth changes to data, firstly with 2d images using z as colour
+
+            refined_joint_set = get_3D_coords(joint_set, raw_image, excl_2D=True)
+            refined_joint_image = draw_joints_on_frame(raw_image, refined_joint_set, use_depth_as_colour=True)
+            cv2.imshow('image with refined joints (excl 2D)',refined_joint_image)
+            cv2.waitKey(0) & 0xff
+
+
+            #display again with 3d positions including altered X and Y
+            final_joint_set = get_3D_coords(joint_set, raw_image, excl_2D=True)
+            final_joint_image = draw_joints_on_frame(raw_image, final_joint_set, use_depth_as_colour=True)
+            cv2.imshow('image with refined joints (incl 2D)',final_joint_image)
+            cv2.waitKey(0) & 0xff
+
+            #out_directory = "./example_imgs/"
+            #os.makedirs(out_directory, exist_ok=True)
+
+            
+    directory = os.fsencode(folder_name)
 def run_images(folder_name):
     directory = os.fsencode(folder_name)
     #print("initialising model")
     model = SimpleHigherHRNet(48, 17, "./weights/pose_higher_hrnet_w48_640.pth")
     #print("model built")
     file_iter = 0
-    subdir_iter = 0
+    subdir_iter = 1
     data_class = 0
     #Format for the joints file
     #Instance Number: Sequence number: Class : Joint positions 1 - 17
@@ -212,8 +270,11 @@ def run_images(folder_name):
 
     for subdir, dirs, files in os.walk(directory):
         #print("new subdir: ", subdir)
-        if subdir_iter % 10 == 0:
+        if subdir_iter % 5 == 0:
             data_class += 1
+            if data_class > 3:
+                data_class = 1
+
 
         first_depth = True
         count_in_directory = 0
@@ -228,6 +289,7 @@ def run_images(folder_name):
             
             os.makedirs(out_directory, exist_ok=True)
 
+            #Once depth file has been found
             if file_name[0] == 'd':
                 if first_depth == True:
                     count_in_directory = file_iter
@@ -289,13 +351,14 @@ def run_images(folder_name):
         file_iter = 0
     #Save to .csv
     print("SAVING")
-    with open("example_dataset.csv","w+", newline='') as my_csv:
+    with open("depth_dataset.csv","w+", newline='') as my_csv:
         csvWriter = csv.writer(my_csv,delimiter=',')
         csvWriter.writerows(joints_file)
 
 
 def main():
-    run_images("./Images")
+    #run_images("./Images")
+    run_depth_sample("./DepthExamples", "depth_examples.csv")
     #run_video()
 if __name__ == '__main__':
     #Main menu
