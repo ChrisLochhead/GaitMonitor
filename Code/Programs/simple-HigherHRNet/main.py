@@ -7,6 +7,7 @@ import os
 import csv
 import copy
 import pandas as pd
+from array import array
 
 from ast import literal_eval
 import pyrealsense2 as rs
@@ -219,15 +220,22 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False):
 def run_depth_sample(folder_name, joints_info):
     #get joints info: 
     joint_dataframe = pd.read_csv(joints_info)
-    print(joint_dataframe.head())
+    #Drop metadata
+    joint_dataframe = joint_dataframe.iloc[:,3:]
 
     #Transform into array 
     depth_array = joint_dataframe.to_numpy()
-    
+
+    #Convert to ints from strings
+    for i, row in enumerate(depth_array):
+        for j, value in enumerate(row):
+            print("correct?", value)
+            depth_array[i, j] = literal_eval(depth_array[i, j])
+
 
     directory = os.fsencode(folder_name)
     for subdir, dirs, files in os.walk(directory):
-    #print("new subdir: ", subdir)
+        print("new subdir: ", subdir)
         for i, file in enumerate(files):
             file_name = os.fsdecode(file)
             sub_dir = os.fsdecode(subdir)
@@ -241,7 +249,6 @@ def run_depth_sample(folder_name, joints_info):
             cv2.waitKey(0) & 0xff
 
             #Apply depth changes to data, firstly with 2d images using z as colour
-
             refined_joint_set = get_3D_coords(joint_set, raw_image, excl_2D=True)
             refined_joint_image = draw_joints_on_frame(raw_image, refined_joint_set, use_depth_as_colour=True)
             cv2.imshow('image with refined joints (excl 2D)',refined_joint_image)
@@ -259,6 +266,8 @@ def run_depth_sample(folder_name, joints_info):
 
             
     directory = os.fsencode(folder_name)
+
+    
 def run_images(folder_name):
     directory = os.fsencode(folder_name)
     #print("initialising model")
