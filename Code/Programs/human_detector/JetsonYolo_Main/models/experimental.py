@@ -8,7 +8,8 @@ import torch.nn as nn
 #from hallwayprograms.human_detector.JetsonYolo_Main.utils.google_utils import attempt_download
 from common import Conv, DWConv
 from google_utils import attempt_download
-from models.yolo import Detect, Model
+#from yolo import Detect, Model
+import yolo
 #from models.common import Conv, DWConv
 #from utils.google_utils import attempt_download
 
@@ -123,7 +124,7 @@ def attempt_load(weights, map_location=None, inplace=True):
         model.append(ckpt['ema' if ckpt.get('ema') else 'model'].float().fuse().eval())  # FP32 model
     # Compatibility updates
     for m in model.modules():
-        if type(m) in [nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU, Detect, Model]:
+        if type(m) in [nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU, yolo.Detect, yolo.Model]:
             m.inplace = inplace  # pytorch 1.7.0 compatibility
         elif type(m) is Conv:
             m._non_persistent_buffers_set = set()  # pytorch 1.6.0 compatibility

@@ -33,6 +33,7 @@ cuda with gpu: pip install torch===1.7.0 torchvision===0.8.1 torchaudio===0.7.0 
 pip install scikit-learn
 pip install statsmodels
 pip install pydrive
+pip install mrcnn
 
 #Reference for this library 
 @misc{matterport_maskrcnn_2017,

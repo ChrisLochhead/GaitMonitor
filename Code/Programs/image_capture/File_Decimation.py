@@ -102,8 +102,6 @@ def decimate(path = './Images/CameraTest'):
             #delete folder
             delete_folder(folder_names[i])
             
-    print("made it out of the loop?")  
-    
 
 def delete_folder(index, path = './Images/CameraTest/'):
     deletion_folder = str(path + str(index))

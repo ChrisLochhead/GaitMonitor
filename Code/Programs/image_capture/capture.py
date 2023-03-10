@@ -13,7 +13,7 @@ import copy
 import File_Decimation
 import datetime
 import csv
-import deep_privacy
+#import deep_privacy
 
 break_program = False
 pause_program = False

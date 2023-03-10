@@ -19,8 +19,6 @@ joint_connections = [[15, 13], [13, 11], [16, 14], [14, 12], [11, 12], [5, 11], 
 
 def save(joints):
     # open the file in the write mode
-    #f = open('image_data.csv', 'w')
-
     with open('image_data.csv', 'w', newline='') as outfile:
         writer = csv.writer(outfile)
 
@@ -30,8 +28,7 @@ def save(joints):
                 list = in_joint.flatten().tolist()
                 row = [ round(elem, 4) for elem in list ]
                 writer.writerow(row)
-    # close the file
-    #f.close()
+
 
 def load(file = "image_data.csv"):
     joints = []
@@ -46,14 +43,12 @@ def load(file = "image_data.csv"):
     #Convert to 2D array 
     joints = dataset.to_numpy()
     #Print array to check
-    print("these are the joints\n", joints)
     return joints
 
 def convert_to_literals(data):
     for i,  (index, row) in enumerate(data.iterrows()):
         for col_index, col in enumerate(row):
             if col_index >= 3:
-                print("converting: ", row[col_index])
                 tmp = ast.literal_eval(row[col_index])
                 data.iat[i, col_index] = copy.deepcopy(tmp)
             else:
@@ -206,10 +201,10 @@ def test_loader(directory = "./Images"):
             #display with openCV original image, overlayed with corresponding joints
             raw_image = cv2.imread(sub_dir + "/" + file_name, cv2.IMREAD_COLOR)
             #i - 2 because iter starts at 1, and the first empty subdir also counts as 1.
-            print("these are the joints: ", joints[joint_iter])
             render_joints(raw_image, joints[joint_iter], delay = True, use_depth = True)
             joint_iter += 1
         subdir_iter += 1
+        #Debug
         if subdir_iter >= 4:
             break
 
@@ -384,7 +379,6 @@ def run_images(folder_name, exclude_2D = False):
             
             if len(joints) > 0:
                 refined_joints, refined_joints_metres = get_3D_coords(joints[0], dep_image, meta_data=0)
-                print("found refined joints no: ", len(refined_joints))
             else:
                 refined_joints = [ [0,0,0] for _ in range(17) ]
                 refined_joints_metres = [ [0,0,0] for _ in range(17) ]
@@ -397,17 +391,18 @@ def run_images(folder_name, exclude_2D = False):
                 tmp = [joint[0], joint[1], joint[2]]
                 new_entry.append(tmp)
 
-            print("full completed depth joints: ", new_entry)
-            render_joints(corr_image, new_entry[3:], delay=True, use_depth=True)
+            #print("full completed depth joints: ", new_entry)
+            render_joints(corr_image, new_entry[3:], delay=False, use_depth=True)
             
             joints_file.append(new_entry)
             joints_file_metres.append(new_entry)
 
             file_iter += 1
         subdir_iter +=1
-        if subdir_iter >= 4:
-            print("BREAKING")
-            break
+        #Debug
+        #if subdir_iter >= 4:
+        #    print("BREAKING")
+        #    break
         file_iter = 0
     #Save to .csv
     print("SAVING")
@@ -421,9 +416,106 @@ def run_images(folder_name, exclude_2D = False):
         csvWriter.writerows(joints_file_metres)
 
 
+
+def render_joints(image, joints, delay = False, use_depth = True):
+    tmp_image = copy.deepcopy(image)
+    tmp_image = draw_joints_on_frame(tmp_image, joints, use_depth_as_colour=use_depth)
+    cv2.imshow('joint Image',tmp_image)
+
+    cv2.setMouseCallback('joint Image', click_event, tmp_image)
+    if delay:
+        cv2.waitKey(0) & 0xff
+        
+def draw_joints_on_frame(frame, joints, use_depth_as_colour = False):
+
+    tmp_frame = copy.deepcopy(frame)
+    tmp_joints = copy.deepcopy(joints)
+
+    for joint in tmp_joints:
+
+        if isinstance(joint, int):
+            continue
+        #0 is X, Y is 1, 2 is confidence.
+
+        #Clamp joints within frame size
+        
+        if joint[0] >= 240:
+            joint[0] = 239
+        if joint[1] >= 424:
+            joint[1] = 423
+            
+        if use_depth_as_colour == False:
+            tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(0, 0, 255), thickness=4)
+        else:
+            tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(150, 100, joint[2]), thickness=4)
+        #break
+    return tmp_frame
+
+def click_event(event, x, y, flags, params):
+  
+    # checking for left mouse clicks
+    if event == cv2.EVENT_LBUTTONDOWN:
+        # displaying the coordinates
+        print(x, ' ', y)
+    if event == cv2.EVENT_RBUTTONDOWN:
+        quit()
+
+        
+#Unravelled_data is proper joints
+#load in proper images
+#debug to make these functions work 
+
+#Add function to outline velocity change by drawing arrow based on velocity of -1 and +1 frame
+
+def plot_velocity_vectors(image, joints_current, joint_next):
+    
+    print("this should be 17-20: ", len(joints_current), len(joints_next))
+    
+    #-3 to account for metadata at front
+    for i in range(0, len(joints_current)-3)
+        image = cv2.arrowedLine(image, joints_current[i], joint_next[i],
+                                             (0,255,0), 4) 
+
+    # Displaying the image 
+    cv2.imshow(window_name, image) 
+    
+    
+############################################################ Draw velocity vectors here ##################
+occlusion_box = [0,1,0,5]
+
+def check_interception(occlusion_box, joint):
+    #X-axis collision
+    if joint[0] > occlusion_box[0] and joint[0] < occlusion_box[1]:
+        #Y-axis collision
+        if joint[1] > occlusion_box[2] and joint[1] < occlusion_box[3]:
+            return True
+    
+    return False
+
+def get_connected_joint(joint_index):
+    for j_connection in joint_connections:
+        if joint_index == j_connection[0]:
+            return j_connection[1]
+        elif joint_index == j_connection[1]:
+            return j_connection[0]
+        
+#Get background to find box co-ordinates of couch for occlusion
+def compensate_depth_occlusion(occlusion_box, joints):
+        for index, row in joints.iterrows():
+            for joint_index, joint in enumerate(row):
+                if check_interception(occlusion_box, joint) == True:
+                    #Reassign this depth value to nearest connected joint
+                    #TODO
+                    #make renderjoints work, need to import corresponding image or just black frame?
+                    render_joints(image, joints, delay = True, use_depth = True):
+                    joints.iloc[index, joint_index][2] = row[get_connected_joint(joint_index)][2]
+                    render_joints(image, joints, delay = True, use_depth = True):
+            
+
+
 def main():
-    #run_images("./Images")
-    test_loader()
+    run_images("./Images")
+    #test_loader()
     #run_images("./Images", exclude_2D=False)
     #run_depth_sample("./DepthExamples", "depth_examples.csv")
     #run_video()

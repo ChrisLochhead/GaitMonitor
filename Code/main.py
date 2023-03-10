@@ -10,13 +10,7 @@ import datetime
 import init_directories
 import capture
 import ImageProcessor
-#from Utilities import remove_block_images, remove_background_images, generate_labels, unravel_FFGEI, create_HOGFFGEI, generate_instance_lengths, extract_ttest_metrics, create_contingency_table
-#import GEI
-#import LocalResnet
-#import Experiment_Functions
-#import File_Decimation
-#import Ensemble
-#import DeepPrivacy
+import File_Decimation
 
 #Torch
 import torch
@@ -86,6 +80,10 @@ def on_press(key):
                 main()
 
         if key.char == '2':
+            if current_menu == 0:
+                print("decimating images")
+                File_Decimation.decimate("./Programs/simple-HigherHRNet/Images")
+                print("Images decimated")
             if current_menu == 2:
                 if selected_function == 0:
                     capture_paused = run_camera(v=1)
@@ -128,6 +126,7 @@ Select one of the following options:
 REGULAR FUNCTIONS
          
 1. Activate Camera
+2. Decimate Selected Files
 9. Quit"""
 
 

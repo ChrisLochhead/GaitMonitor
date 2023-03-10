@@ -10,4 +10,6 @@ sys.path.append(inletPath + "/Programs/image_capture")
 sys.path.append(inletPath + "/Programs/image_processing")
 sys.path.append(inletPath + "/Programs/mask_network/Mask_RCNN/samples")
 sys.path.append(inletPath + "/Programs/Resnet")
+
+#Needs newer version of tensorboard than PhD project environment can handle
 sys.path.append(inletPath + "/Programs/DeepPrivacy")

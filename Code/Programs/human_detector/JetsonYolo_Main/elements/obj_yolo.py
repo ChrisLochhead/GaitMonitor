@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 from experimental import attempt_load
 from general import non_max_suppression
-from models.yolo import Detect, Model
+#from models.yolo import Detect, Model
 import time
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
