@@ -13,8 +13,52 @@ import ast
 from ast import literal_eval
 import pyrealsense2 as rs
 
-joint_connections = [[15, 13], [13, 11], [16, 14], [14, 12], [11, 12], [5, 11], [6, 12], [5, 6], [5, 7],
-[6, 8], [7, 9], [8, 10], [1, 2], [0, 1], [0, 2], [1, 3], [2, 4], [0, 5], [0, 6]]
+'''order of joints:
+
+0,1,2 are meta data:
+
+actual: Format
+0: nose
+1: left eye
+2: right eye
+3: left ear
+4: right ear
+5: left shoulder
+6: right shoulder
+7: left elbow
+8: right elbow
+9: left hand
+10: right hand
+11: left hip
+12: right hip
+13: left knee 
+14:right knee 
+15: left foot 
+16: right foot
+
+No chest (fs)
+'''         
+#left foot - left knee, left knee - left hip,
+#right foot - right knee, right knee - right hip
+#left hip - origin, right hip - origin,
+
+# left hand - left elbow, left elbow - left shoulder, 
+# right hand - right elbow, right elbow - right shoulder, 
+# left shoulder - origin, right shoulder - origin
+
+#left ear - left eye
+#right ear - right eye
+#left eye - origin, left eye - origin 
+
+joint_connections = [[15, 13], [13, 11], # left foot to hip 
+                     [16, 14], [14, 12], # right foot to hip
+                     [11, 0], [12, 0], # hips to origin
+                     [9, 7], [7, 5], # left hand to shoulder
+                     [10, 8], [6, 8], #right hand to shoulder
+                     [5, 0], [6, 0], # Shoulders to origin
+                     [1, 3], [2, 4], # ears to eyes
+                     [3, 0], [4, 0]]# Eyes to origin
+
 
 
 def save(joints):
@@ -392,7 +436,7 @@ def run_images(folder_name, exclude_2D = False):
                 new_entry.append(tmp)
 
             #print("full completed depth joints: ", new_entry)
-            render_joints(corr_image, new_entry[3:], delay=False, use_depth=True)
+            render_joints(corr_image, new_entry[3:], delay=True, use_depth=True)
             
             joints_file.append(new_entry)
             joints_file_metres.append(new_entry)
@@ -431,6 +475,16 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False):
     tmp_frame = copy.deepcopy(frame)
     tmp_joints = copy.deepcopy(joints)
 
+    for joint_pair in joint_connections:
+            #Draw links between joints
+            tmp_a = tmp_joints[joint_pair[1] + 3]
+            tmp_b = tmp_joints[joint_pair[0] + 3]
+            start = [int(float(tmp_a[1])), int(float(tmp_a[0]))]
+            end = [int(float(tmp_b[1])), int(float(tmp_b[0]))]
+
+            cv2.line(tmp_frame, start, end, color = (0,255,0), thickness = 2) 
+
+
     for joint in tmp_joints:
 
         if isinstance(joint, int):
@@ -448,7 +502,8 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False):
             tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(0, 0, 255), thickness=4)
         else:
             tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(150, 100, joint[2]), thickness=4)
-        #break
+       # break
+
     return tmp_frame
 
 def click_event(event, x, y, flags, params):
@@ -467,54 +522,92 @@ def click_event(event, x, y, flags, params):
 
 #Add function to outline velocity change by drawing arrow based on velocity of -1 and +1 frame
 
-def plot_velocity_vectors(image, joints_current, joint_next):
+def plot_velocity_vectors(image, joints_current, joints_next):
     
     print("this should be 17-20: ", len(joints_current), len(joints_next))
     
     #-3 to account for metadata at front
-    for i in range(0, len(joints_current)-3)
-        image = cv2.arrowedLine(image, joints_current[i], joint_next[i],
+    for i in range(3, len(joints_current)):
+        image = cv2.arrowedLine(image, joints_current[i], joints_next[i],
                                              (0,255,0), 4) 
 
     # Displaying the image 
-    cv2.imshow(window_name, image) 
+    cv2.imshow("velocity vector", image) 
     
     
 ############################################################ Draw velocity vectors here ##################
-occlusion_box = [0,1,0,5]
+## couch coords topleft.x, topleft.y, 2 boxes
+occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
 
-def check_interception(occlusion_box, joint):
+def check_interception(occlusion_boxes, joint):
     #X-axis collision
-    if joint[0] > occlusion_box[0] and joint[0] < occlusion_box[1]:
-        #Y-axis collision
-        if joint[1] > occlusion_box[2] and joint[1] < occlusion_box[3]:
-            return True
+    for occlusion_box in occlusion_boxes:
+        #print("joint: ", joint[0], "box: ", occlusion_box[0])
+        if joint[0] > occlusion_box[0] and joint[0] < occlusion_box[2]:
+            #Y-axis collision
+            if joint[1] > occlusion_box[1] and joint[1] < occlusion_box[3]:
+                return True
     
     return False
 
 def get_connected_joint(joint_index):
     for j_connection in joint_connections:
         if joint_index == j_connection[0]:
+            print("found connection: 0", j_connection,  joint_index )
             return j_connection[1]
         elif joint_index == j_connection[1]:
+            print("found connection: 1", j_connection,  joint_index )
             return j_connection[0]
         
 #Get background to find box co-ordinates of couch for occlusion
-def compensate_depth_occlusion(occlusion_box, joints):
-        for index, row in joints.iterrows():
-            for joint_index, joint in enumerate(row):
-                if check_interception(occlusion_box, joint) == True:
-                    #Reassign this depth value to nearest connected joint
-                    #TODO
-                    #make renderjoints work, need to import corresponding image or just black frame?
-                    render_joints(image, joints, delay = True, use_depth = True):
-                    joints.iloc[index, joint_index][2] = row[get_connected_joint(joint_index)][2]
-                    render_joints(image, joints, delay = True, use_depth = True):
-            
+def compensate_depth_occlusion(occlusion_boxes, joints, folder ='./Images'):
+        
+        #Black frame for debug
+        blank_frame = np.zeros((424, 240, 3), dtype= np.uint8)
+        #Load images: 
+        image_data = []
+        directory = os.fsencode(folder)
+        for subdir_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
+            #Ignore base folder and instance 1 (not in dataset)
+            if subdir_iter >= 1:
+                for i, file in enumerate(files):
+                    file_name = os.fsdecode(file)
+                    sub_dir = os.fsdecode(subdir)
+                    
+                    #display with openCV original image, overlayed with corresponding joints
+                    raw_image = cv2.imread(sub_dir + "/" + file_name, cv2.IMREAD_COLOR)
+                    image_data.append(raw_image)
 
+            if subdir_iter >= 5:
+                break
+
+        for index, row in enumerate(joints):
+            intercept_check_count = 0
+            print("before correcting joints")
+            render_joints(image_data[index], row, delay = True, use_depth = True)      
+            for joint_index, joint in enumerate(row):
+                #Ignore metadata
+                if joint_index >= 3:
+                    #Check interception between this x coord and the y coord next in line
+                    if check_interception(occlusion_boxes, joint) == True:
+                        intercept_check_count += 1
+                        print("this joint is connected to: ", row[get_connected_joint(joint_index-3)], "with index: ", get_connected_joint(joint_index-3), "connects to: ", joint_index-3)
+                        #Reassign this depth value to nearest connected joint
+                        #make renderjoints work, need to import corresponding image or just black frame?
+
+                        joints[index][joint_index][2] = row[get_connected_joint(joint_index-3)][2]
+            
+            #New after all occluded joints corrected
+            print("after correcting joints: ", intercept_check_count)
+            render_joints(image_data[index], row, delay = True, use_depth = True)
+
+def apply_joint_occlusion(file):
+    dataset = load(file)
+    compensate_depth_occlusion(occlusion_boxes, dataset)          
 
 def main():
-    run_images("./Images")
+    #run_images("./Images")
+    apply_joint_occlusion("gait_dataset_pixels.csv")
     #test_loader()
     #run_images("./Images", exclude_2D=False)
     #run_depth_sample("./DepthExamples", "depth_examples.csv")
