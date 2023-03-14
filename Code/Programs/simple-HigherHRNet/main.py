@@ -9,6 +9,7 @@ import copy
 import pandas as pd
 from array import array
 import ast
+import operator
 
 from ast import literal_eval
 import pyrealsense2 as rs
@@ -58,6 +59,9 @@ joint_connections = [[15, 13], [13, 11], # left foot to hip
                      [5, 0], [6, 0], # Shoulders to origin
                      [1, 3], [2, 4], # ears to eyes
                      [3, 0], [4, 0]]# Eyes to origin
+
+colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','Joint_4','Joint_5','Joint_6','Joint_7',
+    'Joint_8','Joint_9','Joint_10','Joint_11','Joint_12','Joint_13','Joint_14','Joint_15','Joint_16', 'Joint_17'] 
 
 
 
@@ -521,19 +525,126 @@ def click_event(event, x, y, flags, params):
 #debug to make these functions work 
 
 #Add function to outline velocity change by drawing arrow based on velocity of -1 and +1 frame
+def load_images(folder, ignore_depth = True):
+    image_data = []
+    directory = os.fsencode(folder)
+    for subdir_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
+        #Ignore base folder and instance 1 (not in dataset)
+        if subdir_iter >= 1:
+            for i, file in enumerate(files):
+                if i >= len(files) / 2:
+                    break
+                file_name = os.fsdecode(file)
+                sub_dir = os.fsdecode(subdir)
+                
+                #display with openCV original image, overlayed with corresponding joints
+                raw_image = cv2.imread(sub_dir + "/" + file_name, cv2.IMREAD_COLOR)
+                image_data.append(raw_image)
+    
+    return image_data
 
-def plot_velocity_vectors(image, joints_current, joints_next):
+def get_unit_vector(vector):
+
+    magnitude = np.sqrt((vector[0]**2) + (vector[1]**2) + (vector[2]**2))
+    if magnitude == 0:
+        magnitude = 1
+
+    unit_vector = [vector[0] / magnitude, vector[1] / magnitude, vector[2] / magnitude]
+    return unit_vector
+
+def add_lists(list1, list2, change_type = False):
+    return list((np.array(list1) + np.array(list2)).astype(int))
+
+def list_to_arrays(my_list):
+    for i, l in enumerate(my_list):
+        if isinstance(l, list):
+            my_list[i] = np.array(l)
+
+    return my_list
+
+def subtract_lists(list1, list2):
+    result = np.subtract(list1, list2)
+    return list(result)
+
+def divide_lists(list1, list2, n):
+    return list((np.array(list1) + np.array(list2))/n)
+
+def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, debug = False):
     
-    print("this should be 17-20: ", len(joints_current), len(joints_next))
-    
+    #Add meta data to the start of the row
+    joint_velocities = [joints_current[0], joints_current[1], joints_current[2]]
+
+    #Convert to numpy arrays instead of lists
+    joints_previous = list_to_arrays(joints_previous)
+    joints_current = list_to_arrays(joints_current)
+    joints_next = list_to_arrays(joints_next)
+
     #-3 to account for metadata at front
     for i in range(3, len(joints_current)):
-        image = cv2.arrowedLine(image, joints_current[i], joints_next[i],
-                                             (0,255,0), 4) 
+        if len(joints_next) > 1:
+            direction_vector_after = subtract_lists(joints_next[i], joints_current[i])
+            #Unit vector
+            unit_vector_after = get_unit_vector(direction_vector_after)
+            end_point_after = [joints_current[i][0] + (unit_vector_after[0]), joints_current[i][1] + (unit_vector_after[1]), joints_current[i][2] + (unit_vector_after[2])]
+            direction_after = subtract_lists(end_point_after, [joints_current[i][0], joints_current[i][1], joints_current[i][2]])
 
-    # Displaying the image 
-    cv2.imshow("velocity vector", image) 
-    
+        else:
+            direction_after = [0,0,0]
+
+        if len(joints_previous) > 1:
+            direction_vector_before = subtract_lists(joints_previous[i], joints_current[i])
+            #Unit vector
+            unit_vector_before = get_unit_vector(direction_vector_before)
+            end_point_before = [joints_current[i][0] + (unit_vector_before[0]), joints_current[i][1] + (unit_vector_before[1]), joints_current[i][2] + (unit_vector_before[2])]
+            direction_before = subtract_lists([joints_current[i][0], joints_current[i][1], joints_current[i][2]], end_point_before)
+        else:
+            direction_before = [0,0,0]
+
+
+
+        if len(joints_previous) > 0 and len(joints_next) > 0:
+            smoothed_direction = divide_lists(direction_after, direction_before, 2) 
+        else:
+            smoothed_direction = direction_after + direction_before
+
+
+        if debug:
+            image_direction = [int((smoothed_direction[1] * 40) + joints_current[i][1]),  int((smoothed_direction[0] * 40) + joints_current[i][0])]
+
+            image = cv2.arrowedLine(image, [int(joints_current[i][1]), int(joints_current[i][0])] , image_direction,
+                                            (0,255,0), 4) 
+
+        joint_velocities.append(smoothed_direction)
+
+    if debug:
+        # Displaying the image 
+        cv2.imshow("velocity vector", image) 
+        cv2.setMouseCallback("velocity vector", click_event, image)
+        cv2.waitKey(0) & 0xff
+
+    return joint_velocities
+
+def run_velocity_debugger(folder, jointfile, save = False):
+        
+        joint_data = load(jointfile)
+        image_data = load_images(folder)
+        
+        velocity_dataset = []
+        for i, joints in enumerate(joint_data):
+            if i+1 < len(joint_data) and i > 0:
+                print("this is average image: ", i)
+                velocity_dataset.append(plot_velocity_vectors(image_data[i], joint_data[i - 1], joints, joint_data[i + 1]))
+            elif i+1 < len(joint_data) and i <= 0:
+                print("this is the first image: ", i)
+                velocity_dataset.append(plot_velocity_vectors(image_data[i], [0], joints, joint_data[i + 1]))
+            elif i+1 >= len(joint_data) and i > 0:
+                print("this is the last image: ")
+                velocity_dataset.append(plot_velocity_vectors(image_data[i], joint_data[i - 1], joints, [0]))
+        
+        new_dataframe = pd.DataFrame(velocity_dataset, columns = colnames)
+        if save:
+                #Convert to dataframe 
+            new_dataframe.to_csv("Velocity.csv",index=False, header=False)
     
 ############################################################ Draw velocity vectors here ##################
 ## couch coords topleft.x, topleft.y, 2 boxes
@@ -560,54 +671,50 @@ def get_connected_joint(joint_index):
             return j_connection[0]
         
 #Get background to find box co-ordinates of couch for occlusion
-def compensate_depth_occlusion(occlusion_boxes, joints, folder ='./Images'):
+def compensate_depth_occlusion(occlusion_boxes, joints, folder ='./Images', debug = False):
         
-        #Black frame for debug
-        blank_frame = np.zeros((424, 240, 3), dtype= np.uint8)
-        #Load images: 
-        image_data = []
-        directory = os.fsencode(folder)
-        for subdir_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
-            #Ignore base folder and instance 1 (not in dataset)
-            if subdir_iter >= 1:
-                for i, file in enumerate(files):
-                    file_name = os.fsdecode(file)
-                    sub_dir = os.fsdecode(subdir)
-                    
-                    #display with openCV original image, overlayed with corresponding joints
-                    raw_image = cv2.imread(sub_dir + "/" + file_name, cv2.IMREAD_COLOR)
-                    image_data.append(raw_image)
+    #Load images: 
+    if debug:
+        image_data = load_images(folder)
 
-            if subdir_iter >= 5:
-                break
-
-        for index, row in enumerate(joints):
-            intercept_check_count = 0
+    for index, row in enumerate(joints):
+        intercept_check_count = 0
+        print("instance: ", index)
+        if debug:
             print("before correcting joints")
             render_joints(image_data[index], row, delay = True, use_depth = True)      
-            for joint_index, joint in enumerate(row):
-                #Ignore metadata
-                if joint_index >= 3:
-                    #Check interception between this x coord and the y coord next in line
-                    if check_interception(occlusion_boxes, joint) == True:
+        for joint_index, joint in enumerate(row):
+            #Ignore metadata
+            if joint_index >= 3:
+                #Check interception between this x coord and the y coord next in line
+                if check_interception(occlusion_boxes, joint) == True:
+                    if debug:
                         intercept_check_count += 1
                         print("this joint is connected to: ", row[get_connected_joint(joint_index-3)], "with index: ", get_connected_joint(joint_index-3), "connects to: ", joint_index-3)
-                        #Reassign this depth value to nearest connected joint
-                        #make renderjoints work, need to import corresponding image or just black frame?
-
-                        joints[index][joint_index][2] = row[get_connected_joint(joint_index-3)][2]
-            
-            #New after all occluded joints corrected
+                    
+                    #Reassign this depth value to nearest connected joint
+                    joints[index][joint_index][2] = copy.deepcopy(row[get_connected_joint(joint_index-3)][2]) 
+        #New after all occluded joints corrected
+        if debug:
             print("after correcting joints: ", intercept_check_count)
             render_joints(image_data[index], row, delay = True, use_depth = True)
+        
+    return joints
 
-def apply_joint_occlusion(file):
+def apply_joint_occlusion(file, save = False, debug = False):
     dataset = load(file)
-    compensate_depth_occlusion(occlusion_boxes, dataset)          
+    occluded_data = compensate_depth_occlusion(occlusion_boxes, dataset, debug=debug) 
+
+    new_dataframe = pd.DataFrame(occluded_data, columns = colnames)
+    if save:
+        #Convert to dataframe 
+        print("SAVING")
+        new_dataframe.to_csv("Gait_Pixel_Dataset_Occluded.csv",index=False, header=False)         
 
 def main():
     #run_images("./Images")
-    apply_joint_occlusion("gait_dataset_pixels.csv")
+    #apply_joint_occlusion("gait_dataset_pixels.csv", save = True, debug=False)
+    run_velocity_debugger("./Images", "gait_dataset_pixels.csv", save= True)
     #test_loader()
     #run_images("./Images", exclude_2D=False)
     #run_depth_sample("./DepthExamples", "depth_examples.csv")
