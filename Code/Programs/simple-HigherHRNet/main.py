@@ -14,6 +14,9 @@ import operator
 from ast import literal_eval
 import pyrealsense2 as rs
 
+from DatasetBuilder.utilities import *
+from DatasetBuilder.demo import *
+
 '''order of joints:
 
 0,1,2 are meta data:
@@ -50,7 +53,7 @@ No chest (fs)
 #left ear - left eye
 #right ear - right eye
 #left eye - origin, left eye - origin 
-
+'''
 joint_connections = [[15, 13], [13, 11], # left foot to hip 
                      [16, 14], [14, 12], # right foot to hip
                      [11, 0], [12, 0], # hips to origin
@@ -63,7 +66,7 @@ joint_connections = [[15, 13], [13, 11], # left foot to hip
 colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','Joint_4','Joint_5','Joint_6','Joint_7',
     'Joint_8','Joint_9','Joint_10','Joint_11','Joint_12','Joint_13','Joint_14','Joint_15','Joint_16', 'Joint_17'] 
 
-
+occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
 
 def save(joints):
     # open the file in the write mode
@@ -93,6 +96,8 @@ def load(file = "image_data.csv"):
     #Print array to check
     return joints
 
+'''
+'''
 def convert_to_literals(data):
     for i,  (index, row) in enumerate(data.iterrows()):
         for col_index, col in enumerate(row):
@@ -103,7 +108,9 @@ def convert_to_literals(data):
                 data.iat[i, col_index] = int(data.iat[i, col_index])
 
     return data
+'''
 
+'''
 def run_video():
     print("initialising model")
     model = SimpleHigherHRNet(32, 17, "./weights/pose_higher_hrnet_w32_512.pth")
@@ -142,10 +149,13 @@ def run_video():
     out.release()
     cv2.destroyAllWindows()
 
+
 def blacken_frame(frame):
     dimensions = (len(frame), len(frame[0]))
     blank_frame = np.zeros((dimensions[0],dimensions[1], 3), dtype= np.uint8)
     return blank_frame
+
+'''
 
 def make_intrinsics(intrinsics_file = "depth_intrinsics.csv"):
         '''
@@ -207,6 +217,8 @@ def get_3D_coords(coords_2d, dep_img, pts3d_net = True, dilate = True, meta_data
 
     return pts_3D, pts_3D_metres
 
+
+'''
 def get_joints_from_frame(model, frame, anonymous = True):
     joints = model.predict(frame)
 
@@ -231,9 +243,8 @@ def get_joints_from_frame(model, frame, anonymous = True):
 
     return frame, joints
 
-def test_loader(directory = "./Images"):
+def load_and_overlay_joints(directory = "./Images"):
     joints = load("gait_dataset_pixels.csv")
-    instance_limit = 2
     subdir_iter = 1
     joint_iter = 0
     for i, (subdir, dirs, files) in enumerate(os.walk(directory)):
@@ -255,6 +266,7 @@ def test_loader(directory = "./Images"):
         #Debug
         if subdir_iter >= 4:
             break
+'''
 
 def run_image(image_name, single = True, save = False, directory = None, model= None, image_no = 0):
     if model == None:
@@ -278,6 +290,7 @@ def run_image(image_name, single = True, save = False, directory = None, model= 
 
     return image, joints
 
+'''
 def draw_joints_on_frame(frame, joints, use_depth_as_colour = False):
 
     tmp_frame = copy.deepcopy(frame)
@@ -302,6 +315,7 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False):
             tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(150, 100, joint[2]), thickness=4)
         #break
     return tmp_frame
+'''
 
 def run_depth_sample(folder_name, joints_info):
     #get joints info: 
@@ -361,6 +375,7 @@ def run_depth_sample(folder_name, joints_info):
             cv2.waitKey(0) & 0xff
 
 
+'''
 def render_joints(image, joints, delay = False, use_depth = True):
     tmp_image = copy.deepcopy(image)
     tmp_image = draw_joints_on_frame(tmp_image, joints, use_depth_as_colour=use_depth)
@@ -379,12 +394,13 @@ def click_event(event, x, y, flags, params):
     if event == cv2.EVENT_RBUTTONDOWN:
         quit()
 
+'''
 
 #Exclude 2D depth coord calculations to just get pixel data and depth value, otherwise it will return actual distances good for ML but
 #not possible to properly display for debugging without re-projecting back to pixel data.
 def run_images(folder_name, exclude_2D = False):
     directory = os.fsencode(folder_name)
-    model = SimpleHigherHRNet(48, 17, "./weights/pose_higher_hrnet_w48_640.pth")
+    model = SimpleHigherHRNet(32, 17, "./weights/pose_higher_hrnet_w32_512.pth")
     file_iter = 0
     subdir_iter = 1
     data_class = 0
@@ -440,7 +456,7 @@ def run_images(folder_name, exclude_2D = False):
                 new_entry.append(tmp)
 
             #print("full completed depth joints: ", new_entry)
-            render_joints(corr_image, new_entry[3:], delay=True, use_depth=True)
+            render_joints(corr_image, new_entry[3:], delay=True, use_depth=True, metadata = 0)
             
             joints_file.append(new_entry)
             joints_file_metres.append(new_entry)
@@ -455,34 +471,36 @@ def run_images(folder_name, exclude_2D = False):
     #Save to .csv
     print("SAVING")
 
-    with open("gait_dataset_pixels.csv","w+", newline='') as my_csv:
+    with open("./EDA/gait_dataset_pixels.csv","w+", newline='') as my_csv:
         csvWriter = csv.writer(my_csv,delimiter=',')
         csvWriter.writerows(joints_file)
 
-    with open("gait_dataset_metres.csv","w+", newline='') as my_csv:
+    with open("./EDA/gait_dataset_metres.csv","w+", newline='') as my_csv:
         csvWriter = csv.writer(my_csv,delimiter=',')
         csvWriter.writerows(joints_file_metres)
 
 
-
-def render_joints(image, joints, delay = False, use_depth = True):
+'''
+def render_joints(image, joints, delay = False, use_depth = True, metadata = 3):
     tmp_image = copy.deepcopy(image)
-    tmp_image = draw_joints_on_frame(tmp_image, joints, use_depth_as_colour=use_depth)
+    tmp_image = draw_joints_on_frame(tmp_image, joints, use_depth_as_colour=use_depth, metadata=metadata)
     cv2.imshow('joint Image',tmp_image)
 
     cv2.setMouseCallback('joint Image', click_event, tmp_image)
     if delay:
         cv2.waitKey(0) & 0xff
-        
-def draw_joints_on_frame(frame, joints, use_depth_as_colour = False):
+'''
+
+'''
+def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 3):
 
     tmp_frame = copy.deepcopy(frame)
     tmp_joints = copy.deepcopy(joints)
 
     for joint_pair in joint_connections:
             #Draw links between joints
-            tmp_a = tmp_joints[joint_pair[1] + 3]
-            tmp_b = tmp_joints[joint_pair[0] + 3]
+            tmp_a = tmp_joints[joint_pair[1] + metadata]
+            tmp_b = tmp_joints[joint_pair[0] + metadata]
             start = [int(float(tmp_a[1])), int(float(tmp_a[0]))]
             end = [int(float(tmp_b[1])), int(float(tmp_b[0]))]
 
@@ -510,14 +528,15 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False):
 
     return tmp_frame
 
-def click_event(event, x, y, flags, params):
-  
-    # checking for left mouse clicks
-    if event == cv2.EVENT_LBUTTONDOWN:
-        # displaying the coordinates
-        print(x, ' ', y)
-    if event == cv2.EVENT_RBUTTONDOWN:
-        quit()
+'''
+#def click_event(event, x, y, flags, params):
+#  
+#    # checking for left mouse clicks
+#    if event == cv2.EVENT_LBUTTONDOWN:
+#        # displaying the coordinates
+#        print(x, ' ', y)
+##    if event == cv2.EVENT_RBUTTONDOWN:
+#        quit()
 
         
 #Unravelled_data is proper joints
@@ -624,7 +643,7 @@ def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, d
 
     return joint_velocities
 
-def run_velocity_debugger(folder, jointfile, save = False):
+def run_velocity_debugger(folder, jointfile, save = False, debug = False):
         
         joint_data = load(jointfile)
         image_data = load_images(folder)
@@ -633,22 +652,22 @@ def run_velocity_debugger(folder, jointfile, save = False):
         for i, joints in enumerate(joint_data):
             if i+1 < len(joint_data) and i > 0:
                 print("this is average image: ", i)
-                velocity_dataset.append(plot_velocity_vectors(image_data[i], joint_data[i - 1], joints, joint_data[i + 1]))
+                velocity_dataset.append(plot_velocity_vectors(image_data[i], joint_data[i - 1], joints, joint_data[i + 1], debug=debug))
             elif i+1 < len(joint_data) and i <= 0:
                 print("this is the first image: ", i)
-                velocity_dataset.append(plot_velocity_vectors(image_data[i], [0], joints, joint_data[i + 1]))
+                velocity_dataset.append(plot_velocity_vectors(image_data[i], [0], joints, joint_data[i + 1], debug=debug))
             elif i+1 >= len(joint_data) and i > 0:
                 print("this is the last image: ")
-                velocity_dataset.append(plot_velocity_vectors(image_data[i], joint_data[i - 1], joints, [0]))
+                velocity_dataset.append(plot_velocity_vectors(image_data[i], joint_data[i - 1], joints, [0], debug=debug))
         
         new_dataframe = pd.DataFrame(velocity_dataset, columns = colnames)
         if save:
                 #Convert to dataframe 
-            new_dataframe.to_csv("Velocity.csv",index=False, header=False)
+            new_dataframe.to_csv("./EDA/Velocity.csv",index=False, header=False)
     
 ############################################################ Draw velocity vectors here ##################
 ## couch coords topleft.x, topleft.y, 2 boxes
-occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
+
 
 def check_interception(occlusion_boxes, joint):
     #X-axis collision
@@ -709,14 +728,25 @@ def apply_joint_occlusion(file, save = False, debug = False):
     if save:
         #Convert to dataframe 
         print("SAVING")
-        new_dataframe.to_csv("Gait_Pixel_Dataset_Occluded.csv",index=False, header=False)         
+        new_dataframe.to_csv("./EDA/Gait_Pixel_Dataset_Occluded.csv",index=False, header=False)         
 
 def main():
-    #run_images("./Images")
-    #apply_joint_occlusion("gait_dataset_pixels.csv", save = True, debug=False)
-    run_velocity_debugger("./Images", "gait_dataset_pixels.csv", save= True)
-    #test_loader()
+
+    #Demonstrate occlusion fixing
+    apply_joint_occlusion("./EDA/gait_dataset_pixels.csv", save = True, debug=True)
+
+    #Draw calculated velocities
+    run_velocity_debugger("./Images", "./EDA/gait_dataset_pixels.csv", save= True, debug=True)
+
+    #Visualize joints overlaying
+    load_and_overlay_joints()
+
+    #Not used
     #run_images("./Images", exclude_2D=False)
+
+    #Vizualize joints overlaying (in real time)
+    #run_images("./Images")
+
     #run_depth_sample("./DepthExamples", "depth_examples.csv")
     #run_video()
 if __name__ == '__main__':
