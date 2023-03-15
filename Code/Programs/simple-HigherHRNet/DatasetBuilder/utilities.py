@@ -14,6 +14,32 @@ import operator
 from ast import literal_eval
 import pyrealsense2 as rs
 
+'''order of joints:
+
+0,1,2 are meta data:
+
+actual: Format
+0: nose
+1: left eye
+2: right eye
+3: left ear
+4: right ear
+5: left shoulder
+6: right shoulder
+7: left elbow
+8: right elbow
+9: left hand
+10: right hand
+11: left hip
+12: right hip
+13: left knee 
+14:right knee 
+15: left foot 
+16: right foot
+
+No chest
+'''   
+
 joint_connections = [[15, 13], [13, 11], # left foot to hip 
                      [16, 14], [14, 12], # right foot to hip
                      [11, 0], [12, 0], # hips to origin

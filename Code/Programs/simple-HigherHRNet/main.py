@@ -15,147 +15,7 @@ from ast import literal_eval
 import pyrealsense2 as rs
 
 from DatasetBuilder.utilities import *
-from DatasetBuilder.demo import *
-
-'''order of joints:
-
-0,1,2 are meta data:
-
-actual: Format
-0: nose
-1: left eye
-2: right eye
-3: left ear
-4: right ear
-5: left shoulder
-6: right shoulder
-7: left elbow
-8: right elbow
-9: left hand
-10: right hand
-11: left hip
-12: right hip
-13: left knee 
-14:right knee 
-15: left foot 
-16: right foot
-
-No chest (fs)
-'''         
-#left foot - left knee, left knee - left hip,
-#right foot - right knee, right knee - right hip
-#left hip - origin, right hip - origin,
-
-# left hand - left elbow, left elbow - left shoulder, 
-# right hand - right elbow, right elbow - right shoulder, 
-# left shoulder - origin, right shoulder - origin
-
-#left ear - left eye
-#right ear - right eye
-#left eye - origin, left eye - origin 
-'''
-joint_connections = [[15, 13], [13, 11], # left foot to hip 
-                     [16, 14], [14, 12], # right foot to hip
-                     [11, 0], [12, 0], # hips to origin
-                     [9, 7], [7, 5], # left hand to shoulder
-                     [10, 8], [6, 8], #right hand to shoulder
-                     [5, 0], [6, 0], # Shoulders to origin
-                     [1, 3], [2, 4], # ears to eyes
-                     [3, 0], [4, 0]]# Eyes to origin
-
-colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','Joint_4','Joint_5','Joint_6','Joint_7',
-    'Joint_8','Joint_9','Joint_10','Joint_11','Joint_12','Joint_13','Joint_14','Joint_15','Joint_16', 'Joint_17'] 
-
-occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
-
-def save(joints):
-    # open the file in the write mode
-    with open('image_data.csv', 'w', newline='') as outfile:
-        writer = csv.writer(outfile)
-
-        #Save the joints as a CSV
-        for j, pt in enumerate(joints):
-            for in_joint in pt:
-                list = in_joint.flatten().tolist()
-                row = [ round(elem, 4) for elem in list ]
-                writer.writerow(row)
-
-
-def load(file = "image_data.csv"):
-    joints = []
-    #Load in as a pandas dataset
-    colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','Joint_4','Joint_5','Joint_6','Joint_7',
-          'Joint_8','Joint_9','Joint_10','Joint_11','Joint_12','Joint_13','Joint_14','Joint_15','Joint_16', 'Joint_17'] 
-    dataset = pd.read_csv(file, names=colnames, header=None)
-
-    #Convert all data to literals
-    dataset = convert_to_literals(dataset)
-
-    #Convert to 2D array 
-    joints = dataset.to_numpy()
-    #Print array to check
-    return joints
-
-'''
-'''
-def convert_to_literals(data):
-    for i,  (index, row) in enumerate(data.iterrows()):
-        for col_index, col in enumerate(row):
-            if col_index >= 3:
-                tmp = ast.literal_eval(row[col_index])
-                data.iat[i, col_index] = copy.deepcopy(tmp)
-            else:
-                data.iat[i, col_index] = int(data.iat[i, col_index])
-
-    return data
-'''
-
-'''
-def run_video():
-    print("initialising model")
-    model = SimpleHigherHRNet(32, 17, "./weights/pose_higher_hrnet_w32_512.pth")
-    cap = cv2.VideoCapture(0)
-    width, height = 200, 200
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-
-    # get the final frame size
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-    fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
-    # Define the codec and create VideoWriter object
-    #fourcc = cv2.cv.CV_FOURCC(*'DIVX')
-    #out = cv2.VideoWriter('output.avi',fourcc, 20.0, (640,480))
-    #out = cv2.VideoWriter('output.avi', -1, 20.0, (512,512))
-    out = cv2.VideoWriter('output.avi', fourcc, 20.0, (width, height))
-
-    while(cap.isOpened()):
-        ret, frame = cap.read()
-        if ret==True:
-            frame, joints = get_joints_from_frame(model, frame)
-
-            # write the flipped frame
-            out.write(frame)
-
-            cv2.imshow('frame',frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-        else:
-            break
-
-    # Release everything if job is finished
-    cap.release()
-    out.release()
-    cv2.destroyAllWindows()
-
-
-def blacken_frame(frame):
-    dimensions = (len(frame), len(frame[0]))
-    blank_frame = np.zeros((dimensions[0],dimensions[1], 3), dtype= np.uint8)
-    return blank_frame
-
-'''
+from DatasetBuilder.demo import *      
 
 def make_intrinsics(intrinsics_file = "depth_intrinsics.csv"):
         '''
@@ -217,57 +77,6 @@ def get_3D_coords(coords_2d, dep_img, pts3d_net = True, dilate = True, meta_data
 
     return pts_3D, pts_3D_metres
 
-
-'''
-def get_joints_from_frame(model, frame, anonymous = True):
-    joints = model.predict(frame)
-
-    if anonymous:
-        frame = blacken_frame(frame)
-
-    for person in joints:
-
-        for joint_pair in joint_connections:
-            #Draw links between joints
-            tmp_a = person[joint_pair[1]]
-            tmp_b = person[joint_pair[0]]
-            start = [int(float(tmp_a[1])), int(float(tmp_a[0]))]
-            end = [int(float(tmp_b[1])), int(float(tmp_b[0]))]
-
-            cv2.line(frame, start, end, color = (0,255,0), thickness = 2) 
-
-            #Draw joints themselves
-            for joint in person:
-                #0 is X, Y is 1, 2 is confidence.
-                frame = cv2.circle(frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(0, 0, 255), thickness=4)
-
-    return frame, joints
-
-def load_and_overlay_joints(directory = "./Images"):
-    joints = load("gait_dataset_pixels.csv")
-    subdir_iter = 1
-    joint_iter = 0
-    for i, (subdir, dirs, files) in enumerate(os.walk(directory)):
-        
-        for j, file in enumerate(files):
-            #Ignore depth images which are second half
-            if j >= len(files)/2:
-                break
-
-            file_name = os.fsdecode(file)
-            sub_dir = os.fsdecode(subdir)
-        
-            #display with openCV original image, overlayed with corresponding joints
-            raw_image = cv2.imread(sub_dir + "/" + file_name, cv2.IMREAD_COLOR)
-            #i - 2 because iter starts at 1, and the first empty subdir also counts as 1.
-            render_joints(raw_image, joints[joint_iter], delay = True, use_depth = True)
-            joint_iter += 1
-        subdir_iter += 1
-        #Debug
-        if subdir_iter >= 4:
-            break
-'''
-
 def run_image(image_name, single = True, save = False, directory = None, model= None, image_no = 0):
     if model == None:
         model = SimpleHigherHRNet(32, 17, "./weights/pose_higher_hrnet_w32_512.pth")
@@ -289,33 +98,6 @@ def run_image(image_name, single = True, save = False, directory = None, model= 
         cv2.imwrite(directory + "/" + str(image_no) + ".jpg", image)
 
     return image, joints
-
-'''
-def draw_joints_on_frame(frame, joints, use_depth_as_colour = False):
-
-    tmp_frame = copy.deepcopy(frame)
-    tmp_joints = copy.deepcopy(joints)
-
-    for joint in tmp_joints:
-
-        if isinstance(joint, int):
-            continue
-        #0 is X, Y is 1, 2 is confidence.
-
-        #Clamp joints within frame size
-        
-        if joint[0] >= 240:
-            joint[0] = 239
-        if joint[1] >= 424:
-            joint[1] = 423
-            
-        if use_depth_as_colour == False:
-            tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(0, 0, 255), thickness=4)
-        else:
-            tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(150, 100, joint[2]), thickness=4)
-        #break
-    return tmp_frame
-'''
 
 def run_depth_sample(folder_name, joints_info):
     #get joints info: 
@@ -374,27 +156,6 @@ def run_depth_sample(folder_name, joints_info):
             cv2.setMouseCallback('image with refined joints (incl 2D)', click_event, final_joint_image)
             cv2.waitKey(0) & 0xff
 
-
-'''
-def render_joints(image, joints, delay = False, use_depth = True):
-    tmp_image = copy.deepcopy(image)
-    tmp_image = draw_joints_on_frame(tmp_image, joints, use_depth_as_colour=use_depth)
-    cv2.imshow('joint Image',tmp_image)
-
-    cv2.setMouseCallback('joint Image', click_event, tmp_image)
-    if delay:
-        cv2.waitKey(0) & 0xff
-
-def click_event(event, x, y, flags, params):
-  
-    # checking for left mouse clicks
-    if event == cv2.EVENT_LBUTTONDOWN:
-        # displaying the coordinates
-        print(x, ' ', y)
-    if event == cv2.EVENT_RBUTTONDOWN:
-        quit()
-
-'''
 
 #Exclude 2D depth coord calculations to just get pixel data and depth value, otherwise it will return actual distances good for ML but
 #not possible to properly display for debugging without re-projecting back to pixel data.
@@ -478,65 +239,6 @@ def run_images(folder_name, exclude_2D = False):
     with open("./EDA/gait_dataset_metres.csv","w+", newline='') as my_csv:
         csvWriter = csv.writer(my_csv,delimiter=',')
         csvWriter.writerows(joints_file_metres)
-
-
-'''
-def render_joints(image, joints, delay = False, use_depth = True, metadata = 3):
-    tmp_image = copy.deepcopy(image)
-    tmp_image = draw_joints_on_frame(tmp_image, joints, use_depth_as_colour=use_depth, metadata=metadata)
-    cv2.imshow('joint Image',tmp_image)
-
-    cv2.setMouseCallback('joint Image', click_event, tmp_image)
-    if delay:
-        cv2.waitKey(0) & 0xff
-'''
-
-'''
-def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 3):
-
-    tmp_frame = copy.deepcopy(frame)
-    tmp_joints = copy.deepcopy(joints)
-
-    for joint_pair in joint_connections:
-            #Draw links between joints
-            tmp_a = tmp_joints[joint_pair[1] + metadata]
-            tmp_b = tmp_joints[joint_pair[0] + metadata]
-            start = [int(float(tmp_a[1])), int(float(tmp_a[0]))]
-            end = [int(float(tmp_b[1])), int(float(tmp_b[0]))]
-
-            cv2.line(tmp_frame, start, end, color = (0,255,0), thickness = 2) 
-
-
-    for joint in tmp_joints:
-
-        if isinstance(joint, int):
-            continue
-        #0 is X, Y is 1, 2 is confidence.
-
-        #Clamp joints within frame size
-        
-        if joint[0] >= 240:
-            joint[0] = 239
-        if joint[1] >= 424:
-            joint[1] = 423
-            
-        if use_depth_as_colour == False:
-            tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(0, 0, 255), thickness=4)
-        else:
-            tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(150, 100, joint[2]), thickness=4)
-       # break
-
-    return tmp_frame
-
-'''
-#def click_event(event, x, y, flags, params):
-#  
-#    # checking for left mouse clicks
-#    if event == cv2.EVENT_LBUTTONDOWN:
-#        # displaying the coordinates
-#        print(x, ' ', y)
-##    if event == cv2.EVENT_RBUTTONDOWN:
-#        quit()
 
         
 #Unravelled_data is proper joints
