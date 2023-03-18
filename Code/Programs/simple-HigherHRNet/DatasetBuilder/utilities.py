@@ -33,7 +33,7 @@ actual: Format
 11: left hip
 12: right hip
 13: left knee 
-14:right knee 
+14: right knee 
 15: left foot 
 16: right foot
 
@@ -53,6 +53,64 @@ colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','
     'Joint_8','Joint_9','Joint_10','Joint_11','Joint_12','Joint_13','Joint_14','Joint_15','Joint_16', 'Joint_17'] 
 
 occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
+
+#Hand crafted features
+'''        cadence (number of steps),
+
+        stride length,
+
+        height of feet above the ground,
+
+        time left leg off ground,
+
+        time right leg off ground,
+
+        speed, stride length variance,
+
+        time with both feet on the floor (gait freezing),
+
+        difference in left and right leg stride length(detect limping),
+'''
+def create_hcf_dataset(abs_joint_data, rel_joint_data):
+    print("incomplete")
+    #For every joint instance, first extract each gait cycle
+
+    #Then for every gait cycle create a new instance with the following features: 
+
+    #This will require relative dataset for positions and absolute
+    #calculate cadence
+        #get left foot, 
+        #split into sequences of decreasing and increasing
+            #if i > j add to decreasing vector (within threshold), if i < j add to increasing vector (within threshold)
+            #count the number of these sequentially
+            #whenever it changes direction, iterate cadence counter
+            #draw image and change colour of foot when increasing or decreasing
+        #double number of these instances, these are the number of steps
+
+    #Height of feet above the ground
+    #get math.dist between head and left + right foot for a total of 2 values
+
+    #Time leg off of ground
+    #if foot velocity > 0 + threshold and math.dist(foot, head) > threshold then foot is in motion, add to vector
+    #once this no longer holds, change colour and show
+    #implement for left and right leg
+
+    #Speed
+    #get absolute values of the head at first frame vs last, divide number of frames by that distance
+
+    #Stride length
+    #get max and min from left leg relative to head
+    #get corresponding values in absolute values for leg
+    #math.dist to get the distance between these two values
+    #repeat for both legs
+
+    #Stride length variance
+    #Get ratio of left to right leg stride length, clamp between 0-1 or -0.5 to 0.5
+
+    #Time both feet not moving
+    # if foot velocity > 0 + threshold and math.dist(foot, head) > threshold then foot is in motion, add to vector
+    #Add every frame that this isn't the case 
+
 
 def blacken_frame(frame):
     dimensions = (len(frame), len(frame[0]))
@@ -92,7 +150,7 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
             cv2.line(tmp_frame, start, end, color = (0,255,0), thickness = 2) 
 
 
-    for joint in tmp_joints:
+    for i, joint in enumerate(tmp_joints):
 
         if isinstance(joint, int):
             continue
@@ -104,11 +162,14 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
             joint[0] = 239
         if joint[1] >= 424:
             joint[1] = 423
-            
+
         if use_depth_as_colour == False:
             tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(0, 0, 255), thickness=4)
         else:
+            #if i < len(tmp_joints) - 1:
             tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(150, 100, joint[2]), thickness=4)
+            #else:
+            #    tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(255, 0, 0), thickness=10)
        # break
 
     return tmp_frame

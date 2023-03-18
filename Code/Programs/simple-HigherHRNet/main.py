@@ -10,12 +10,30 @@ import pandas as pd
 from array import array
 import ast
 import operator
-
+import math
 from ast import literal_eval
 import pyrealsense2 as rs
 
 from DatasetBuilder.utilities import *
 from DatasetBuilder.demo import *      
+
+#Hand crafted features
+'''        cadence (number of steps),
+
+        stride length,
+
+        height of feet above the ground,
+
+        time left leg off ground,
+
+        time right leg off ground,
+
+        speed, stride length variance,
+
+        time with both feet on the floor (gait freezing),
+
+        difference in left and right leg stride length(detect limping),
+'''
 
 def make_intrinsics(intrinsics_file = "depth_intrinsics.csv"):
         '''
@@ -285,6 +303,12 @@ def list_to_arrays(my_list):
 
 def subtract_lists(list1, list2):
     result = np.subtract(list1, list2)
+  #  result = map(int, result)
+    return list(result)#
+
+def midpoint(list1, list2):
+    result = (np.array(list1) + np.array(list2)).astype(int)
+    result = result / 2
     return list(result)
 
 def divide_lists(list1, list2, n):
@@ -344,6 +368,29 @@ def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, d
         cv2.waitKey(0) & 0xff
 
     return joint_velocities
+
+def create_dataset_with_chestpoint(jointfile, folder, save = True, debug = False):
+    joint_data = load(jointfile)
+    image_data = load_images(folder)
+
+    chest_dataset = []
+
+    for i, joints in enumerate(joint_data):
+        chest_dataset_row = list(joints)
+        chest_datapoint = midpoint(joints[9], joints[8])
+        chest_dataset_row.append(chest_datapoint)
+        chest_dataset.append(chest_dataset_row)
+
+        if debug:
+            render_joints(image_data[i], chest_dataset_row, delay=True, use_depth=True)
+    
+    chest_colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','Joint_4','Joint_5','Joint_6','Joint_7',
+    'Joint_8','Joint_9','Joint_10','Joint_11','Joint_12','Joint_13','Joint_14','Joint_15','Joint_16', 'Joint_17', 'Joint_18'] 
+
+    new_dataframe = pd.DataFrame(chest_dataset, columns = chest_colnames)
+    if save:
+            #Convert to dataframe 
+        new_dataframe.to_csv("./EDA/Chest_Dataset.csv",index=False, header=False)
 
 def run_velocity_debugger(folder, jointfile, save = False, debug = False):
         
@@ -434,14 +481,17 @@ def apply_joint_occlusion(file, save = False, debug = False):
 
 def main():
 
+    #Create dataset with chest joints
+    #create_dataset_with_chestpoint("./EDA/gait_dataset_pixels.csv", "./Images")
+    
+    #Visualize joints overlaying
+    #load_and_overlay_joints()
+
     #Demonstrate occlusion fixing
-    apply_joint_occlusion("./EDA/gait_dataset_pixels.csv", save = True, debug=True)
+    #apply_joint_occlusion("./EDA/gait_dataset_pixels.csv", save = True, debug=True)
 
     #Draw calculated velocities
     run_velocity_debugger("./Images", "./EDA/gait_dataset_pixels.csv", save= True, debug=True)
-
-    #Visualize joints overlaying
-    load_and_overlay_joints()
 
     #Not used
     #run_images("./Images", exclude_2D=False)
