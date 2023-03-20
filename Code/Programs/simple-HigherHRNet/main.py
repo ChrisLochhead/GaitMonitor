@@ -479,19 +479,22 @@ def apply_joint_occlusion(file, save = False, debug = False):
         print("SAVING")
         new_dataframe.to_csv("./EDA/Gait_Pixel_Dataset_Occluded.csv",index=False, header=False)         
 
+
 def main():
 
+    #Experimental creating hand crafted features
+    #get_gait_cycles(load("./EDA/unravelled_relative_data.csv"))
     #Create dataset with chest joints
     #create_dataset_with_chestpoint("./EDA/gait_dataset_pixels.csv", "./Images")
     
     #Visualize joints overlaying
-    #load_and_overlay_joints()
+    load_and_overlay_joints()
 
     #Demonstrate occlusion fixing
     #apply_joint_occlusion("./EDA/gait_dataset_pixels.csv", save = True, debug=True)
 
     #Draw calculated velocities
-    run_velocity_debugger("./Images", "./EDA/gait_dataset_pixels.csv", save= True, debug=True)
+    #run_velocity_debugger("./Images", "./EDA/gait_dataset_pixels.csv", save= True, debug=True)
 
     #Not used
     #run_images("./Images", exclude_2D=False)

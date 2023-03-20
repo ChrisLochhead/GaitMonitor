@@ -14,6 +14,14 @@ import operator
 from ast import literal_eval
 import pyrealsense2 as rs
 
+import re, seaborn as sns
+import numpy as np
+
+from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.colors import ListedColormap
+
+
 '''order of joints:
 
 0,1,2 are meta data:
@@ -71,6 +79,89 @@ occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
 
         difference in left and right leg stride length(detect limping),
 '''
+
+#def lorentz_deriv((x, y, z), t0, sigma=10., beta=8./3, rho=28.0):
+#    """Compute the time-derivative of a Lorentz system."""
+#    return [sigma * (y - x), x * (rho - z) - y, x * y - beta * z]
+
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from scipy.integrate import odeint as ODEint
+
+def chart_single_joint(joints):
+    x = []
+    y = []
+    z = []
+    for j in joints:
+        x.append(j[0])
+        y.append(j[1])
+        z.append(j[2])
+    
+
+    #x =  np.linspace(0, 20, 1000)
+    #y, z = 10.*np.cos(x), 10.*np.sin(x) # something simple
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1,2,1,projection='3d')
+    ax.plot(x, y, z)
+
+    # now Lorentz
+    times = np.linspace(0, 4, 1000) 
+
+    start_pts = 30. - 15.*np.random.random((20,3))  # 20 random xyz starting values
+
+    trajectories = []
+    for start_pt in start_pts:
+        print("incomplete")
+        #trajectory = ODEint(lorentz_deriv, start_pt, times)
+        #trajectories.append(trajectory)
+
+    ax = fig.add_subplot(1,2,2,projection='3d')
+    for trajectory in trajectories:
+        x, y, z = trajectory.T  # transpose and unpack 
+        # x, y, z = zip(*trajectory)  # this also works!
+        ax.plot(x, y, z)
+
+    plt.show()
+
+#This will only work with relative data
+def get_gait_cycles(joint_data):
+    instances = []
+    instance = []
+    current_instance = -1
+
+    #Firstly, separate all data into arrays of each instance
+    for row in joint_data:
+        if current_instance == -1:
+            current_instance = row[0]
+        
+        #Reset and add the instance once you get to a new instance
+        if current_instance != -1 and current_instance != row[0]:
+            instances.append(copy.deepcopy(instance))
+            instance = [row[0], row[2]]
+            current_instance = row[0]
+        
+        #Keep metadata for each cycle, ignore number in cycle
+        print("row: ", row, "\nrow after cut: ", row[3:])
+        instance.append([row[3:]])
+
+
+    #Instances contain every set of joints for each instance in one array, topped
+    #with the class and instance metadata
+    right_feet = []
+    for instance in instances:
+        for joints in instance:
+            #3D coords of foot instance
+            right_foot = joints[18]
+            #Get all right foot values into an array
+            right_feet.append(right_foot)
+
+        #Chart them as a line chart and view cut-off as percentage for threshold
+        chart_single_joint(right_feet)
+        break
+        #
+
 def create_hcf_dataset(abs_joint_data, rel_joint_data):
     print("incomplete")
     #For every joint instance, first extract each gait cycle
@@ -116,6 +207,50 @@ def blacken_frame(frame):
     dimensions = (len(frame), len(frame[0]))
     blank_frame = np.zeros((dimensions[0],dimensions[1], 3), dtype= np.uint8)
     return blank_frame
+
+def filter_coords(joints, index, metadata = 3):
+    coords = []
+    for i, j in enumerate(joints):
+        if i >= metadata:
+            coords.append(j[index])
+    
+    return coords
+
+def plot3D_joints(joints):
+    # generate data
+    x = filter_coords(joints, 0)
+    y = filter_coords(joints, 1)
+    z = filter_coords(joints, 2)
+
+    # axes instance
+    #fig, ax = plt.subplots()
+    fig = plt.figure(figsize=(6,6))
+    ax = Axes3D(fig, auto_add_to_figure=False)
+    fig.add_axes(ax)
+
+    # get colormap from seaborn
+    #424 by 240
+    ax.set_xlim([0, 240])
+    ax.set_ylim([0, 424])
+    ax.set_zlim3d([0, 255])
+    plt.gca().invert_yaxis()
+    plt.gca().invert_zaxis()
+    ax.view_init(-90, 180)
+
+    cmap = ListedColormap(sns.color_palette("husl", 256).as_hex())
+
+    # plot
+    sc = ax.scatter(x, y, z, s=40, c=x, marker='o', cmap=cmap, alpha=1)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    # legend
+    #-90, 180, 0 angle, azimuth and roll
+    plt.legend(*sc.legend_elements(), bbox_to_anchor=(1.05, 1), loc=2)
+    plt.show(block=True)
+    # save
+    #plt.savefig("scatter_hue", bbox_inches='tight')
 
 def render_joints(image, joints, delay = False, use_depth = True, metadata = 3):
     tmp_image = copy.deepcopy(image)
