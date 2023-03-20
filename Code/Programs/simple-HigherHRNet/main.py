@@ -295,11 +295,12 @@ def add_lists(list1, list2, change_type = False):
     return list((np.array(list1) + np.array(list2)).astype(int))
 
 def list_to_arrays(my_list):
-    for i, l in enumerate(my_list):
+    tmp_list = copy.deepcopy(my_list)
+    for i, l in enumerate(tmp_list):
         if isinstance(l, list):
-            my_list[i] = np.array(l)
+            tmp_list[i] = np.array(l)
 
-    return my_list
+    return tmp_list
 
 def subtract_lists(list1, list2):
     result = np.subtract(list1, list2)
@@ -352,8 +353,16 @@ def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, d
         else:
             smoothed_direction = direction_after + direction_before
 
+            
+        #Remove noise:
+        for j in range(0, 3):
+            if smoothed_direction[j] < 0.01 and smoothed_direction[j] > -0.01:
+                smoothed_direction[j] = np.float64(0.0)
+        print("smoothed direction: ", smoothed_direction, type(smoothed_direction[0]))
 
         if debug:
+            x = int((smoothed_direction[1] * 40) + joints_current[i][1])
+            y = int((smoothed_direction[0] * 40) + joints_current[i][0])
             image_direction = [int((smoothed_direction[1] * 40) + joints_current[i][1]),  int((smoothed_direction[0] * 40) + joints_current[i][0])]
 
             image = cv2.arrowedLine(image, [int(joints_current[i][1]), int(joints_current[i][0])] , image_direction,
@@ -487,14 +496,14 @@ def main():
     #Create dataset with chest joints
     #create_dataset_with_chestpoint("./EDA/gait_dataset_pixels.csv", "./Images")
     
-    #Visualize joints overlaying
-    load_and_overlay_joints()
+    #Visualize joints overlaying (2D and 3D)
+    #load_and_overlay_joints()
 
     #Demonstrate occlusion fixing
     #apply_joint_occlusion("./EDA/gait_dataset_pixels.csv", save = True, debug=True)
 
     #Draw calculated velocities
-    #run_velocity_debugger("./Images", "./EDA/gait_dataset_pixels.csv", save= True, debug=True)
+    run_velocity_debugger("./Images", "./EDA/gait_dataset_pixels.csv", save= True, debug=True)
 
     #Not used
     #run_images("./Images", exclude_2D=False)
