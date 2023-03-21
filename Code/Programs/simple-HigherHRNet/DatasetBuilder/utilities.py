@@ -42,8 +42,8 @@ actual: Format
 12: right hip
 13: left knee 
 14: right knee 
-15: left foot 
-16: right foot
+15: left foot 18
+16: right foot 19
 
 No chest
 '''   
@@ -84,11 +84,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+
+def numericalSort(value):
+    numbers = re.compile(r'(\d+)')
+    parts = numbers.split(str(value))
+    parts[1::2] = map(int, parts[1::2])
+    return parts
+
 #Add function to outline velocity change by drawing arrow based on velocity of -1 and +1 frame
 def load_images(folder, ignore_depth = True):
     image_data = []
     directory = os.fsencode(folder)
     for subdir_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
+        dirs.sort(key=numericalSort)
+        print("current subdirectory in utility function: ", subdir)
         #Ignore base folder and instance 1 (not in dataset)
         if subdir_iter >= 1:
             for i, file in enumerate(files):
@@ -171,7 +180,6 @@ def get_gait_cycles(joint_data, images):
             
 
 def create_hcf_dataset(jointfile, rel_jointfile, folder):
-    print("incomplete")
     abs_joint_data = load(jointfile)
     rel_joint_data = load(rel_jointfile)
     images = load_images(folder)

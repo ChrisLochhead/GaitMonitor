@@ -135,7 +135,7 @@ def run_depth_sample(folder_name, joints_info):
 
     directory = os.fsencode(folder_name)
     for subdir, dirs, files in os.walk(directory):
-
+        dirs.sort(key=numericalSort)
         for i, file in enumerate(files):
             #Ignore depth images which are second half
             if i >= len(files)/2:
@@ -189,6 +189,7 @@ def run_images(folder_name, exclude_2D = False):
     joints_file_metres = []
 
     for subdir, dirs, files in os.walk(directory):
+        dirs.sort(key=numericalSort)
         if subdir_iter % 5 == 0:
             data_class += 1
             if data_class > 3:
@@ -235,7 +236,7 @@ def run_images(folder_name, exclude_2D = False):
                 new_entry.append(tmp)
 
             #print("full completed depth joints: ", new_entry)
-            render_joints(corr_image, new_entry[3:], delay=True, use_depth=True, metadata = 0)
+            #render_joints(corr_image, new_entry[3:], delay=True, use_depth=True, metadata = 0)
             
             joints_file.append(new_entry)
             joints_file_metres.append(new_entry)
@@ -465,12 +466,121 @@ def apply_joint_occlusion(file, save = False, debug = False):
         print("SAVING")
         new_dataframe.to_csv("./EDA/Gait_Pixel_Dataset_Occluded.csv",index=False, header=False)         
 
+def correct_joints_data(image_file, joint_file, save = False):
+
+    #Get raw images and corresponding joint info
+    joint_data = load(joint_file)
+    image_data = load_images(image_file)
+
+    finished_joint_data = []
+
+    #Occlude area where not walking properly
+    image_data, joint_data = occlude_area_in_frame([[0,0], [0,0]], joint_data, image_data)
+
+    for i, row in enumerate(joint_data):
+        empty_coords = 0
+        for j, coord in enumerate(row):
+            if j > 2:
+                if all(v == 0 for v in coord) == True:
+                    empty_coords += 1
+        
+        if empty_coords < 5:
+            finished_joint_data.append(copy.deepcopy(row))
+            #finished_image_data.append(image_data[i])
+
+        #Save images as you go
+            if save:
+                if row[1] < 10:
+                    file_no = str(0) + str(row[1])
+                else:
+                    file_no = str(row[1])
+
+                directory = "./EDA/Finished_Data/Images/Instance_" + str(float(row[0] - 2))
+                os.makedirs(directory, exist_ok = True)
+                cv2.imwrite(directory + "/" + file_no + ".jpg", image_data[i])
+
+    #Fix head coordinates
+    normalize_head_coords(joint_data, image_data)
+
+
+    #Finally finish joints
+    if save:
+        with open("./EDA/Finished_Data/pixel_data_absolute.csv","w+", newline='') as my_csv:
+            csvWriter = csv.writer(my_csv,delimiter=',')
+            csvWriter.writerows(finished_joint_data)
+
+
+def occlude_area_in_frame(occlusion_box, joint_data, image_data):
+
+    refined_joint_data = []
+    refined_image_data = []
+
+    for i, row in enumerate(joint_data):
+        occlusion_counter = 0
+        for j, coord in enumerate(row):
+            if check_interception(occlusion_boxes=occlusion_box) == True:
+                occlusion_counter += 1
+        
+        #If more than 5 joints are in the occlusion zone, get rid of these joints and corresponding images
+        if occlusion_counter < 5:
+            refined_joint_data.append(row)
+            refined_image_data.append(image_data[i])
+
+        return refined_image_data, refined_joint_data
+
+
+
+
+#3: nose
+#4: left eye
+#5: right eye
+#6: left ear
+#7: right ear
+def normalize_head_coords(joints_data, image_data):
+
+    for i, row in enumerate(joints_data):
+
+        print("before")
+        render_joints(image_data[i], row, delay = True)
+
+        face_joints = []
+        null_counter = 0
+        for j, coord in enumerate(row):
+            if j > 2 and j < 8:
+                face_joints.append(coord)
+                if all(v == 0 for v in coord) == True:
+                    null_counter += 1
+        
+        #If more than one is out of place but it's not every one of them, correct the broken ones
+        if null_counter > 0 and null_counter < 5:
+            normalize_scalar = len(face_joints) - null_counter
+            mean = [0,0,0]
+            for f in face_joints:
+                mean = add_lists(mean, f)
+            
+            mean = divide_lists(mean, normalize_scalar)
+
+            #Re-iterate through correcting the broken face joints
+            for j, coord in enumerate(row):
+                if j > 2 and j < 8:
+                    if all(v == 0 for v in coord) == True:
+                        joints_data[i][j] = mean
+
+        
+        print("after")
+        render_joints(image_data[i], row, delay = True)
+
 
 def main():
 
+    #Process data from EDA into perfect form
+    #correct_joints_data("./Images", "./EDA/gait_dataset_pixels.csv", save=True)
+    #Test:
+    #load_and_overlay_joints(directory="./EDA/Finished_Data/Images/", joint_file="./EDA/Finished_Data/pixel_data_absolute.csv", ignore_depth=False)
+
     #Experimental creating hand crafted features
     #get_gait_cycles(load("./EDA/unravelled_relative_data.csv"))
-    create_hcf_dataset("./EDA/gait_dataset_pixels.csv", "./EDA/gait_dataset_pixels.csv", "./Images")
+    #create_hcf_dataset("./EDA/gait_dataset_pixels.csv", "./EDA/gait_dataset_pixels.csv", "./Images")
     #Create dataset with chest joints
     #create_dataset_with_chestpoint("./EDA/gait_dataset_pixels.csv", "./Images")
     
@@ -481,10 +591,10 @@ def main():
     #apply_joint_occlusion("./EDA/gait_dataset_pixels.csv", save = True, debug=True)
 
     #Draw calculated velocities
-    run_velocity_debugger("./Images", "./EDA/gait_dataset_pixels.csv", save= True, debug=True)
+    #run_velocity_debugger("./Images", "./EDA/gait_dataset_pixels.csv", save= True, debug=True)
 
     #Not used
-    #run_images("./Images", exclude_2D=False)
+    run_images("./Images", exclude_2D=False)
 
     #Vizualize joints overlaying (in real time)
     #run_images("./Images")

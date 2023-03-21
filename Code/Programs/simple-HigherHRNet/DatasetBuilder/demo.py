@@ -78,15 +78,16 @@ def get_joints_from_frame(model, frame, anonymous = True):
 
     return frame, joints
 
-def load_and_overlay_joints(directory = "./Images"):
-    joints = load("./EDA/gait_dataset_pixels.csv")
+def load_and_overlay_joints(directory = "./Images", joint_file = "./EDA/gait_dataset_pixels.csv", ignore_depth = True):
+    joints = load(joint_file)
     subdir_iter = 1
     joint_iter = 0
     for i, (subdir, dirs, files) in enumerate(os.walk(directory)):
-        
+        print("current subdirectory in overlay function: ", subdir)
+        dirs.sort(key=numericalSort)
         for j, file in enumerate(files):
             #Ignore depth images which are second half
-            if j >= len(files)/2:
+            if j >= len(files)/2 and ignore_depth:
                 break
 
             file_name = os.fsdecode(file)
@@ -96,9 +97,9 @@ def load_and_overlay_joints(directory = "./Images"):
             raw_image = cv2.imread(sub_dir + "/" + file_name, cv2.IMREAD_COLOR)
             #i - 2 because iter starts at 1, and the first empty subdir also counts as 1.
             render_joints(raw_image, joints[joint_iter], delay = True, use_depth = True)
-            plot3D_joints(joints[joint_iter])
+            #plot3D_joints(joints[joint_iter])
             joint_iter += 1
         subdir_iter += 1
         #Debug
-        if subdir_iter >= 4:
-            break
+        #if subdir_iter >= 4:
+        #    break
