@@ -258,29 +258,6 @@ def run_images(folder_name, exclude_2D = False):
         csvWriter = csv.writer(my_csv,delimiter=',')
         csvWriter.writerows(joints_file_metres)
 
-        
-#Unravelled_data is proper joints
-#load in proper images
-#debug to make these functions work 
-
-#Add function to outline velocity change by drawing arrow based on velocity of -1 and +1 frame
-def load_images(folder, ignore_depth = True):
-    image_data = []
-    directory = os.fsencode(folder)
-    for subdir_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
-        #Ignore base folder and instance 1 (not in dataset)
-        if subdir_iter >= 1:
-            for i, file in enumerate(files):
-                if i >= len(files) / 2:
-                    break
-                file_name = os.fsdecode(file)
-                sub_dir = os.fsdecode(subdir)
-                
-                #display with openCV original image, overlayed with corresponding joints
-                raw_image = cv2.imread(sub_dir + "/" + file_name, cv2.IMREAD_COLOR)
-                image_data.append(raw_image)
-    
-    return image_data
 
 def get_unit_vector(vector):
 
@@ -493,6 +470,7 @@ def main():
 
     #Experimental creating hand crafted features
     #get_gait_cycles(load("./EDA/unravelled_relative_data.csv"))
+    create_hcf_dataset("./EDA/gait_dataset_pixels.csv", "./EDA/gait_dataset_pixels.csv", "./Images")
     #Create dataset with chest joints
     #create_dataset_with_chestpoint("./EDA/gait_dataset_pixels.csv", "./Images")
     

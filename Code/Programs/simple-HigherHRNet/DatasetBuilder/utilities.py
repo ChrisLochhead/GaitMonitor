@@ -80,90 +80,105 @@ occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
         difference in left and right leg stride length(detect limping),
 '''
 
-#def lorentz_deriv((x, y, z), t0, sigma=10., beta=8./3, rho=28.0):
-#    """Compute the time-derivative of a Lorentz system."""
-#    return [sigma * (y - x), x * (rho - z) - y, x * y - beta * z]
-
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-from scipy.integrate import odeint as ODEint
 
-def chart_single_joint(joints):
-    x = []
-    y = []
-    z = []
-    for j in joints:
-        x.append(j[0])
-        y.append(j[1])
-        z.append(j[2])
+#Add function to outline velocity change by drawing arrow based on velocity of -1 and +1 frame
+def load_images(folder, ignore_depth = True):
+    image_data = []
+    directory = os.fsencode(folder)
+    for subdir_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
+        #Ignore base folder and instance 1 (not in dataset)
+        if subdir_iter >= 1:
+            for i, file in enumerate(files):
+                if i >= len(files) / 2:
+                    break
+                file_name = os.fsdecode(file)
+                sub_dir = os.fsdecode(subdir)
+                
+                #display with openCV original image, overlayed with corresponding joints
+                raw_image = cv2.imread(sub_dir + "/" + file_name, cv2.IMREAD_COLOR)
+                image_data.append(raw_image)
     
-
-    #x =  np.linspace(0, 20, 1000)
-    #y, z = 10.*np.cos(x), 10.*np.sin(x) # something simple
-
-    fig = plt.figure()
-    ax = fig.add_subplot(1,2,1,projection='3d')
-    ax.plot(x, y, z)
-
-    # now Lorentz
-    times = np.linspace(0, 4, 1000) 
-
-    start_pts = 30. - 15.*np.random.random((20,3))  # 20 random xyz starting values
-
-    trajectories = []
-    for start_pt in start_pts:
-        print("incomplete")
-        #trajectory = ODEint(lorentz_deriv, start_pt, times)
-        #trajectories.append(trajectory)
-
-    ax = fig.add_subplot(1,2,2,projection='3d')
-    for trajectory in trajectories:
-        x, y, z = trajectory.T  # transpose and unpack 
-        # x, y, z = zip(*trajectory)  # this also works!
-        ax.plot(x, y, z)
-
-    plt.show()
+    return image_data
 
 #This will only work with relative data
-def get_gait_cycles(joint_data):
+def get_gait_cycles(joint_data, images):
     instances = []
     instance = []
-    current_instance = -1
+    threshold = 15
+    ahead = 0
+    ahead_previous = 0
 
     #Firstly, separate all data into arrays of each instance
-    for row in joint_data:
-        if current_instance == -1:
-            current_instance = row[0]
-        
-        #Reset and add the instance once you get to a new instance
-        if current_instance != -1 and current_instance != row[0]:
-            instances.append(copy.deepcopy(instance))
-            instance = [row[0], row[2]]
-            current_instance = row[0]
-        
-        #Keep metadata for each cycle, ignore number in cycle
-        print("row: ", row, "\nrow after cut: ", row[3:])
-        instance.append([row[3:]])
+    for row_iter, row in enumerate(joint_data):
+
+        #Take note of what last ahead was
+        ahead_previous = ahead
+        #Going left as usual
+        if row[19][1] > row[18][1] + threshold:
+            if ahead_previous == 1:
+                instance.append(row)
+                print("A detected overlap, resetting", len(instance))
+                instances.append(copy.deepcopy(instance))
+                instance = []
+            else:
+                instance.append(row)
+            print("A", row[18][1], row[19][1])
+            ahead = 0
+        #Going right as usual
+        elif row[18][1] > row[19][1] + threshold:
+            if ahead_previous == 0:
+                instance.append(row)            
+                print("B detected overlap, resetting", len(instance))                
+                instances.append(copy.deepcopy(instance))
+                instance = []
+            else:
+                instance.append(row)
+            ahead = 1
+            print("B", row[18][1], row[19][1])
+        else:
+            instance.append(row)
 
 
-    #Instances contain every set of joints for each instance in one array, topped
-    #with the class and instance metadata
-    right_feet = []
-    for instance in instances:
-        for joints in instance:
-            #3D coords of foot instance
-            right_foot = joints[18]
-            #Get all right foot values into an array
-            right_feet.append(right_foot)
 
-        #Chart them as a line chart and view cut-off as percentage for threshold
-        chart_single_joint(right_feet)
-        break
-        #
+        print("current row values: ", row[18][1], row[19][1])
 
-def create_hcf_dataset(abs_joint_data, rel_joint_data):
+        if ahead == 1:
+            render_joints(images[row_iter], row, delay=True, use_depth=False, colour=(0,0, 255))
+        else:
+            render_joints(images[row_iter], row, delay=True, use_depth=False, colour=(255,0, 0))
+
+    #Debug drawing, just draw regular blue for left, red for right
+    print("gait cycle retreival completed")
+    counter = 0
+    cycle_count = 0
+
+    blue_cycle = False
+    for i, inst in enumerate(instances):
+        print("new cycle of length: ", len(inst), cycle_count, i)
+        for j, joints_frame in enumerate(inst):            
+            if i % 2 == 0:
+                render_joints(images[counter], joints_frame, delay=True, use_depth=False, colour=(0,0, 255))
+            else:
+                render_joints(images[counter], joints_frame, delay=True, use_depth=False, colour=(255,0, 0))
+            counter += 1
+        #New Cycle incoming
+        cycle_count += 1
+
+
+            
+
+def create_hcf_dataset(jointfile, rel_jointfile, folder):
     print("incomplete")
+    abs_joint_data = load(jointfile)
+    rel_joint_data = load(rel_jointfile)
+    images = load_images(folder)
+
+    print("images and joints loaded, getting gait cycles...")
+    get_gait_cycles(abs_joint_data, images)
+    ##calculate gait using crossing point of legs
     #For every joint instance, first extract each gait cycle
 
     #Then for every gait cycle create a new instance with the following features: 
@@ -252,9 +267,9 @@ def plot3D_joints(joints):
     # save
     #plt.savefig("scatter_hue", bbox_inches='tight')
 
-def render_joints(image, joints, delay = False, use_depth = True, metadata = 3):
+def render_joints(image, joints, delay = False, use_depth = True, metadata = 3, colour = (255, 0, 0)):
     tmp_image = copy.deepcopy(image)
-    tmp_image = draw_joints_on_frame(tmp_image, joints, use_depth_as_colour=use_depth, metadata = metadata)
+    tmp_image = draw_joints_on_frame(tmp_image, joints, use_depth_as_colour=use_depth, metadata = metadata, colour=colour)
     cv2.imshow('Joint Utilities Image',tmp_image)
 
     cv2.setMouseCallback('Joint Utilities Image', click_event, tmp_image)
@@ -266,11 +281,11 @@ def click_event(event, x, y, flags, params):
     # checking for left mouse clicks
     if event == cv2.EVENT_LBUTTONDOWN:
         # displaying the coordinates
-        print(x, ' ', y)
+        print(x)
     if event == cv2.EVENT_RBUTTONDOWN:
         quit()
 
-def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 3):
+def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 3, colour = (0, 0, 255)):
 
     tmp_frame = copy.deepcopy(frame)
     tmp_joints = copy.deepcopy(joints)
@@ -297,9 +312,9 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
             joint[0] = 239
         if joint[1] >= 424:
             joint[1] = 423
-
+        
         if use_depth_as_colour == False:
-            tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(0, 0, 255), thickness=4)
+            tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=colour, thickness=4)
         else:
             #if i < len(tmp_joints) - 1:
             tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(150, 100, joint[2]), thickness=4)
