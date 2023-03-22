@@ -177,7 +177,7 @@ def run_depth_sample(folder_name, joints_info):
 
 #Exclude 2D depth coord calculations to just get pixel data and depth value, otherwise it will return actual distances good for ML but
 #not possible to properly display for debugging without re-projecting back to pixel data.
-def run_images(folder_name, exclude_2D = False):
+def run_images(folder_name, exclude_2D = False, write_mode = "w+", start_point = 0):
     directory = os.fsencode(folder_name)
     model = SimpleHigherHRNet(32, 17, "./weights/pose_higher_hrnet_w32_512.pth")
     file_iter = 0
@@ -188,12 +188,18 @@ def run_images(folder_name, exclude_2D = False):
     joints_file = []
     joints_file_metres = []
 
-    for subdir, dirs, files in os.walk(directory):
+    for directory_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
         dirs.sort(key=numericalSort)
+
+        #Skip any instances already recorded
+        if directory_iter < start_point:
+            subdir_iter += 1
+            continue
+
         if subdir_iter % 5 == 0:
             data_class += 1
-            if data_class > 3:
-                data_class = 1
+            if data_class > 2:
+                data_class = 0
 
         first_depth = True
         count_in_directory = 0
@@ -243,21 +249,30 @@ def run_images(folder_name, exclude_2D = False):
 
             file_iter += 1
         subdir_iter +=1
+
+        #Save after every folder
+        if os.path.exists("./EDA/gait_dataset_pixels.csv"):
+            write_mode = "a"
+        else:
+            write_mode = "w+"
+
+        #Save to .csv
+        print("SAVING")
+
+        with open("./EDA/gait_dataset_pixels.csv",write_mode, newline='') as my_csv:
+            csvWriter = csv.writer(my_csv,delimiter=',')
+            csvWriter.writerows(joints_file)
+
+        with open("./EDA/gait_dataset_metres.csv",write_mode, newline='') as my_csv:
+            csvWriter = csv.writer(my_csv,delimiter=',')
+            csvWriter.writerows(joints_file_metres)
+
         #Debug
         #if subdir_iter >= 4:
         #    print("BREAKING")
         #    break
         file_iter = 0
-    #Save to .csv
-    print("SAVING")
 
-    with open("./EDA/gait_dataset_pixels.csv","w+", newline='') as my_csv:
-        csvWriter = csv.writer(my_csv,delimiter=',')
-        csvWriter.writerows(joints_file)
-
-    with open("./EDA/gait_dataset_metres.csv","w+", newline='') as my_csv:
-        csvWriter = csv.writer(my_csv,delimiter=',')
-        csvWriter.writerows(joints_file_metres)
 
 
 def get_unit_vector(vector):
