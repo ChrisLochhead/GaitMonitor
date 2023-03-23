@@ -289,7 +289,7 @@ def click_event(event, x, y, flags, params):
     # checking for left mouse clicks
     if event == cv2.EVENT_LBUTTONDOWN:
         # displaying the coordinates
-        print(x)
+        print(x, y)
     if event == cv2.EVENT_RBUTTONDOWN:
         quit()
 
