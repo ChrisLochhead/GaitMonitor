@@ -430,7 +430,7 @@ def run_velocity_debugger(folder, jointfile, save = False, debug = False):
 def check_interception(occlusion_boxes, joint):
     #X-axis collision
     for occlusion_box in occlusion_boxes:
-        print("joint: ", joint[0], "box: ", occlusion_box[0])
+        #print("joint: ", joint[0], "box: ", occlusion_box[0])
         if joint[0] > occlusion_box[0] and joint[0] < occlusion_box[2]:
             #Y-axis collision
             if joint[1] > occlusion_box[1] and joint[1] < occlusion_box[3]:
@@ -441,10 +441,10 @@ def check_interception(occlusion_boxes, joint):
 def get_connected_joint(joint_index):
     for j_connection in joint_connections:
         if joint_index == j_connection[0]:
-            print("found connection: 0", j_connection,  joint_index )
+            #print("found connection: 0", j_connection,  joint_index )
             return j_connection[1]
         elif joint_index == j_connection[1]:
-            print("found connection: 1", j_connection,  joint_index )
+            #print("found connection: 1", j_connection,  joint_index )
             return j_connection[0]
         
 #Get background to find box co-ordinates of couch for occlusion
@@ -456,9 +456,9 @@ def compensate_depth_occlusion(occlusion_boxes, joints, folder ='./Images', debu
 
     for index, row in enumerate(joints):
         intercept_check_count = 0
-        print("instance: ", index)
+        #print("instance: ", index)
         if debug:
-            print("before correcting joints")
+            #print("before correcting joints")
             render_joints(image_data[index], row, delay = True, use_depth = True)      
         for joint_index, joint in enumerate(row):
             #Ignore metadata
@@ -467,13 +467,13 @@ def compensate_depth_occlusion(occlusion_boxes, joints, folder ='./Images', debu
                 if check_interception(occlusion_boxes, joint) == True:
                     if debug:
                         intercept_check_count += 1
-                        print("this joint is connected to: ", row[get_connected_joint(joint_index-3)], "with index: ", get_connected_joint(joint_index-3), "connects to: ", joint_index-3)
+                        #print("this joint is connected to: ", row[get_connected_joint(joint_index-3)], "with index: ", get_connected_joint(joint_index-3), "connects to: ", joint_index-3)
                     
                     #Reassign this depth value to nearest connected joint
                     joints[index][joint_index][2] = copy.deepcopy(row[get_connected_joint(joint_index-3)][2]) 
         #New after all occluded joints corrected
         if debug:
-            print("after correcting joints: ", intercept_check_count)
+            #print("after correcting joints: ", intercept_check_count)
             render_joints(image_data[index], row, delay = True, use_depth = True)
         
     return joints
@@ -492,58 +492,78 @@ def correct_joints_data(image_file, joint_file, save = False):
 
     #Get raw images and corresponding joint info
     joint_data = load(joint_file)
-    print("joint data: ", joint_data)
+   #print("joint data: ", joint_data)
     image_data = load_images(image_file)
 
     finished_joint_data = []
     
     #Remove last n frames to avoid weird behaviour
-    n_removed_frames = 5
+    n_removed_frames = 6
 
     print("running frame occlusion", len(joint_data))
     #Occlude area where not walking properly
-    image_data, joint_data = occlude_area_in_frame([[0,375,240,424]], joint_data, image_data)
+    image_data, joint_data = occlude_area_in_frame([[0,320,240,424]], joint_data, image_data)
 
     #Fix any incorrect depth data
     print("detecting outlier values ", len(joint_data))
     joint_data = normalize_outlier_values(joint_data, image_data)
 
     print("Removing empty frames", len(joint_data))
+    empty_counter = 0
+    has_been_in_instance = False
+
     for i, row in enumerate(joint_data):
 
-        #Find and remove the end 5 frames in an instance 
-        if joint_data[i + n_removed_frames][1] == 0:
-            n_removed_frames -= 1
-            continue
+       # empty_coords = 0
+       # for j, coord in enumerate(row):
+       #     if j > 2:
+       #         if all(v == 0 for v in coord) == True:
+        #            empty_coords += 1
 
-        if n_removed_frames < 5 and n_removed_frames > 0:
-            n_removed_frames -= 1
-            continue
+        #if empty_coords > 15 and has_been_in_instance:
+        #    empty_counter += 1#
 
-        if n_removed_frames == 0:
-            n_removed_frames = 5
-
-                
-
-        empty_coords = 0
-        for j, coord in enumerate(row):
-            if j > 2:
-                if all(v == 0 for v in coord) == True:
-                    empty_coords += 1
+#        if i > 0:
+#            if row[1] < joint_data[i - 1][1]:
+#                empty_counter = 0
+#                has_been_in_instance = False
         
-        if empty_coords < 5:
-            finished_joint_data.append(copy.deepcopy(row))
+        #If empties more than 3 in a row, person has definetely left the screen, remove all following 
+        #frames until the next sequence begins
+ #       if joint_data[i][0] == 2:
+ #           print("lens: ", empty_counter, has_been_in_instance)
+ #           render_joints(image_data[i], row, delay=True)
+
+
+ #       if empty_coords < 5:
+        finished_joint_data.append(copy.deepcopy(row))
+ #           has_been_in_instance = True
+ #       else:
+ #           print("discarding joint row: ", i)
+ #           if has_been_in_instance:
+ #               empty_counter += 1
+ #           continue
+
+ #       if empty_counter > 5 and len(joint_data) > i + 1:
+ #           if row[1] < joint_data[i+1][1]:
+ #               print("continuing because: ", row[1], joint_data[i+1][1])
+ #               continue
+ #           else:
+ #               empty_counter = 0
+
+
 
         #Save images as you go
-            if save:
-                if row[1] < 10:
-                    file_no = str(0) + str(row[1])
-                else:
-                    file_no = str(row[1])
+        if save:
+            print("saving instance: ", str(float(row[0])))
+            if row[1] < 10:
+                file_no = str(0) + str(row[1])
+            else:
+                file_no = str(row[1])
 
-                directory = "./EDA/Finished_Data/Images/Instance_" + str(float(row[0] - 2))
-                os.makedirs(directory, exist_ok = True)
-                cv2.imwrite(directory + "/" + file_no + ".jpg", image_data[i])
+            directory = "./EDA/Finished_Data/Images/Instance_" + str(float(row[0]))
+            os.makedirs(directory, exist_ok = True)
+            cv2.imwrite(directory + "/" + file_no + ".jpg", image_data[i])
 
     #Fix head coordinates on what's left
     normalize_head_coords(joint_data, image_data)
@@ -561,67 +581,49 @@ def occlude_area_in_frame(occlusion_box, joint_data, image_data):
     refined_joint_data = []
     refined_image_data = []
 
+    occlusion_begun = False
+    has_been_in_frame = False
+
     for i, row in enumerate(joint_data):
         print("joint: ", i, "of : ", len(joint_data))
         occlusion_counter = 0
         #Ignore metadata
+
+        #Reset for the start of a new instance
+        if i > 0:
+            if row[1] < joint_data[i - 1][1]:
+                #print("RESETTING TO FALSE")
+                #render_joints(image_data[i], row, delay=True)
+                occlusion_begun = False
+                has_been_in_frame = False
+
+        empty_coords = 0
+        for j, coord in enumerate(row):
+            if j > 2:
+                if all(v == 0 for v in coord) == True:
+                    empty_coords += 1
+
         for j, coord in enumerate(row):
             if j >= 3:
-                if check_interception(occlusion_box, coord) == True:
+                if check_interception(occlusion_box, coord) == True and empty_coords < 15:
                     occlusion_counter += 1
         
         #If more than 5 joints are in the occlusion zone, get rid of these joints and corresponding images
-        if occlusion_counter < 5:
-            refined_joint_data.append(row)
-            refined_image_data.append(image_data[i])
-            print("num joints occluded = ", occlusion_counter)
-        else:
-            print("removing frame: ")
-           #render_joints(image_data[i], row, delay=True)
+        if occlusion_begun == False:
+            if occlusion_counter < 3 and empty_coords < 15:
+                refined_joint_data.append(row)
+                refined_image_data.append(image_data[i])
+                has_been_in_frame = True
+                #print("num joints occluded = ", occlusion_counter)
+                #print("keeping frame:")
+                #render_joints(image_data[i], row, delay=True)
+            else:
+                if has_been_in_frame == True:
+                    occlusion_begun = True
+                #print("removing frame: ", occlusion_begun)
+                #render_joints(image_data[i], row, delay=True)
 
     return refined_image_data, refined_joint_data
-
-
-
-def normalize_depth_extremities(joints_data, image_data):
-    threshold = 30
-    #Get all joints within threshold of extremities 
-    for i, row in enumerate(joints_data):
-        normalize = []
-        #Find indices of joints lying near the extremities of the camera FOV
-        for j, joint in enumerate(row):
-            if joint[0] > 235 or joint[0] < 5:
-                normalize.append(j)
-            if joint[1] > 420 or joint[1] < 5:
-                normalize.append(j)
-        
-    
-        if len(normalize) > 0:
-            print("inconsistent depth values detected")
-            plot3D_joints(row)
-
-        #Once row is enumerated, go through joint connections to find each indices neighbour
-        for extremity in normalize:
-            for j in joint_connections:
-                if j[0] + 3 == extremity:
-                    if abs(joints_data[extremity][2] - joints_data[j[1]][2]) > threshold:
-                        joints_data[i][extremity] = j[1][2]
-                        continue
-                elif j[1] + 3 == extremity:
-                    joints_data[i][extremity] = j[0][2]
-                    continue
-        
-        if len(normalize) > 0:
-            print("inconsistent depth values fixed")
-            plot3D_joints(joints_data[i])
-
-
-    return joints_data
-
-    #If this joint isn't within threshold of difference depth-wise to its connected neighbour, set it's depth to that neighbour
-
-    #return modified data
-
 
 
 def normalize_outlier_values(joints_data, image_data, plot3d = True):
@@ -629,56 +631,63 @@ def normalize_outlier_values(joints_data, image_data, plot3d = True):
 
         print("before")
         render_joints(image_data[i], row, delay = True)
-        #plot3D_joints(row)
+        plot3D_joints(row)
         depth_values = []
         #Get average depth of row
         for j, joints in enumerate(row):
             if j > 2:
                 depth_values.append(joints_data[i][j][2])
-        
-        #standard_dev = np.std(depth_values)
-        #mean = np.mean(depth_values)
 
-        quartiles = np.quantile(depth_values, [0,0.25,0.5,0.75,1])
+        quartiles = np.quantile(depth_values, [0,0.15,0.5,0.9,1])
+
+        #Work out if quartile extent is even a problem
+        q1_problem = False
+        q4_problem = False
+
+        #Do this by examining if there is a huge gap between the median and the extremities
+        if quartiles[3] > quartiles[2] + 50:
+            q4_problem = True
+        if quartiles[1] < quartiles[2] - 50:
+            q1_problem = True
+
         #Find all the instances with an inconsistent depth
         incorrect_depth_indices = []
         for k, d in enumerate(depth_values):
             #Check if an outlier
-            print("depth value is: ", d, "threshold is: ", quartiles[3], quartiles[1])
-            if d > quartiles[3] or d <= quartiles[1]:
-                print("found incorrect depth: ", k)
-                incorrect_depth_indices.append(k)
+            #print("depth value is: ", d, "threshold is: ", quartiles[3], quartiles[1])
+            if d > quartiles[3] and q4_problem == True or d <= quartiles[1] and q1_problem == True or d <= 15.0:
+                #print("found incorrect depth: ", k, d, "coord: ", joints_data[i][3 + k])
+                incorrect_depth_indices.append(k + 3)
 
         k = 0
         #Set incorrect depths to the depths of their neighbours if they fall inside the range
+        #print("number of corrections to be made: ", len(incorrect_depth_indices))
         for k, indice in enumerate(incorrect_depth_indices):
             for connection_pair in joint_connections:
-                print("connection pair: ", connection_pair, connection_pair[0], connection_pair[1], indice)
+                #print("resetting indice: ", indice, joints_data[i][indice])
                 if connection_pair[0] + 3 == indice:
                     connection_joint = joints_data[i][connection_pair[1] + 3][2]
                     if connection_joint < quartiles[3] and connection_joint > quartiles[1]:
                         joints_data[i][indice][2] = connection_joint
-                        print("resetting connection joint depth")
+                       # print("resetting connection joint depth", indice)
+                        continue
                     else:
                         joints_data[i][indice][2] = quartiles[2]
-                        print("resetting connection joint depth with median")
+                      #  print("resetting connection joint depth with median", indice)
                         continue
                 elif connection_pair[1] + 3 == indice:
-                    print("debug: ", joints_data[i])
-                    print("debug: ", joint_connections)
-                    print("debug: ", joints_data[i][connection_pair[0]])
-                    print("debug: ", joints_data[i])
                     connection_joint = joints_data[i][connection_pair[0] + 3][2]
                     if connection_joint < quartiles[3] and connection_joint > quartiles[1]:
                         joints_data[i][indice][2] = connection_joint
-                        print("resetting connection joint depth")
+                       # print("resetting connection joint depth", indice)
+                        continue
                     else:
                         joints_data[i][indice][2] = quartiles[2]
-                        print("resetting connection joint depth with median")
+                     #   print("resetting connection joint depth with median", indice)
                         continue
         print("after corrections")
         render_joints(image_data[i], row, delay = True)
-        #plot3D_joints(row)
+        plot3D_joints(row)
     
     return joints_data
 #3: nose
@@ -690,22 +699,20 @@ def normalize_head_coords(joints_data, image_data):
 
     for i, row in enumerate(joints_data):
 
-        print("before")
-        render_joints(image_data[i], row, delay = True)
+        #print("before")
+        #render_joints(image_data[i], row, delay = True)
 
         face_joints = []
         null_counter = 0
         face_joints_depth_mean = 0
-        inconsistent_counter = 0
-        inconsistent_positions = [0,0,0,0,0]
         null_positions = [0,0,0,0,0]
         for j, coord in enumerate(row):
             if j > 2 and j < 8:
                 face_joints.append(coord)
                 for v in face_joints:
-                    print("coords here: ", v)
+                    #print("coords here: ", v)
                     if v[0] <= 5 and v[1] <= 5:
-                        print("finding null here")
+                        #print("finding null here")
                         null_counter += 1
                         null_positions[j - 3] = 1
                         face_joints_depth_mean += v[2]
@@ -716,25 +723,25 @@ def normalize_head_coords(joints_data, image_data):
             normalize_scalar = 4# len(face_joints) - null_counter
             mean = [0,0,0]
             for f in face_joints:
-                print("adding mean: ", mean, f)
+                #print("adding mean: ", mean, f)
                 mean = add_lists(mean, f)
 
-            print("dividing result", mean, normalize_scalar)
+            #print("dividing result", mean, normalize_scalar)
             mean = divide_list(mean, normalize_scalar) 
-            print("result", mean) 
+            #print("result", mean) 
 
-            print("getting here?")
+            #print("getting here?")
             #Re-iterate through correcting the broken face joints
             for k, coord in enumerate(row):
                 if k > 2 and k < 8:
                     if null_positions[k - 3] == 1:
-                        print("applying new joints data value", joints_data[i][k])
+                        #print("applying new joints data value", joints_data[i][k])
                         joints_data[i][k] = mean
-                        print("value now", joints_data[i][k])
+                        #print("value now", joints_data[i][k])
 
         
-        print("after", null_counter)
-        render_joints(image_data[i], joints_data[i], delay = True)
+        #print("after", null_counter)
+        #render_joints(image_data[i], joints_data[i], delay = True)
 
 
 def main():
@@ -742,6 +749,7 @@ def main():
     #Process data from EDA into perfect form
     correct_joints_data("./Images", "./EDA/gait_dataset_pixels.csv", save=True)
     #Test:
+    print("Correction processing sucessfully completed, testing resulting images and joints...")
     load_and_overlay_joints(directory="./EDA/Finished_Data/Images/", joint_file="./EDA/Finished_Data/pixel_data_absolute.csv", ignore_depth=False, plot_3D=True)
 
     #Experimental creating hand crafted features

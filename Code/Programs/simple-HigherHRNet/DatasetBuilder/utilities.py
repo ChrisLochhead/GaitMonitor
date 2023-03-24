@@ -258,7 +258,9 @@ def plot3D_joints(joints):
     ax.set_zlim3d([0, 255])
     plt.gca().invert_yaxis()
     plt.gca().invert_zaxis()
-    ax.view_init(-90, 180)
+    #z forward -90, 180
+    #on the corner -175, 120
+    ax.view_init(-175, 120)
 
     cmap = ListedColormap(sns.color_palette("husl", 256).as_hex())
 
@@ -271,7 +273,10 @@ def plot3D_joints(joints):
     # legend
     #-90, 180, 0 angle, azimuth and roll
     plt.legend(*sc.legend_elements(), bbox_to_anchor=(1.05, 1), loc=2)
+    #plt.draw()#block=True)
     plt.show(block=True)
+    #plt.waitforbuttonpress(0) # this will wait for indefinite time
+    #plt.close(fig)
     # save
     #plt.savefig("scatter_hue", bbox_inches='tight')
 
