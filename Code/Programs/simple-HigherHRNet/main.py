@@ -88,7 +88,6 @@ def get_3D_coords(coords_2d, dep_img, pts3d_net = True, dilate = True, meta_data
             result = rs.rs2_deproject_pixel_to_point(loaded_intrinsics, [x, y], orig_dep_img[(x, y)])
             pts_3D_metres.append([-result[0], -result[1], result[2]])
             pts_3D.append([x, y, result[2]])
-
         else:
             pts_3D.append([x,y, dep_img[(y,x)]])
             pts_3D_metres.append([x,y, dep_img[(y,x)]])
@@ -235,18 +234,21 @@ def run_images(folder_name, exclude_2D = False, write_mode = "w+", start_point =
                 refined_joints_metres = [ [0,0,0] for _ in range(17) ]
 
             new_entry = [subdir_iter, file_iter, data_class]
-
+            new_metres_entry = [subdir_iter, file_iter, data_class]
             # 0 is instance, 1 is num in sequence, 2 is class, 3 is array of joints
             for i, joint in enumerate(refined_joints):
                 #Convert so it saves with comma delimiters within the joint-sets
                 tmp = [joint[0], joint[1], joint[2]]
+                tmp_metres = [refined_joints_metres[i][0], refined_joints_metres[i][1],refined_joints_metres[i][2] ]
                 new_entry.append(tmp)
+                new_metres_entry.append(tmp_metres)
+
 
             print("full completed depth joints: ", len(new_entry))
             #render_joints(corr_image, new_entry[3:], delay=True, use_depth=True, metadata = 0)
             
             joints_file.append(new_entry)
-            joints_file_metres.append(new_entry)
+            joints_file_metres.append(new_metres_entry)
 
             file_iter += 1
         subdir_iter +=1
@@ -265,7 +267,7 @@ def run_images(folder_name, exclude_2D = False, write_mode = "w+", start_point =
         with open("./EDA/gait_dataset_pixels.csv",write_mode, newline='') as my_csv:
             csvWriter = csv.writer(my_csv,delimiter=',')
             csvWriter.writerows(joints_file)
-            joints_file = []
+        joints_file = []
         with open("./EDA/gait_dataset_metres.csv",write_mode, newline='') as my_csv:
             csvWriter = csv.writer(my_csv,delimiter=',')
             csvWriter.writerows(joints_file_metres)
@@ -404,24 +406,20 @@ def create_dataset_with_chestpoint(jointfile, folder, save = True, debug = False
 def run_velocity_debugger(folder, jointfile, save = False, debug = False):
         
         joint_data = load(jointfile)
-        image_data = load_images(folder)
-        
+        image_data = load_images(folder, ignore_depth=False)
         velocity_dataset = []
         for i, joints in enumerate(joint_data):
             if i+1 < len(joint_data) and i > 0:
-                print("this is average image: ", i)
                 velocity_dataset.append(plot_velocity_vectors(image_data[i], joint_data[i - 1], joints, joint_data[i + 1], debug=debug))
             elif i+1 < len(joint_data) and i <= 0:
-                print("this is the first image: ", i)
                 velocity_dataset.append(plot_velocity_vectors(image_data[i], [0], joints, joint_data[i + 1], debug=debug))
             elif i+1 >= len(joint_data) and i > 0:
-                print("this is the last image: ")
                 velocity_dataset.append(plot_velocity_vectors(image_data[i], joint_data[i - 1], joints, [0], debug=debug))
         
         new_dataframe = pd.DataFrame(velocity_dataset, columns = colnames)
         if save:
                 #Convert to dataframe 
-            new_dataframe.to_csv("./EDA/Velocity.csv",index=False, header=False)
+            new_dataframe.to_csv("./EDA/Finished_Data/pixel_velocity_relative.csv",index=False, header=False)
     
 ############################################################ Draw velocity vectors here ##################
 ## couch coords topleft.x, topleft.y, 2 boxes
@@ -488,12 +486,12 @@ def apply_joint_occlusion(file, save = False, debug = False):
         print("SAVING")
         new_dataframe.to_csv("./EDA/Gait_Pixel_Dataset_Occluded.csv",index=False, header=False)         
 
-def correct_joints_data(image_file, joint_file, save = False):
+def correct_joints_data(image_file, joint_file, save = False, pixels = True):
 
     #Get raw images and corresponding joint info
     joint_data = load(joint_file)
    #print("joint data: ", joint_data)
-    image_data = load_images(image_file)
+    image_data = load_images(image_file, ignore_depth=True)
 
     finished_joint_data = []
     
@@ -502,56 +500,31 @@ def correct_joints_data(image_file, joint_file, save = False):
 
     print("running frame occlusion", len(joint_data))
     #Occlude area where not walking properly
-    image_data, joint_data = occlude_area_in_frame([[0,320,240,424]], joint_data, image_data)
+    occlusion_box_pixels = [[0,320,240,424]]
+
+    #Create blank depth image
+    tmp_depth = np.zeros((240,424))
+    for i, row in enumerate(tmp_depth):
+        for j, col in enumerate(row):
+            tmp_depth[i][j] = 15
+
+    _, occlusion_box_metres = get_3D_coords([[0,320,15],[240,424,15]], tmp_depth, meta_data=0)
+    print("occlusion: ", occlusion_box_metres)
+    occlusion_box_metres = [[occlusion_box_metres[0][0],occlusion_box_metres[0][1],occlusion_box_metres[1][0],occlusion_box_metres[1][1]]]
+    
+    if pixels:
+        image_data, joint_data = occlude_area_in_frame(occlusion_box_pixels, joint_data, image_data)
+    else:
+        image_data, joint_data = occlude_area_in_frame(occlusion_box_metres, joint_data, image_data)
 
     #Fix any incorrect depth data
     print("detecting outlier values ", len(joint_data))
     joint_data = normalize_outlier_values(joint_data, image_data)
 
     print("Removing empty frames", len(joint_data))
-    empty_counter = 0
-    has_been_in_instance = False
 
     for i, row in enumerate(joint_data):
-
-       # empty_coords = 0
-       # for j, coord in enumerate(row):
-       #     if j > 2:
-       #         if all(v == 0 for v in coord) == True:
-        #            empty_coords += 1
-
-        #if empty_coords > 15 and has_been_in_instance:
-        #    empty_counter += 1#
-
-#        if i > 0:
-#            if row[1] < joint_data[i - 1][1]:
-#                empty_counter = 0
-#                has_been_in_instance = False
-        
-        #If empties more than 3 in a row, person has definetely left the screen, remove all following 
-        #frames until the next sequence begins
- #       if joint_data[i][0] == 2:
- #           print("lens: ", empty_counter, has_been_in_instance)
- #           render_joints(image_data[i], row, delay=True)
-
-
- #       if empty_coords < 5:
         finished_joint_data.append(copy.deepcopy(row))
- #           has_been_in_instance = True
- #       else:
- #           print("discarding joint row: ", i)
- #           if has_been_in_instance:
- #               empty_counter += 1
- #           continue
-
- #       if empty_counter > 5 and len(joint_data) > i + 1:
- #           if row[1] < joint_data[i+1][1]:
- #               print("continuing because: ", row[1], joint_data[i+1][1])
- #               continue
- #           else:
- #               empty_counter = 0
-
-
 
         #Save images as you go
         if save:
@@ -561,9 +534,9 @@ def correct_joints_data(image_file, joint_file, save = False):
             else:
                 file_no = str(row[1])
 
-            directory = "./EDA/Finished_Data/Images/Instance_" + str(float(row[0]))
-            os.makedirs(directory, exist_ok = True)
-            cv2.imwrite(directory + "/" + file_no + ".jpg", image_data[i])
+            #directory = "./EDA/Finished_Data/Images/Instance_" + str(float(row[0]))
+            #os.makedirs(directory, exist_ok = True)
+            #cv2.imwrite(directory + "/" + file_no + ".jpg", image_data[i])
 
     #Fix head coordinates on what's left
     normalize_head_coords(joint_data, image_data)
@@ -571,7 +544,7 @@ def correct_joints_data(image_file, joint_file, save = False):
     print("finished length of joints: ", len(finished_joint_data))
     #Finally finish joints
     if save:
-        with open("./EDA/Finished_Data/pixel_data_absolute.csv","w+", newline='') as my_csv:
+        with open("./EDA/Finished_Data/metres_data_absolute.csv","w+", newline='') as my_csv:
             csvWriter = csv.writer(my_csv,delimiter=',')
             csvWriter.writerows(finished_joint_data)
 
@@ -630,8 +603,8 @@ def normalize_outlier_values(joints_data, image_data, plot3d = True):
     for i, row in enumerate(joints_data):
 
         print("before")
-        render_joints(image_data[i], row, delay = True)
-        plot3D_joints(row)
+        #render_joints(image_data[i], row, delay = True)
+        #plot3D_joints(row)
         depth_values = []
         #Get average depth of row
         for j, joints in enumerate(row):
@@ -686,8 +659,8 @@ def normalize_outlier_values(joints_data, image_data, plot3d = True):
                      #   print("resetting connection joint depth with median", indice)
                         continue
         print("after corrections")
-        render_joints(image_data[i], row, delay = True)
-        plot3D_joints(row)
+        #render_joints(image_data[i], row, delay = True)
+        #plot3D_joints(row)
     
     return joints_data
 #3: nose
@@ -747,14 +720,14 @@ def normalize_head_coords(joints_data, image_data):
 def main():
 
     #Process data from EDA into perfect form
-    correct_joints_data("./Images", "./EDA/gait_dataset_pixels.csv", save=True)
+    #correct_joints_data("./Images", "./EDA/gait_dataset_metres.csv", save=True, pixels=False)
     #Test:
-    print("Correction processing sucessfully completed, testing resulting images and joints...")
-    load_and_overlay_joints(directory="./EDA/Finished_Data/Images/", joint_file="./EDA/Finished_Data/pixel_data_absolute.csv", ignore_depth=False, plot_3D=True)
+    #print("Correction processing sucessfully completed, testing resulting images and joints...")
+    #load_and_overlay_joints(directory="./EDA/Finished_Data/Images/", joint_file="./EDA/Finished_Data/pixel_data_absolute.csv", ignore_depth=False, plot_3D=True)
 
     #Experimental creating hand crafted features
     #get_gait_cycles(load("./EDA/unravelled_relative_data.csv"))
-    #create_hcf_dataset("./EDA/gait_dataset_pixels.csv", "./EDA/gait_dataset_pixels.csv", "./Images")
+    create_hcf_dataset("./EDA/Finished_Data/pixel_data_absolute.csv", "./EDA/gait_dataset_pixels.csv", "./Images")
     #Create dataset with chest joints
     #create_dataset_with_chestpoint("./EDA/gait_dataset_pixels.csv", "./Images")
     
@@ -765,13 +738,9 @@ def main():
     #apply_joint_occlusion("./EDA/gait_dataset_pixels.csv", save = True, debug=True)
 
     #Draw calculated velocities
-    #run_velocity_debugger("./Images", "./EDA/gait_dataset_pixels.csv", save= True, debug=True)
+    #run_velocity_debugger("./EDA/Finished_Data/Images/", "./EDA/Finished_Data/pixel_data_relative.csv", save= True, debug=False)
 
-    #Not used
-    #run_images("./Images", exclude_2D=False)
-
-    #Vizualize joints overlaying (in real time)
-    #run_images("./Images")
+    #run_images("./Images", exclude_2D=False, start_point=0)
 
     #run_depth_sample("./DepthExamples", "depth_examples.csv")
     #run_video()
