@@ -267,7 +267,7 @@ def run_images(folder_name, exclude_2D = False, write_mode = "w+", start_point =
         with open("./EDA/gait_dataset_pixels.csv",write_mode, newline='') as my_csv:
             csvWriter = csv.writer(my_csv,delimiter=',')
             csvWriter.writerows(joints_file)
-        joints_file = []
+            joints_file = []
         with open("./EDA/gait_dataset_metres.csv",write_mode, newline='') as my_csv:
             csvWriter = csv.writer(my_csv,delimiter=',')
             csvWriter.writerows(joints_file_metres)

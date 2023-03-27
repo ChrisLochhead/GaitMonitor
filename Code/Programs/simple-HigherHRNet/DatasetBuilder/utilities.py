@@ -304,7 +304,7 @@ def get_cadence(gait_cycles, images):
 
 
 
-def create_hcf_dataset(jointfile, rel_jointfile, abs_veljointfile, folder):
+def create_hcf_dataset(jointfile, rel_jointfile, abs_veljointfile, folder, save = True):
     abs_joint_data = load(jointfile)
     rel_joint_data = load(rel_jointfile)
     abs_veljoint_data = load(abs_veljoint_data)
@@ -346,6 +346,25 @@ def create_hcf_dataset(jointfile, rel_jointfile, abs_veljointfile, folder):
     stride_lengths, stride_ratios = get_stride_lengths(rel_gait_cycles, images)
 
     #Combine all hand crafted features into one concrete dataset, save and return it.
+    gait_cycles_dataset = []
+    for i, cycle in enumerate(gait_cycles):
+        #Add metadata
+        hcf_cycle = [cycle[0][0], cycle[0][1], cycle[0][1]]
+        hcf_cycle.append(cadences[i])
+        hcf_cycle.append(feet_heights[i])
+        hcf_cycle.append(times_LOG[i], times_not_moving[i])
+        hcf_cycle.append(speeds[i])
+        hcf_cycle.append(stride_lengths[i])
+        hcf_cycle.append(stride_ratios[0])
+        gait_cycles_dataset.append(copy.deepcopy(hcf_cycle))
+
+    if save:
+        with open("./EDA/Finished_Data/hcf_dataset_pixels.csv","w+", newline='') as my_csv:
+            csvWriter = csv.writer(my_csv,delimiter=',')
+            csvWriter.writerows(gait_cycles_dataset)
+
+    return gait_cycles_dataset
+
 
 
 def blacken_frame(frame):
