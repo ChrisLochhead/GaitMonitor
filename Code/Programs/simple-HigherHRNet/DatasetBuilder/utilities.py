@@ -182,102 +182,100 @@ def get_time_cycles(joint_data, images):
 def get_gait_cycles(joint_data, images):
     instances = []
     instance = []
-    threshold = 15
-    ahead = 1
-    ahead_previous = 1
-    changes = 0
-    draw_colour = (0,255,0)
     current_instance = 0
-    #Firstly, separate all data into arrays of each instance
-    for row_iter, row in enumerate(joint_data):
-        if len(joint_data) > row_iter + 1 and len(instance) > 1:
-            if joint_data[row_iter + 1][0] != current_instance:
-                current_instance = row[0]
-                instance.append(row)
-                print("-A detected overlap, resetting", len(instance))
-                instances.append(copy.deepcopy(instance))
-                if draw_colour == (0, 255, 0):
-                    draw_colour = (0, 0, 255)
-                else:
-                    draw_colour = (0, 255, 0)
-
-                instance = []
-                changes = 0
-                continue
-
-        #Check for a new instance
-        print("lens: ", len(images), len(joint_data))
-        #Take note of what last ahead was
-        ahead_previous = ahead
-        #Going left as usual
-        if row[19][1] > row[18][1] + threshold:
-            if ahead_previous == 1:
-                changes += 1
-                instance.append(row)
-                if changes > 2:
-                    print("A detected overlap, resetting", len(instance))
-                    instances.append(copy.deepcopy(instance))
-                    if draw_colour == (0, 255, 0):
-                        draw_colour = (0, 0, 255)
-                    else:
-                        draw_colour = (0, 255, 0)
-
-                    instance = []
-                    changes = 0
-            else:
-                instance.append(row)
-            print("A", row[18][1], row[19][1])
-            ahead = 0
-
-        #Going right as usual
-        elif row[18][1] > row[19][1] + threshold:
-            if ahead_previous == 0:
-                changes += 1
-                instance.append(row)            
-                if changes > 2:   
-                    print("B detected overlap, resetting", len(instance))             
-                    instances.append(copy.deepcopy(instance))
-                    if draw_colour == (0, 255, 0):
-                        draw_colour = (0, 0, 255)
-                    else:
-                        draw_colour = (0, 255, 0)
-                    instance = []
-                    changes = 0
-            else:
-                instance.append(row)
-            ahead = 1
-
-            print("B", row[18][1], row[19][1])
+    #First separate the joints into individual instances
+    for joints in joint_data:
+        #Append joints as normal
+        if joints[0] == current_instance:
+            instance.append(joints)
         else:
-            instance.append(row)
+            #If this is the first of a new instance, add the old instance to the array,
+            #clear it, add this current one and reset what current instance is.
+            instances.append(copy.deepcopy(instance))
+            instance = []
+            instance.append(joints)
+            current_instance = joints[0]
 
+    print("number of instances: ", len(instances))
 
+    gait_cycles = []
+    gait_cycle = []
 
-        print("current row values: ", row[18][1], row[19][1], draw_colour)
-
-        #if ahead == 1:
-        #    render_joints(images[row_iter], row, delay=True, use_depth=False, colour=draw_colour)
-        #else:
-        #   render_joints(images[row_iter], row, delay=True, use_depth=False, colour=draw_colour)
-
-    #Debug drawing, just draw regular blue for left, red for right
-    print("gait cycle retreival completed")
-    counter = 0
-    cycle_count = 0
-
-    blue_cycle = False
+    #For each instance
     for i, inst in enumerate(instances):
-        print("new cycle of length: ", len(inst), cycle_count, i)
-        for j, joints_frame in enumerate(inst):            
-            if i % 2 == 0:
-                render_joints(images[counter], joints_frame, delay=True, use_depth=False, colour=(0,0, 255))
+        found_initial_direction = False
+        direction = -1
+        crossovers = 0
+        for j, row in enumerate(inst):
+            print("Current left and right leg values: ", row[18], row[19])
+            #Only register initial direction if they aren't equal
+            if found_initial_direction == False:
+                if row[18][1] > row[19][1]:
+                    direction = 0
+                    found_initial_direction = True
+                elif row[18][1] < row[19][1]:
+                    direction = 1
+                    found_initial_direction = True
+
+            #Check if the direction matches the current movement and append as appropriate
+            if row[18][1] > row[19][1] and direction == 0:
+                print("no crossover: ", row[18][1] , row[19][1] )
+                gait_cycle.append(row)
+            elif row[18][1] < row[19][1] and direction == 1:
+                print("no crossover: ", row[18][1] , row[19][1] )
+                gait_cycle.append(row)
+            elif row[18][1] > row[19][1] and direction == 1:
+                print("crossover 1", row[18][1] , row[19][1])
+                crossovers += 1
+                gait_cycle.append(row)
+                direction = 0
+            elif row[18][1] < row[19][1] and direction == 0:
+                print("crossover 2", row[18][1] , row[19][1])
+                crossovers += 1
+                gait_cycle.append(row)
+                direction = 1
             else:
-                render_joints(images[counter], joints_frame, delay=True, use_depth=False, colour=(255,0, 0))
-            counter += 1
-        #New Cycle incoming
-        cycle_count += 1
+                #There is either no cross over or the rows are totally equal, in which case just add as usual
+                print("default: ", row[18][1] , row[19][1])
+                gait_cycle.append(row)
+
+            #Check the number of crossovers 
+            #If there has been 2 this is one full gait cycle, append it to the gait cycles and reset the 
+            #current gait cycle.
+            if crossovers > 1:
+                crossovers = 0
+                gait_cycles.append(copy.deepcopy(gait_cycle))
+                gait_cycle = []
+                #gait_cycle.append(row)
+
+            #Check if we are at the end of the instance and adjust the last cycle accordingly so we dont end up with length 1 gait cycles.
+            if j == len(inst):
+                #If the current gait cycle isn't at least 5 frames, just append it on to the latest one
+                if len(gait_cycle) < 5:
+                    for g in gait_cycle:
+                        gait_cycles[-1].append(g)
+                    gait_cycles = []
+                else:
+                #Otherwise just add this one and reset it before the next instance starts.
+                    gait_cycles.append(gait_cycle)
+                    gait_cycle = []
+
+    #Illustrate results
+    col = (0,0,255)
+    image_iter = 0
+    for cycle in gait_cycles:
+        #Switch the cycle every new gait cycle
+        if col == (0,0,255):
+            col = (255,0,0)
+        else:
+            col = (0,0,255)
+        for row in cycle:
+            #Render every frame
+            #render_joints(images[image_iter], row, delay=True, use_depth=False, colour=col)
+            image_iter += 1
+            
+
     
-    return instances
 
 def get_stride_lengths(gait_cycles, images, abs_gait_cycles):
     stride_lengths = []
@@ -309,7 +307,7 @@ def get_stride_lengths(gait_cycles, images, abs_gait_cycles):
     return stride_lengths, stride_ratios
             
 
-def get_speed(abs_joints, gait_cycles, images):
+def get_speed(gait_cycles, images):
 
     #instance_speeds = []
     #current_instance = -1
@@ -460,8 +458,11 @@ def create_hcf_dataset(jointfile, rel_jointfile, abs_veljointfile, folder, save 
     #Gait cycle has instances of rows: each instance contains an array of rows
     #denoting all of the frames in their respective gait cycle, appended with their
     #metadata at the start
-    #gait_cycles = get_gait_cycles(abs_joint_data, images)
-    gait_cycles = get_time_cycles(abs_joint_data, images)
+    gait_cycles = get_gait_cycles(abs_joint_data, images)
+
+    #Terrible
+    #gait_cycles = get_time_cycles(abs_joint_data, images)
+
     #Replicate this pattern for the relative gait cycle (if youn run it directly, 
     #relative gait will return very marginally different gait cycles.)
     rel_gait_cycles = []
@@ -474,7 +475,6 @@ def create_hcf_dataset(jointfile, rel_jointfile, abs_veljointfile, folder, save 
         rel_gait_cycles.append(copy.deepcopy(new_cycle))
 
     print("number of total gait cycles: ", len(gait_cycles))
-    return
     #Then for every gait cycle create a new instance with the following features: 
     #Cadences returns a scalar for every gait cycle returning the number of steps 
     #cadences = get_cadence(gait_cycles, images)
