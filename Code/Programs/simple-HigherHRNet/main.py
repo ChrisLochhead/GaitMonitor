@@ -727,7 +727,8 @@ def main():
 
     #Experimental creating hand crafted features
     #get_gait_cycles(load("./EDA/unravelled_relative_data.csv"))
-    create_hcf_dataset("./EDA/Finished_Data/pixel_data_absolute.csv", "./EDA/gait_dataset_pixels.csv", "./Images")
+    create_hcf_dataset("./EDA/Finished_Data/pixel_data_absolute.csv", "./EDA/Finished_Data/pixel_data_relative.csv", \
+                        "./EDA/Finished_Data/pixel_velocity_absolute.csv", "./EDA/Finished_Data/Images")
     #Create dataset with chest joints
     #create_dataset_with_chestpoint("./EDA/gait_dataset_pixels.csv", "./Images")
     

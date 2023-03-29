@@ -112,52 +112,153 @@ def load_images(folder, ignore_depth = True):
     
     return image_data
 
+def add_lists(list1, list2, change_type = False):
+    return list((np.array(list1) + np.array(list2)).astype(int))
+
+def list_to_arrays(my_list):
+    tmp_list = copy.deepcopy(my_list)
+    for i, l in enumerate(tmp_list):
+        if isinstance(l, list):
+            tmp_list[i] = np.array(l)
+
+    return tmp_list
+
+def subtract_lists(list1, list2):
+    result = np.subtract(list1, list2)
+  #  result = map(int, result)
+    return list(result)#
+
+def midpoint(list1, list2):
+    result = (np.array(list1) + np.array(list2)).astype(int)
+    result = result / 2
+    return list(result)
+
+def divide_lists(list1, list2, n):
+    return list((np.array(list1) + np.array(list2))/n)
+
+def divide_list(list1, n):
+    return list((np.array(list1))/n)
+
+def get_time_cycles(joint_data, images):
+    instances = []
+    instance = []
+    threshold = 5
+    current_instance = 0
+    for row_iter, row in enumerate(joint_data):
+        current_instance = row[0]
+
+        instance.append(row)
+        if len(instance) >= threshold:
+            instances.append(copy.deepcopy(instance))
+            print("A final length: ", len(instance))
+            instance = []
+            continue 
+
+        if len(joint_data) > row_iter + 1:
+            if joint_data[row_iter + 1][0] != current_instance:
+                #Add to previous to make sure no cycle is less than 5
+                if len(instance) < threshold:
+                    for inst in instance:
+                        instances[-1].append(inst)
+                #instances.append(copy.deepcopy(instance))
+                print("B final length: ", len(instance))
+                instance = []
+                continue
+
+    print("Time instances made:, lengths: ")
+    iter = 0
+    cycle_iter = 0
+    for cycle in instances:
+        print("length: ", len(cycle))
+        iter += len(cycle)
+        cycle_iter += 1
+    print("total number of instances: ", iter, " number of cycles: ", cycle_iter)
+
+    return instances
+        
+
+
 #This will only work with relative data
 def get_gait_cycles(joint_data, images):
     instances = []
     instance = []
     threshold = 15
-    ahead = 0
-    ahead_previous = 0
-
+    ahead = 1
+    ahead_previous = 1
+    changes = 0
+    draw_colour = (0,255,0)
+    current_instance = 0
     #Firstly, separate all data into arrays of each instance
     for row_iter, row in enumerate(joint_data):
+        if len(joint_data) > row_iter + 1 and len(instance) > 1:
+            if joint_data[row_iter + 1][0] != current_instance:
+                current_instance = row[0]
+                instance.append(row)
+                print("-A detected overlap, resetting", len(instance))
+                instances.append(copy.deepcopy(instance))
+                if draw_colour == (0, 255, 0):
+                    draw_colour = (0, 0, 255)
+                else:
+                    draw_colour = (0, 255, 0)
 
+                instance = []
+                changes = 0
+                continue
+
+        #Check for a new instance
+        print("lens: ", len(images), len(joint_data))
         #Take note of what last ahead was
         ahead_previous = ahead
         #Going left as usual
         if row[19][1] > row[18][1] + threshold:
             if ahead_previous == 1:
+                changes += 1
                 instance.append(row)
-                print("A detected overlap, resetting", len(instance))
-                instances.append(copy.deepcopy(instance))
-                instance = []
+                if changes > 2:
+                    print("A detected overlap, resetting", len(instance))
+                    instances.append(copy.deepcopy(instance))
+                    if draw_colour == (0, 255, 0):
+                        draw_colour = (0, 0, 255)
+                    else:
+                        draw_colour = (0, 255, 0)
+
+                    instance = []
+                    changes = 0
             else:
                 instance.append(row)
             print("A", row[18][1], row[19][1])
             ahead = 0
+
         #Going right as usual
         elif row[18][1] > row[19][1] + threshold:
             if ahead_previous == 0:
+                changes += 1
                 instance.append(row)            
-                print("B detected overlap, resetting", len(instance))                
-                instances.append(copy.deepcopy(instance))
-                instance = []
+                if changes > 2:   
+                    print("B detected overlap, resetting", len(instance))             
+                    instances.append(copy.deepcopy(instance))
+                    if draw_colour == (0, 255, 0):
+                        draw_colour = (0, 0, 255)
+                    else:
+                        draw_colour = (0, 255, 0)
+                    instance = []
+                    changes = 0
             else:
                 instance.append(row)
             ahead = 1
+
             print("B", row[18][1], row[19][1])
         else:
             instance.append(row)
 
 
 
-        print("current row values: ", row[18][1], row[19][1])
+        print("current row values: ", row[18][1], row[19][1], draw_colour)
 
-        if ahead == 1:
-            render_joints(images[row_iter], row, delay=True, use_depth=False, colour=(0,0, 255))
-        else:
-            render_joints(images[row_iter], row, delay=True, use_depth=False, colour=(255,0, 0))
+        #if ahead == 1:
+        #    render_joints(images[row_iter], row, delay=True, use_depth=False, colour=draw_colour)
+        #else:
+        #   render_joints(images[row_iter], row, delay=True, use_depth=False, colour=draw_colour)
 
     #Debug drawing, just draw regular blue for left, red for right
     print("gait cycle retreival completed")
@@ -178,61 +279,105 @@ def get_gait_cycles(joint_data, images):
     
     return instances
 
-def get_stride_lengths(gait_cycles, images):
+def get_stride_lengths(gait_cycles, images, abs_gait_cycles):
     stride_lengths = []
     stride_ratios = []
+    image_iter = 0
+
+    print("total rel and abs: ", len(gait_cycles), len(abs_gait_cycles))
     for i, frame in enumerate(gait_cycles):
         max_stride_lengths =[0,0]
         stride_ratio = 0
         #Get max stride length values in this cycle
         for j, joints in enumerate(frame):
             if joints[18][1] > max_stride_lengths[0]:
+                print ("this:", joints[18][1] , "is bigger than ", max_stride_lengths[0])
                 max_stride_lengths[0] = copy.deepcopy(joints[18][1])
             if joints[19][1] > max_stride_lengths[1]:
+                print ("this:", joints[19][1] , "is bigger than ", max_stride_lengths[1])
                 max_stride_lengths[1] = copy.deepcopy(joints[19][1])
-        
+            print("relative joints: ", joints)
+            print("absolute joints: ", abs_gait_cycles[i][j])
+            print("JOINTS: ", max_stride_lengths)
+            #render_joints(images[image_iter], abs_gait_cycles[i][j], delay=True)
+            image_iter += 1
         stride_lengths.append(max_stride_lengths)
         stride_ratio = max_stride_lengths[0]/max_stride_lengths[1]
+        print("final max lengs and ratio: ", max_stride_lengths, stride_ratio)
         stride_ratios.append(stride_ratio)
 
     return stride_lengths, stride_ratios
             
 
-def get_speed(gait_cycles, images):
+def get_speed(abs_joints, gait_cycles, images):
+
+    #instance_speeds = []
+    #current_instance = -1
+    #instance_iter = 0
+    #for i, joint in enumerate(abs_joints):
+    #    if joint[0] == current_instance:
+    #        instance_iter += 1
+    #        continue
+    #    else:
+    #        last = joint[i-1]
+    #        first = joint[i - instance_iter]
+    #        speed = np.sqrt((abs(last[0] - first[0])**2) + (abs(last[1] - first[1])**2) + (abs(last[2] - first[2])**2))
+       
     speeds = []
-    for i, frame in enumerate(gait_cycles):
+    image_iter = 0
+    for i, cycle in enumerate(gait_cycles):
+
         speed = 0
         #Sometimes first frame can be messy, get second one.
-        first_frame_position = [1]
-        #Get last frame
-        last_frame_position = frame[-1]
+        first = cycle[0]
+        #Get last frame (some last ones corrupted, get third from last)
+        last = cycle[-1]
         #Get the average speed throughout the frames
-        speed = abs(first_frame_position - last_frame_position) / len(frame)
-        speeds.append(speed)
+        speed = np.sqrt((abs(last[0] - first[0])**2) + (abs(last[1] - first[1])**2) + (abs(last[2] - first[2])**2))
+        print("cumulative speed: ", speed)
+        speeds.append(speed/len(cycle))
+        print("added average speed: ", speed/len(cycle), len(cycle))
+        render_joints(images[image_iter], cycle[0])
+
+        for frame in cycle:
+            image_iter += 1
     return speeds
 
 
 def get_time_LofG(gait_cycles, velocity_joints, images):
     frames_off_ground_array = []
     both_not_moving_array = []
-    threshold = 0.1
+    threshold = 0.55
     image_iter = 0
     for i, frame in enumerate(gait_cycles):
         frames_off_ground = [0,0]
         frames_not_moving = 0
         for j, joints in enumerate(frame):
+            left_velocity = abs(velocity_joints[image_iter][18][0]) + abs(velocity_joints[image_iter][18][1])+ abs(velocity_joints[image_iter][16][0])+ abs(velocity_joints[image_iter][16][1])
+            right_velocity = abs(velocity_joints[image_iter][19][0]) + abs(velocity_joints[image_iter][19][1])+ abs(velocity_joints[image_iter][17][0])+ abs(velocity_joints[image_iter][17][1])
+
+
+            print("velocities: ", left_velocity, right_velocity)
             #Left leg moving, leg is off ground
-            if velocity_joints[18][0] > 0 + threshold or velocity_joints[18][0] < 0 - threshold:
+            if left_velocity > right_velocity and left_velocity >= right_velocity + threshold:
+            #if velocity_joints[image_iter][18][0] > 0 + threshold or velocity_joints[image_iter][18][0] < 0 - threshold:
                 frames_off_ground[0] += 1
-                render_joints(images[image_iter], joints, delay=True, use_depth=False, colour=(0,0, 255))
+                print("left leg off ground")
+                #render_joints(images[image_iter], joints, delay=True, use_depth=False, colour=(0,0, 255))
             #Right leg moving
-            elif velocity_joints[19][0] > 0 + threshold or velocity_joints[19][0] < 0 - threshold:
+            elif right_velocity > left_velocity and right_velocity >= left_velocity + threshold:
+            #elif velocity_joints[image_iter][19][0] > 0 + threshold or velocity_joints[image_iter][19][0] < 0 - threshold:
                 frames_off_ground[1] += 1
-                render_joints(images[image_iter], joints, delay=True, use_depth=False, colour=(0,0, 255))
+                print("right leg off ground")
+                #render_joints(images[image_iter], joints, delay=True, use_depth=False, colour=(0,0, 255))
             #Neither leg moving, this is double support
-            elif velocity_joints[18][0] < 0 + threshold and velocity_joints[18][0] > 0 - threshold \
-                and velocity_joints[19][0] < 0 + threshold and velocity_joints[19][0] > 0 - threshold:
+            else:
+            #elif velocity_joints[image_iter][18][0] < 0 + threshold and velocity_joints[image_iter][18][0] > 0 - threshold \
+            #    and velocity_joints[image_iter][19][0] < 0 + threshold and velocity_joints[image_iter][19][0] > 0 - threshold:
+                    print("neither leg off ground")
                     frames_not_moving += 1
+                    #render_joints(images[image_iter], joints, delay=True, use_depth=False, colour=(0,0, 255))
+           
             image_iter += 1
 
         frames_off_ground_array.append(copy.deepcopy(frames_off_ground))
@@ -252,8 +397,8 @@ def get_feet_height(gait_cycles, images):
             total_feet_height[0] += abs(joints[18][0] - joints[3][0])
             total_feet_height[1] += abs(joints[19][0] - joints[3][0])
             
-            print("feet heights: ", feet_heights)
-            render_joints(images[image_iter], joints, delay=True, use_depth=False, colour=(255,0, 0))
+            #print("feet heights: ", feet_heights, total_feet_height, len(gait_cycles))
+            #render_joints(images[image_iter], joints, delay=True, use_depth=False, colour=(255,0, 0))
             image_iter += 1
 
         #Take the average height across the gait cycle
@@ -274,6 +419,7 @@ def get_cadence(gait_cycles, images):
 
     for i, frame in enumerate(gait_cycles):
         cadence = 0
+        print("CADENCE RESET: ", cadence)
         for j, joints in enumerate(frame):
             #Take note of what last ahead was
             ahead_previous = ahead
@@ -281,14 +427,14 @@ def get_cadence(gait_cycles, images):
             if joints[19][1] > joints[18][1] + threshold:
                 if ahead_previous == 1:
                     cadence += 1
-                    print("A detected overlap, resetting", cadence)
+                    print("A detected overlap, cadence", cadence)
                 print("A", joints[18][1], joints[19][1])
                 ahead = 0
             #Going right as usual
             elif joints[18][1] > joints[19][1] + threshold:
                 if ahead_previous == 0:   
                     cadence += 1        
-                    print("B detected overlap, resetting", cadence)                
+                    print("B detected overlap, cadence", cadence)                
                 ahead = 1
                 print("B", joints[18][1], joints[19][1])
 
@@ -307,20 +453,31 @@ def get_cadence(gait_cycles, images):
 def create_hcf_dataset(jointfile, rel_jointfile, abs_veljointfile, folder, save = True):
     abs_joint_data = load(jointfile)
     rel_joint_data = load(rel_jointfile)
-    abs_veljoint_data = load(abs_veljoint_data)
-    images = load_images(folder)
+    abs_veljoint_data = load(abs_veljointfile)
+    images = load_images(folder, ignore_depth=False)
 
     print("images and joints loaded, getting gait cycles...")
     #Gait cycle has instances of rows: each instance contains an array of rows
     #denoting all of the frames in their respective gait cycle, appended with their
     #metadata at the start
-    gait_cycles = get_gait_cycles(abs_joint_data, images)
-    rel_gait_cycles = get_gait_cycles(rel_joint_data, images)
+    #gait_cycles = get_gait_cycles(abs_joint_data, images)
+    gait_cycles = get_time_cycles(abs_joint_data, images)
+    #Replicate this pattern for the relative gait cycle (if youn run it directly, 
+    #relative gait will return very marginally different gait cycles.)
+    rel_gait_cycles = []
+    joint_counter = 0
+    for cycle in gait_cycles:
+        new_cycle = []
+        for frame in cycle:
+            new_cycle.append(rel_joint_data[joint_counter])
+            joint_counter += 1
+        rel_gait_cycles.append(copy.deepcopy(new_cycle))
 
     print("number of total gait cycles: ", len(gait_cycles))
+    return
     #Then for every gait cycle create a new instance with the following features: 
     #Cadences returns a scalar for every gait cycle returning the number of steps 
-    cadences = get_cadence(gait_cycles, images)
+    #cadences = get_cadence(gait_cycles, images)
 
     #Height of feet above the ground
     #returns feet heights using distance between each foot joint and head in relative
@@ -343,19 +500,23 @@ def create_hcf_dataset(jointfile, rel_jointfile, abs_veljointfile, folder, save 
     #get corresponding values in absolute values for leg
     #math.dist to get the distance between these two values
     #repeat for both legs
-    stride_lengths, stride_ratios = get_stride_lengths(rel_gait_cycles, images)
+    stride_lengths, stride_ratios = get_stride_lengths(rel_gait_cycles, images, gait_cycles)
 
     #Combine all hand crafted features into one concrete dataset, save and return it.
     gait_cycles_dataset = []
     for i, cycle in enumerate(gait_cycles):
         #Add metadata
-        hcf_cycle = [cycle[0][0], cycle[0][1], cycle[0][1]]
-        hcf_cycle.append(cadences[i])
-        hcf_cycle.append(feet_heights[i])
-        hcf_cycle.append(times_LOG[i], times_not_moving[i])
+        hcf_cycle = [cycle[0][0], cycle[0][1], cycle[0][2]]
+        #hcf_cycle.append(cadences[i])
+        hcf_cycle.append(feet_heights[i][0])
+        hcf_cycle.append(feet_heights[i][1])
+        hcf_cycle.append(times_LOG[i][0])
+        hcf_cycle.append(times_LOG[i][1])
+        hcf_cycle.append(times_not_moving[i])
         hcf_cycle.append(speeds[i])
-        hcf_cycle.append(stride_lengths[i])
-        hcf_cycle.append(stride_ratios[0])
+        hcf_cycle.append(stride_lengths[i][0])
+        hcf_cycle.append(stride_lengths[i][1])
+        hcf_cycle.append(stride_ratios[i])
         gait_cycles_dataset.append(copy.deepcopy(hcf_cycle))
 
     if save:
