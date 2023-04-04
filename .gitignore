@@ -6,6 +6,8 @@ Code/Instance_Counts/*
 Code/Archive/*
 *.h5
 *.pth
+*.jpg
+*.png
 Code/Programs/Data_Analysis/simple-HigherHRNet/Images/*
 Code/Programs/Data_Analysis/simple-HigherHRNet/DepthExamples/*
 Code/Programs/Data_Analysis/simple-HigherHRNet/Archive/*
