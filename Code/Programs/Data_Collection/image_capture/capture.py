@@ -207,7 +207,7 @@ class Camera:
                         #Debug
                         debug_img, not_used = JetsonYolo.plot_obj_bounds(objs, np.asarray(refined_img))
 
-                refined_img = np.asarray(debug_img)
+                    refined_img = np.asarray(debug_img)
 
                 i += 1
                 #Print FPS
