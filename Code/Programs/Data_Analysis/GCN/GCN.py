@@ -11,6 +11,24 @@ from torch_geometric.utils import to_networkx
 from torch.nn import Linear
 from torch_geometric.nn import GCNConv
 import pandas as pd
+from torch_geometric.data import Data
+import torch_geometric
+from torch_geometric.data import Dataset
+import os
+from tqdm import tqdm
+
+joint_connections = [[15, 13], [13, 11], # left foot to hip 
+                     [16, 14], [14, 12], # right foot to hip
+                     [11, 0], [12, 0], # hips to origin
+                     [9, 7], [7, 5], # left hand to shoulder
+                     [10, 8], [6, 8], #right hand to shoulder
+                     [5, 0], [6, 0], # Shoulders to origin
+                     [1, 3], [2, 4], # ears to eyes
+                     [3, 0], [4, 0],
+                     [5, 6], [11, 12]]# shoulders connected, hips connected
+
+                    
+
 #%%capture
 from IPython.display import display, HTML
 from matplotlib import animation
@@ -18,21 +36,27 @@ plt.rcParams["animation.bitrate"] = 3000
 plt.rcParams['animation.ffmpeg_path'] = "C:/Users/Chris/Desktop/ffmpeg-5.1.2-full_build/bin/ffmpeg.exe"
 
 def plot_graph(data):
-    G = to_networkx(data, to_undirected=True)
+    #G = to_networkx(data, to_undirected=True)
+    G = process_data_to_graph(data, get_COO_matrix())
+    print("nodes: ", G.nodes(G))
     plt.figure(figsize=(12, 12))
     plt.axis('off')
-    nx.draw_networkx(G,
-                     pos=nx.spring_layout(G, seed=0),
-                     with_labels=True,
-                     node_size=800,
-                     node_color=data.y,
-                     cmap="hsv",
-                     vmin=-2,
-                     vmax=3,
-                     width=0.8,
-                     edge_color="grey",
-                     font_size=14
-                     )
+    plt.gca().invert_xaxis()
+    plt.gca().invert_yaxis()
+
+    nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=True, node_size=800)
+   # nx.draw_networkx(G,
+   #                  pos=nx.spring_layout(G, seed=0),
+   #                  with_labels=True,
+   #                  node_size=800,
+   #                  #node_color=data.y,
+   #                  cmap="hsv",
+   #                  vmin=-2,
+   #                  vmax=3,
+   #                  width=0.8,
+   #                  edge_color="grey",
+   #                  font_size=14
+   #                 )
     plt.show()
 
 class GCN(torch.nn.Module):
@@ -133,39 +157,31 @@ def animate_alt(i, *fargs):
               fontsize=18, pad=40)
 
 def main():
-    # Import dataset from PyTorch Geometric
-    #dataset = KarateClub()
-    dataset = PascalVOCKeypoints("./Datasets", "Person")
+    #Create dataset
+    dataset = JointDataset('./', 'pixel_data_absolute.csv')
+    print("Dataset type: ", type(dataset), type(dataset[0]))
 
-    # Print information for whole graph from data
-    print(dataset)
-    print("type: ", type(dataset), type(dataset[0]))
     print('------------')
     print(f'Number of graphs: {len(dataset)}')
     print(f'Number of features: {dataset.num_features}')
     print(f'Number of classes: {dataset.num_classes}')
     print(f'Graph: {dataset[0]}')
-
+    print(f'Graph2: {dataset[1]}')
     #Print individual node information
-    data = dataset[0]
+    data = dataset[7]
     print(f'x = {data.x.shape}')
     print(data.x)
+    print(data.y.shape, type(data.y), data.y)
 
-    #Convert from bag of words form to dense adjacency matrix
-    A = to_dense_adj(data.edge_index)[0].numpy().astype(int)
-    print(f'A = {A.shape}')
-    print(A)
 
-    print(f'y = {data.y.shape}')
-    print(data.y)
-
-    print(f'train_mask = {data.train_mask.shape}')
-    print(data.train_mask)
-
+    #Not sure what these'll say
     print(f'Edges are directed: {data.is_directed()}')
     print(f'Graph has isolated nodes: {data.has_isolated_nodes()}')
     print(f'Graph has loops: {data.has_self_loops()}')
 
+    ##Uncurated
+
+    
     #Plot graph data using networkX
     plot_graph(data)
 
@@ -189,6 +205,7 @@ def main():
     plt.show()
     #display(html)
 
+    '''
     embed = hs[0].detach().cpu().numpy()
 
     #Second figure for animation
@@ -217,28 +234,121 @@ def main():
     html = HTML(anim.to_html5_video())
 
     plt.show()
-
-if __name__ == "__main__":
-    #Step 1: Download data:
-    #colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','Joint_4','Joint_5','Joint_6','Joint_7',
-    #      'Joint_8','Joint_9','Joint_10','Joint_11','Joint_12','Joint_13','Joint_14','Joint_15','Joint_16', 'Joint_17'] #
-
-#    dataset_master = pd.read_csv("pixel_data_absolute.csv", names =colnames, header=None )
-#    print(dataset_master.head())
-    main()
+'''
 
 
-#%%
+def shift_class_col(df):
+    cols_at_end = ['Class']
+    df = df[[c for c in df if c not in cols_at_end] 
+            + [c for c in cols_at_end if c in df]]
 
-import pandas as pd
-import torch
-import torch_geometric
-from torch_geometric.data import Dataset
-import numpy as np 
-import os
-from tqdm import tqdm
-#import deepchem as dc
-#from rdkit import Chem 
+    return df
+def process_dataset():
+    colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','Joint_4','Joint_5','Joint_6','Joint_7',
+        'Joint_8','Joint_9','Joint_10','Joint_11','Joint_12','Joint_13','Joint_14','Joint_15','Joint_16', 'Joint_17'] #
+
+    dataset_master = pd.read_csv("pixel_data_absolute.csv", names =colnames, header=None )
+    dataset_master = shift_class_col(dataset_master)
+    coo_matrix = get_COO_matrix()
+    print(dataset_master.head())
+
+    graph_dataset = []
+    for index, row in dataset_master.iterrows():
+        graph_dataset.append(data_to_graph(row, coo_matrix))
+
+def get_COO_matrix():
+  res = [[],[]]
+  for connection in joint_connections:
+    #Once for each of the 3 coords in each connection
+    for i in range(0, 3):
+        res[0] += [connection[0], connection[1]]
+        res[1] += [connection[1], connection[0]]
+  return res
+
+import ast 
+import copy 
+
+def convert_to_literals(data):
+    for i,  (index, row) in enumerate(data.iterrows()):
+        for col_index, col in enumerate(row):
+            if col_index >= 3:
+                tmp = ast.literal_eval(row[col_index])
+                data.iat[i, col_index] = copy.deepcopy(tmp)
+            else:
+                data.iat[i, col_index] = int(data.iat[i, col_index])
+
+    return data
+
+def unravel_data(row):
+    processed_row = []
+    print("row passing through: ", row)
+    for coords in row:
+        for value in coords:
+            processed_row.append(copy.deepcopy(value))
+    
+    print("row returning: ", processed_row)
+    return processed_row
+            
+def process_data_to_graph(row, coo_matrix):
+    G = nx.Graph()
+    #G.add_node('Hamburg', pos=(53.5672, 10.0285))
+
+    #Add nodes
+    for i, val in enumerate(row):
+        print("val : ", val, type(val))
+        for x in val[1].numpy():
+            print("x : ", x)
+            #G.add_edge(str(int(j/3)), coo_matrix[j])
+            for j, coord in enumerate(x):
+                if j % 3 == 0:
+                    print("node: ", int(j/3))
+                    G.add_node(int(j/3), pos=(-x[j + 1], x[j]))
+        #Break to avoid reading edge indices
+        break
+    
+    print("Existing nodes: ", G.nodes())
+    #Add edges
+    for connection in joint_connections:
+        G.add_edge(connection[0], connection[1])
+
+    return G
+
+
+#Input here would be each row
+def data_to_graph(row, coo_matrix):
+    #Atoms in this case would be the class + joint info 
+    #atoms = row.GetAtoms()
+    #node features would just be this
+    refined_row = row.iloc[3:]
+    node_f= refined_row
+    #Bonds would be un-needed as edges have to features
+    #bonds = row.GetBonds()
+
+
+    #Edge index would return the same indices every time as human shape never changes
+
+    #edge_index = get_bond_pair(row)
+
+    #edge_attr = [bond_features(bond, use_chirality=False) for bond in bonds]
+    #for bond in bonds:
+    #  edge_attr.append(bond_features(bond))
+
+    #This is standard Data that has edge shit
+    row_as_array = np.array(node_f.values.tolist())
+    row_as_array = unravel_data(row_as_array)
+
+    print("did this work?", len(row_as_array))
+    print("row: ", row_as_array[0])
+    print("y: ", [row.iloc[2]])
+
+
+    data = Data(x=torch.tensor([row_as_array], dtype=torch.float),
+                y=torch.tensor([row.iloc[2]], dtype=torch.int),
+                edge_index=torch.tensor(coo_matrix, dtype=torch.long),
+                #This isn't needed
+                #edge_attr=torch.tensor(edge_attr,dtype=torch.float)
+                )
+    return data
 
 print(f"Torch version: {torch.__version__}")
 print(f"Cuda available: {torch.cuda.is_available()}")
@@ -264,8 +374,9 @@ class JointDataset(Dataset):
     @property
     def processed_file_names(self):
         """ If these files are found in raw_dir, processing is skipped"""
-        self.data = pd.read_csv(self.raw_paths[0]).reset_index()
-
+        self.data = pd.read_csv(self.raw_paths[0], header=None)
+        print("data being read from: ", self.raw_paths[0], type(self.raw_paths[0]))
+        print(self.raw_paths[0])
         if self.test:
             return [f'data_test_{i}.pt' for i in list(self.data.index)]
         else:
@@ -276,22 +387,23 @@ class JointDataset(Dataset):
         pass
 
     def process(self):
-        self.data = pd.read_csv(self.raw_paths[0]).reset_index()
-        featurizer = dc.feat.MolGraphConvFeaturizer(use_edges=True)
+        #colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','Joint_4','Joint_5','Joint_6','Joint_7',
+        #  'Joint_8','Joint_9','Joint_10','Joint_11','Joint_12','Joint_13','Joint_14','Joint_15','Joint_16', 'Joint_17'] 
+        #dataset = pd.read_csv(file, names=colnames, header=None)
+
+
+        self.data = pd.read_csv(self.raw_paths[0], header=None)#.reset_index()
+        self.data = convert_to_literals(self.data)
+
+        #featurizer = dc.feat.MolGraphConvFeaturizer(use_edges=True)
+        coo_matrix = get_COO_matrix()
+
         for index, row in tqdm(self.data.iterrows(), total=self.data.shape[0]):
             # Featurize molecule
             #mol = Chem.MolFromSmiles(row["smiles"])
             #f = featurizer._featurize(mol)
             #data = f.to_pyg_graph()
-            data = Data
-
-            #Change data.x to one video per instance for 60 instances, each having 1 class label and 1 instance as metadata 
-
-            data.instance = row[0]
-            data.no_in_sequence = row[2]
-            data.x = row.iloc[3:]
-            data.y = self._get_label(row[2])
-
+            data = data_to_graph(row, coo_matrix)
 
             if self.test:
                 torch.save(data, 
@@ -311,9 +423,6 @@ class JointDataset(Dataset):
         return self.data.shape[0]
 
     def get(self, idx):
-        """ - Equivalent to __getitem__ in pytorch
-            - Is not needed for PyG's InMemoryDataset
-        """
         if self.test:
             data = torch.load(os.path.join(self.processed_dir, 
                                  f'data_test_{idx}.pt'))
@@ -321,44 +430,6 @@ class JointDataset(Dataset):
             data = torch.load(os.path.join(self.processed_dir, 
                                  f'data_{idx}.pt'))        
         return data
-
-#%%
-
-class MyOwnDataset(Dataset):
-    def __init__(self, root, transform=None, pre_transform=None, pre_filter=None):
-        super().__init__(root, transform, pre_transform, pre_filter)
-
-    @property
-    def raw_file_names(self):
-        return ['some_file_1', 'some_file_2', ...]
-
-    @property
-    def processed_file_names(self):
-        return ['data_1.pt', 'data_2.pt', ...]
-
-    def download(self):
-        # Download to `self.raw_dir`.
-        path = download_url(url, self.raw_dir)
-        ...
-
-    def process(self):
-        idx = 0
-        for raw_path in self.raw_paths:
-            # Read data from `raw_path`.
-            data = Data(...)
-
-            if self.pre_filter is not None and not self.pre_filter(data):
-                continue
-
-            if self.pre_transform is not None:
-                data = self.pre_transform(data)
-
-            torch.save(data, osp.join(self.processed_dir, f'data_{idx}.pt'))
-            idx += 1
-
-    def len(self):
-        return len(self.processed_file_names)
-
-    def get(self, idx):
-        data = torch.load(osp.join(self.processed_dir, f'data_{idx}.pt'))
-        return data
+    
+if __name__ == "__main__":
+    main()
