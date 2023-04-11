@@ -65,6 +65,8 @@ def train(model, data):
         # Training
         optimizer.zero_grad()
         _, out = model(data.x, data.edge_index)
+
+        print("criterion values: ", out[data.train_mask].shape, data.y[data.train_mask].shape)
         loss = criterion(out[data.train_mask], data.y[data.train_mask])
         acc = accuracy(out[data.train_mask].argmax(dim=1), data.y[data.train_mask])
         loss.backward()

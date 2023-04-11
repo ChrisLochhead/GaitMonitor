@@ -9,7 +9,8 @@ from torch_geometric.datasets import KarateClub, PascalVOCKeypoints
 from torch_geometric.utils import to_dense_adj
 from torch_geometric.utils import to_networkx
 from torch.nn import Linear
-from torch_geometric.nn import GCNConv
+import torch.nn.functional as F
+from torch_geometric.nn import GCNConv, global_mean_pool
 import pandas as pd
 from torch_geometric.data import Data
 import torch_geometric
@@ -62,15 +63,24 @@ def plot_graph(data):
 class GCN(torch.nn.Module):
     def __init__(self, dataset):
         super().__init__()
-        self.gcn = GCNConv(dataset.num_features, 3)
-        self.out = Linear(3, dataset.num_classes)
+        self.gcn = GCNConv(dataset.num_features, 16)
+        self.out = Linear(16, dataset.num_classes)
+        #self.out = GCNConv(16, dataset.num_classes)
+        print("dataset num classes: ", dataset.num_classes)
 
-    def forward(self, x, edge_index):
-        print("forward pass: ", len(x))
-        print(x)
-        print("edge index: ", edge_index)
+    def forward(self, data, x, edge_index):
+        print("forward pass: ", len(x), x.shape)
+        #print(x)
+        #print("edge index: ", edge_index)
         h = self.gcn(x, edge_index).relu()
-        z = self.out(h)
+        print("h shape: ", h.shape)
+        g = global_mean_pool(h, data.batch)
+        
+        z = self.out(g)
+        print("z shape: ", z.shape)
+        #return h, z
+        final = F.log_softmax(z, dim=1)
+        print("final: ", final.shape, z.shape)
         return h, z
 
     # Calculate accuracy
@@ -93,10 +103,14 @@ class GCN(torch.nn.Module):
             optimizer.zero_grad()
 
             # Forward pass
-            h, z = model(data.x, data.edge_index)
+            h, z = model(data, data.x, data.edge_index)
 
             # Calculate loss function
+            print("z and y: ", z.shape, data.y.shape)
+            print("types ", z.type(), data.y.type())
+            #loss = F.nll_loss(z, data.y)
             loss = criterion(z, data.y)
+            
 
             # Calculate accuracy
             acc = model.accuracy(z.argmax(dim=1), data.y)
@@ -133,7 +147,7 @@ def animate(i, *fargs):
                     pos=nx.spring_layout(G, seed=0),
                     with_labels=True,
                     node_size=800,
-                    node_color=outputs[i],
+                    node_color="blue",#outputs[i],
                     cmap="hsv",
                     vmin=-2,
                     vmax=3,
@@ -174,6 +188,7 @@ def main():
     print('------------')
     print(f'Number of graphs: {len(dataset)}')
     print(f'Number of features: {dataset.num_features}')
+    print(f'Number of nodes: {dataset[7].num_nodes}')
     print(f'Number of classes: {dataset.num_classes}')
     print(f'Graph: {dataset[0]}')
     print(f'Graph2: {dataset[1]}')
@@ -204,6 +219,8 @@ def main():
 
     #Animate results
     print("training complete, animating")
+
+    '''
     fig = plt.figure(figsize=(12, 12))
     plt.axis('off')
 
@@ -211,9 +228,8 @@ def main():
     
     html = HTML(anim.to_html5_video())
     plt.show()
-    #display(html)
-
-    '''
+    display(html)
+'''
     embed = hs[0].detach().cpu().numpy()
 
     #Second figure for animation
@@ -224,8 +240,15 @@ def main():
                     bottom=False,
                     labelleft=False,
                     labelbottom=False)
+    
+    col = (255, 0, 0)
+    if data.y == 0:
+        col = (0, 255, 0)
+    elif data.y == 1:
+        col = (0,0,255)
+
     ax.scatter(embed[:, 0], embed[:, 1], embed[:, 2],
-               s=200, c=data.y, cmap="hsv", vmin=-2, vmax=3)
+               s=200, c="blue", cmap="hsv", vmin=-2, vmax=3)
 
     plt.show()
 
@@ -242,7 +265,6 @@ def main():
     html = HTML(anim.to_html5_video())
 
     plt.show()
-'''
 
 
 def shift_class_col(df):
@@ -302,10 +324,11 @@ def process_data_to_graph(row, coo_matrix):
     #for i, val in enumerate(row):
     print("row", row.x)
     for i, x in enumerate(row.x.numpy()):
-        if i % 3 == 0:
-            G.add_node(int(i/3), pos=(-row.x.numpy()[i+ 1], row.x.numpy()[i]))
+        #if i % 3 == 0:
+        print("node", x, -x[0], x[1])
+        G.add_node(int(i), pos=(-x[1], x[0]))# pos=(-row.x.numpy()[i+ 1], row.x.numpy()[i]))
         #Break to avoid reading edge indices
-     #   break
+        #break
     
     #Add edges
     for connection in joint_connections:
@@ -321,11 +344,19 @@ def data_to_graph(row, coo_matrix):
 
     #This is standard Data that has edge shit
     row_as_array = np.array(node_f.values.tolist())
-    print("row as array: ", row_as_array)
-    #row_as_array = unravel_data(row_as_array)
+    #print("row as array: ", row_as_array)
+    #for r in row_as_array:
+    #    print("individual node: ", r, type(r), type(row_as_array))
 
-    data = Data(x=torch.tensor([row_as_array], dtype=torch.float),
-                y=torch.tensor([row.iloc[2]], dtype=torch.int),
+    #Turn into one-hot vector
+    y = int(row.iloc[2])
+    #y_array = [0,0,0]
+    #y_array[y] = 1
+
+    #print("Class: ", y_array, "original number: ", y)
+
+    data = Data(x=torch.tensor(row_as_array, dtype=torch.float),
+                y=torch.tensor([y], dtype=torch.long),
                 edge_index=torch.tensor(coo_matrix, dtype=torch.long),
                 #This isn't needed
                 #edge_attr=torch.tensor(edge_attr,dtype=torch.float)
