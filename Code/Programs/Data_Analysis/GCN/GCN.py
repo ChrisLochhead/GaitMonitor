@@ -66,6 +66,9 @@ class GCN(torch.nn.Module):
         self.out = Linear(3, dataset.num_classes)
 
     def forward(self, x, edge_index):
+        print("forward pass: ", len(x))
+        print(x)
+        print("edge index: ", edge_index)
         h = self.gcn(x, edge_index).relu()
         z = self.out(h)
         return h, z
@@ -158,6 +161,13 @@ def animate_alt(i, *fargs):
 
 def main():
     #Create dataset
+
+    test = KarateClub()
+
+    print(test.num_features)
+    for i in test[0].x.numpy():
+        print("i : ", i)
+    print("len: ", len(test[0].x))
     dataset = JointDataset('./', 'pixel_data_absolute.csv')
     print("Dataset type: ", type(dataset), type(dataset[0]))
 
@@ -179,13 +189,11 @@ def main():
     print(f'Graph has isolated nodes: {data.has_isolated_nodes()}')
     print(f'Graph has loops: {data.has_self_loops()}')
 
-    ##Uncurated
-
-    
     #Plot graph data using networkX
     plot_graph(data)
 
     #Define model
+    print("Creating model: ")
     model = GCN(dataset=dataset)
     print(model)
     criterion = torch.nn.CrossEntropyLoss()
@@ -281,32 +289,24 @@ def convert_to_literals(data):
 
 def unravel_data(row):
     processed_row = []
-    print("row passing through: ", row)
     for coords in row:
         for value in coords:
             processed_row.append(copy.deepcopy(value))
     
-    print("row returning: ", processed_row)
     return processed_row
             
 def process_data_to_graph(row, coo_matrix):
     G = nx.Graph()
-    #G.add_node('Hamburg', pos=(53.5672, 10.0285))
 
     #Add nodes
-    for i, val in enumerate(row):
-        print("val : ", val, type(val))
-        for x in val[1].numpy():
-            print("x : ", x)
-            #G.add_edge(str(int(j/3)), coo_matrix[j])
-            for j, coord in enumerate(x):
-                if j % 3 == 0:
-                    print("node: ", int(j/3))
-                    G.add_node(int(j/3), pos=(-x[j + 1], x[j]))
+    #for i, val in enumerate(row):
+    print("row", row.x)
+    for i, x in enumerate(row.x.numpy()):
+        if i % 3 == 0:
+            G.add_node(int(i/3), pos=(-row.x.numpy()[i+ 1], row.x.numpy()[i]))
         #Break to avoid reading edge indices
-        break
+     #   break
     
-    print("Existing nodes: ", G.nodes())
     #Add edges
     for connection in joint_connections:
         G.add_edge(connection[0], connection[1])
@@ -316,31 +316,13 @@ def process_data_to_graph(row, coo_matrix):
 
 #Input here would be each row
 def data_to_graph(row, coo_matrix):
-    #Atoms in this case would be the class + joint info 
-    #atoms = row.GetAtoms()
-    #node features would just be this
     refined_row = row.iloc[3:]
     node_f= refined_row
-    #Bonds would be un-needed as edges have to features
-    #bonds = row.GetBonds()
-
-
-    #Edge index would return the same indices every time as human shape never changes
-
-    #edge_index = get_bond_pair(row)
-
-    #edge_attr = [bond_features(bond, use_chirality=False) for bond in bonds]
-    #for bond in bonds:
-    #  edge_attr.append(bond_features(bond))
 
     #This is standard Data that has edge shit
     row_as_array = np.array(node_f.values.tolist())
-    row_as_array = unravel_data(row_as_array)
-
-    print("did this work?", len(row_as_array))
-    print("row: ", row_as_array[0])
-    print("y: ", [row.iloc[2]])
-
+    print("row as array: ", row_as_array)
+    #row_as_array = unravel_data(row_as_array)
 
     data = Data(x=torch.tensor([row_as_array], dtype=torch.float),
                 y=torch.tensor([row.iloc[2]], dtype=torch.int),
@@ -387,22 +369,12 @@ class JointDataset(Dataset):
         pass
 
     def process(self):
-        #colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','Joint_4','Joint_5','Joint_6','Joint_7',
-        #  'Joint_8','Joint_9','Joint_10','Joint_11','Joint_12','Joint_13','Joint_14','Joint_15','Joint_16', 'Joint_17'] 
-        #dataset = pd.read_csv(file, names=colnames, header=None)
-
-
         self.data = pd.read_csv(self.raw_paths[0], header=None)#.reset_index()
         self.data = convert_to_literals(self.data)
-
-        #featurizer = dc.feat.MolGraphConvFeaturizer(use_edges=True)
         coo_matrix = get_COO_matrix()
 
         for index, row in tqdm(self.data.iterrows(), total=self.data.shape[0]):
             # Featurize molecule
-            #mol = Chem.MolFromSmiles(row["smiles"])
-            #f = featurizer._featurize(mol)
-            #data = f.to_pyg_graph()
             data = data_to_graph(row, coo_matrix)
 
             if self.test:
