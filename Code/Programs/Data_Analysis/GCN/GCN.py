@@ -10,13 +10,15 @@ from torch_geometric.utils import to_dense_adj
 from torch_geometric.utils import to_networkx
 from torch.nn import Linear
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv, global_mean_pool
+from torch_geometric.nn import GCNConv, global_mean_pool, global_add_pool, GINConv
 import pandas as pd
 from torch_geometric.data import Data
 import torch_geometric
 from torch_geometric.data import Dataset
 import os
 from tqdm import tqdm
+from torch_geometric.loader import DataLoader
+from torch.nn import Linear, Sequential, BatchNorm1d, ReLU, Dropout
 
 joint_connections = [[15, 13], [13, 11], # left foot to hip 
                      [16, 14], [14, 12], # right foot to hip
@@ -61,13 +63,44 @@ def plot_graph(data):
     plt.show()
 
 class GCN(torch.nn.Module):
-    def __init__(self, dataset):
-        super().__init__()
-        self.gcn = GCNConv(dataset.num_features, 16)
-        self.out = Linear(16, dataset.num_classes)
-        #self.out = GCNConv(16, dataset.num_classes)
-        print("dataset num classes: ", dataset.num_classes)
+    def __init__(self, dim_h, dataset):
+        super(GCN, self).__init__()
+        self.conv1 = GINConv(
+            Sequential(Linear(dataset.num_node_features, dim_h),
+                       BatchNorm1d(dim_h), ReLU(),
+                       Linear(dim_h, dim_h), ReLU()))
+        self.conv2 = GINConv(
+            Sequential(Linear(dim_h, dim_h), BatchNorm1d(dim_h), ReLU(),
+                       Linear(dim_h, dim_h), ReLU()))
+        self.conv3 = GINConv(
+            Sequential(Linear(dim_h, dim_h), BatchNorm1d(dim_h), ReLU(),
+                       Linear(dim_h, dim_h), ReLU()))
+        self.lin1 = Linear(dim_h * 3, dim_h * 3)
+        self.lin2 = Linear(dim_h * 3, dataset.num_classes)
 
+    def forward(self, x, edge_index, batch):
+        # Node embeddings
+        h1 = self.conv1(x, edge_index)
+        h2 = self.conv2(h1, edge_index)
+        h3 = self.conv3(h2, edge_index)
+
+        # Graph-level readout
+        h1 = global_add_pool(h1, batch)
+        h2 = global_add_pool(h2, batch)
+        h3 = global_add_pool(h3, batch)
+
+        # Concatenate graph embeddings
+        h = torch.cat((h1, h2, h3), dim=1)
+
+        # Classifier
+        h = self.lin1(h)
+        h = h.relu()
+        h = F.dropout(h, p=0.5, training=self.training)
+        h = self.lin2(h)
+
+        return h, F.log_softmax(h, dim=1)
+    
+    '''
     def forward(self, data, x, edge_index):
         print("forward pass: ", len(x), x.shape)
         #print(x)
@@ -82,13 +115,83 @@ class GCN(torch.nn.Module):
         final = F.log_softmax(z, dim=1)
         print("final: ", final.shape, z.shape)
         return h, z
+    '''
 
-    # Calculate accuracy
-    def accuracy(self, pred_y, y):
-        return (pred_y == y).sum() / len(y)
+# Calculate accuracy
+def accuracy(pred_y, y):
+    return (pred_y == y).sum() / len(y)
 
 
-    def train(self, model, criterion, optimizer, data):
+def train(model, loader, val_loader, test_loader):
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(),
+                                lr=0.01,
+                                weight_decay=0.01)
+    epochs = 100
+
+    model.train()
+    for epoch in range(epochs + 1):
+        total_loss = 0
+        acc = 0
+        val_loss = 0
+        val_acc = 0
+
+        # Data for animations
+        embeddings = []
+        losses = []
+        accuracies = []
+        outputs = []
+        hs = []
+
+        # Train on batches
+        for data in loader:
+            optimizer.zero_grad()
+            h, out = model(data.x, data.edge_index, data.batch)
+            loss = criterion(out, data.y)
+            total_loss += loss / len(loader)
+            acc += accuracy(out.argmax(dim=1), data.y) / len(loader)
+            loss.backward()
+            optimizer.step()
+
+            embeddings.append(h)
+            losses.append(loss)
+            accuracies.append(acc)
+            outputs.append(out.argmax(dim=1))
+            hs.append(h)
+
+
+            # Validation
+            val_loss, val_acc = test(model, val_loader)
+
+    # Print metrics every 10 epochs
+    if (epoch % 10 == 0):
+        print(f'Epoch {epoch:>3} | Train Loss: {total_loss:.2f} '
+            f'| Train Acc: {acc * 100:>5.2f}% '
+            f'| Val Loss: {val_loss:.2f} '
+            f'| Val Acc: {val_acc * 100:.2f}%')
+
+    test_loss, test_acc = test(model, test_loader)
+    print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
+
+    #return model
+    return model, embeddings, losses, accuracies, outputs, hs
+
+@torch.no_grad()
+def test(model, loader):
+    criterion = torch.nn.CrossEntropyLoss()
+    model.eval()
+    loss = 0
+    acc = 0
+
+    for data in loader:
+        _, out = model(data.x, data.edge_index, data.batch)
+        loss += criterion(out, data.y) / len(loader)
+        acc += accuracy(out.argmax(dim=1), data.y) / len(loader)
+
+    return loss, acc
+
+'''
+    def train(self, model, train_loader, val_loader, test_loader, criterion, optimizer, data):
 
         # Data for animations
         embeddings = []
@@ -134,7 +237,7 @@ class GCN(torch.nn.Module):
 
         return embeddings, losses, accuracies, outputs, hs
 
-
+'''
 
 def animate(i, *fargs):
     data = fargs[0]
@@ -182,7 +285,7 @@ def main():
     for i in test[0].x.numpy():
         print("i : ", i)
     print("len: ", len(test[0].x))
-    dataset = JointDataset('./', 'pixel_data_absolute.csv')
+    dataset = JointDataset('./', 'pixel_data_absolute.csv').shuffle()
     print("Dataset type: ", type(dataset), type(dataset[0]))
 
     print('------------')
@@ -207,20 +310,35 @@ def main():
     #Plot graph data using networkX
     plot_graph(data)
 
+        # Create training, validation, and test sets
+    train_dataset = dataset[:int(len(dataset)*0.8)]
+    val_dataset   = dataset[int(len(dataset)*0.8):int(len(dataset)*0.9)]
+    test_dataset  = dataset[int(len(dataset)*0.9):]
+
+    print(f'Training set   = {len(train_dataset)} graphs')
+    print(f'Validation set = {len(val_dataset)} graphs')
+    print(f'Test set       = {len(test_dataset)} graphs')
+
+    # Create mini-batches
+    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=64, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
+
     #Define model
     print("Creating model: ")
-    model = GCN(dataset=dataset)
+    
+    model = GCN(dim_h=16, dataset=dataset)
     print(model)
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.02)
 
     #Train model
-    embeddings, losses, accuracies, outputs, hs = model.train(model, criterion, optimizer, data)
-
+    #embeddings, losses, accuracies, outputs, hs = model.train(model, criterion, optimizer, data)
+    model, embeddings, losses, accuracies, outputs, hs = train(model, train_loader, val_loader, test_loader)
     #Animate results
     print("training complete, animating")
 
-    '''
+    
     fig = plt.figure(figsize=(12, 12))
     plt.axis('off')
 
@@ -265,7 +383,7 @@ def main():
     html = HTML(anim.to_html5_video())
 
     plt.show()
-
+'''
 
 def shift_class_col(df):
     cols_at_end = ['Class']
