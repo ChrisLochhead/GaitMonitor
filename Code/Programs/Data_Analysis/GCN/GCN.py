@@ -10,7 +10,7 @@ from torch_geometric.utils import to_dense_adj
 from torch_geometric.utils import to_networkx
 from torch.nn import Linear
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv, global_mean_pool, global_add_pool, GINConv
+from torch_geometric.nn import GCNConv, global_mean_pool, global_add_pool, GINConv, GATv2Conv
 import pandas as pd
 from torch_geometric.data import Data
 import torch_geometric
@@ -62,9 +62,28 @@ def plot_graph(data):
    #                 )
     plt.show()
 
-class GCN(torch.nn.Module):
+class GAT(torch.nn.Module):
+    """Graph Attention Network"""
+    def __init__(self, dim_in, dim_h, dim_out, heads=8):
+        super().__init__()
+        self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
+        self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1)
+        self.optimizer = torch.optim.Adam(self.parameters(),
+                                          lr=0.005,
+                                          weight_decay=5e-4)
+
+    def forward(self, x, edge_index):
+        h = F.dropout(x, p=0.6, training=self.training)
+        h = self.gat1(h, edge_index)
+        h = F.elu(h)
+        h = F.dropout(h, p=0.6, training=self.training)
+        h = self.gat2(h, edge_index)
+        return h, F.log_softmax(h, dim=1)
+    
+class GIN(torch.nn.Module):
+    """GIN"""
     def __init__(self, dim_h, dataset):
-        super(GCN, self).__init__()
+        super(GIN, self).__init__()
         self.conv1 = GINConv(
             Sequential(Linear(dataset.num_node_features, dim_h),
                        BatchNorm1d(dim_h), ReLU(),
@@ -99,24 +118,25 @@ class GCN(torch.nn.Module):
         h = self.lin2(h)
 
         return h, F.log_softmax(h, dim=1)
-    
-    '''
-    def forward(self, data, x, edge_index):
-        print("forward pass: ", len(x), x.shape)
-        #print(x)
-        #print("edge index: ", edge_index)
-        h = self.gcn(x, edge_index).relu()
-        print("h shape: ", h.shape)
-        g = global_mean_pool(h, data.batch)
-        
-        z = self.out(g)
-        print("z shape: ", z.shape)
-        #return h, z
-        final = F.log_softmax(z, dim=1)
-        print("final: ", final.shape, z.shape)
-        return h, z
-    '''
 
+
+class GCN(torch.nn.Module):
+    """Graph Convolutional Network"""
+    def __init__(self, dim_in, dim_h, dim_out):
+      super().__init__()
+      self.gcn1 = GCNConv(dim_in, dim_h)
+      self.gcn2 = GCNConv(dim_h, dim_out)
+      self.optimizer = torch.optim.Adam(self.parameters(),
+                                        lr=0.01,
+                                        weight_decay=5e-4)
+
+    def forward(self, x, edge_index):
+        h = F.dropout(x, p=0.5, training=self.training)
+        h = self.gcn1(h, edge_index).relu()
+        h = F.dropout(h, p=0.5, training=self.training)
+        h = self.gcn2(h, edge_index)
+        return h, F.log_softmax(h, dim=1)
+    
 # Calculate accuracy
 def accuracy(pred_y, y):
     return (pred_y == y).sum() / len(y)
@@ -127,21 +147,22 @@ def train(model, loader, val_loader, test_loader):
     optimizer = torch.optim.Adam(model.parameters(),
                                 lr=0.01,
                                 weight_decay=0.01)
-    epochs = 100
+    epochs = 1000
 
     model.train()
+
+    # Data for animations
+    embeddings = []
+    losses = []
+    accuracies = []
+    outputs = []
+    hs = []
+    
     for epoch in range(epochs + 1):
         total_loss = 0
         acc = 0
         val_loss = 0
         val_acc = 0
-
-        # Data for animations
-        embeddings = []
-        losses = []
-        accuracies = []
-        outputs = []
-        hs = []
 
         # Train on batches
         for data in loader:
@@ -163,17 +184,18 @@ def train(model, loader, val_loader, test_loader):
             # Validation
             val_loss, val_acc = test(model, val_loader)
 
-    # Print metrics every 10 epochs
-    if (epoch % 10 == 0):
-        print(f'Epoch {epoch:>3} | Train Loss: {total_loss:.2f} '
-            f'| Train Acc: {acc * 100:>5.2f}% '
-            f'| Val Loss: {val_loss:.2f} '
-            f'| Val Acc: {val_acc * 100:.2f}%')
+        # Print metrics every 10 epochs
+        if (epoch % 10 == 0):
+            print(f'Epoch {epoch:>3} | Train Loss: {total_loss:.2f} '
+                f'| Train Acc: {acc * 100:>5.2f}% '
+                f'| Val Loss: {val_loss:.2f} '
+                f'| Val Acc: {val_acc * 100:.2f}%')
 
     test_loss, test_acc = test(model, test_loader)
     print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
 
     #return model
+    print("returned lens: ", len(embeddings[0]), len(losses), len(accuracies), len(outputs), len(hs))
     return model, embeddings, losses, accuracies, outputs, hs
 
 @torch.no_grad()
@@ -189,55 +211,6 @@ def test(model, loader):
         acc += accuracy(out.argmax(dim=1), data.y) / len(loader)
 
     return loss, acc
-
-'''
-    def train(self, model, train_loader, val_loader, test_loader, criterion, optimizer, data):
-
-        # Data for animations
-        embeddings = []
-        losses = []
-        accuracies = []
-        outputs = []
-        hs = []
-
-        # Training loop
-        for epoch in range(201):
-            # Clear gradients
-            optimizer.zero_grad()
-
-            # Forward pass
-            h, z = model(data, data.x, data.edge_index)
-
-            # Calculate loss function
-            print("z and y: ", z.shape, data.y.shape)
-            print("types ", z.type(), data.y.type())
-            #loss = F.nll_loss(z, data.y)
-            loss = criterion(z, data.y)
-            
-
-            # Calculate accuracy
-            acc = model.accuracy(z.argmax(dim=1), data.y)
-
-            # Compute gradients
-            loss.backward()
-
-            # Tune parameters
-            optimizer.step()
-
-            # Store data for animations
-            embeddings.append(h)
-            losses.append(loss)
-            accuracies.append(acc)
-            outputs.append(z.argmax(dim=1))
-            hs.append(h)
-
-            # Print metrics every 10 epochs
-            if epoch % 10 == 0:
-                print(f'Epoch {epoch:>3} | Loss: {loss:.2f} | Acc: {acc*100:.2f}%')
-
-        return embeddings, losses, accuracies, outputs, hs
-
-'''
 
 def animate(i, *fargs):
     data = fargs[0]
@@ -268,11 +241,30 @@ def animate_alt(i, *fargs):
     losses = fargs[2]
     accuracies = fargs[3]
     ax = fargs[4]
+    train_loader = fargs[5]
 
     embed = embeddings[i].detach().cpu().numpy()
     ax.clear()
+
+    cols = []
+    ite = 0
+    for j, point in enumerate(train_loader):
+        if i != j:
+            continue
+    
+        for k, em in enumerate(point):
+            if k == 2: 
+                class_vals = em[1].numpy()
+                for val in class_vals:
+                    col = "blue"
+                    if val == 1:
+                        col = "red"
+                    elif val == 2:
+                        col = "green"
+                    cols.append(col)
+
     ax.scatter(embed[:, 0], embed[:, 1], embed[:, 2],
-           s=200, c=data.y, cmap="hsv", vmin=-2, vmax=3)
+           s=200, c=cols, cmap="hsv", vmin=-2, vmax=3)
     plt.title(f'Epoch {i} | Loss: {losses[i]:.2f} | Acc: {accuracies[i]*100:.2f}%',
               fontsize=18, pad=40)
 
@@ -327,27 +319,38 @@ def main():
     #Define model
     print("Creating model: ")
     
-    model = GCN(dim_h=16, dataset=dataset)
-    print(model)
+    gin_model = GIN(dim_h=16, dataset=dataset)
+    gcn_model = GIN(dim_h=16, dataset=dataset)
+    gat_model = GIN(dim_h=16, dataset=dataset)
+    #print(model)
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.02)
+    optimizer = torch.optim.Adam(gin_model.parameters(), lr=0.02)
 
     #Train model
     #embeddings, losses, accuracies, outputs, hs = model.train(model, criterion, optimizer, data)
-    model, embeddings, losses, accuracies, outputs, hs = train(model, train_loader, val_loader, test_loader)
+    print("GCN MODEL")
+    model, embeddings, losses, accuracies, outputs, hs = train(gcn_model, train_loader, val_loader, test_loader)
+    '''
+    print("GAT MODEL") 
+    model, embeddings, losses, accuracies, outputs, hs = train(gat_model, train_loader, val_loader, test_loader)
+    print("GIN MODEL")
+    model, embeddings, losses, accuracies, outputs, hs = train(gin_model, train_loader, val_loader, test_loader)
+    '''
+
     #Animate results
     print("training complete, animating")
 
     
-    fig = plt.figure(figsize=(12, 12))
-    plt.axis('off')
+    #fig = plt.figure(figsize=(12, 12))
+    #plt.axis('off')
 
-    anim = animation.FuncAnimation(fig, animate, np.arange(0, 200, 10), interval=500, repeat=True, fargs=[data, outputs, losses, accuracies])
+    #print("lengths: ", len(outputs), len(losses), len(accuracies))
+    #anim = animation.FuncAnimation(fig, animate, np.arange(0, 200, 10), interval=500, repeat=True, fargs=[data, outputs, losses, accuracies])
     
-    html = HTML(anim.to_html5_video())
-    plt.show()
-    display(html)
-'''
+    #html = HTML(anim.to_html5_video())
+    #plt.show()
+    #display(html)
+    '''
     embed = hs[0].detach().cpu().numpy()
 
     #Second figure for animation
@@ -369,7 +372,8 @@ def main():
                s=200, c="blue", cmap="hsv", vmin=-2, vmax=3)
 
     plt.show()
-
+    '''
+    
     fig = plt.figure(figsize=(12, 12))
     plt.axis('off')
     ax = fig.add_subplot(projection='3d')
@@ -379,11 +383,12 @@ def main():
                     labelbottom=False)
 
     anim = animation.FuncAnimation(fig, animate_alt, \
-                                   np.arange(0, 200, 10), interval=800, repeat=True, fargs=(embeddings, data, losses, accuracies, ax))
+                                   np.arange(0, 200, 10), interval=800, repeat=True, fargs=(embeddings, dataset, losses, accuracies, ax, train_loader))
     html = HTML(anim.to_html5_video())
 
     plt.show()
-'''
+    display(html)
+
 
 def shift_class_col(df):
     cols_at_end = ['Class']
@@ -462,16 +467,9 @@ def data_to_graph(row, coo_matrix):
 
     #This is standard Data that has edge shit
     row_as_array = np.array(node_f.values.tolist())
-    #print("row as array: ", row_as_array)
-    #for r in row_as_array:
-    #    print("individual node: ", r, type(r), type(row_as_array))
 
     #Turn into one-hot vector
     y = int(row.iloc[2])
-    #y_array = [0,0,0]
-    #y_array[y] = 1
-
-    #print("Class: ", y_array, "original number: ", y)
 
     data = Data(x=torch.tensor(row_as_array, dtype=torch.float),
                 y=torch.tensor([y], dtype=torch.long),
