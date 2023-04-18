@@ -6,6 +6,7 @@ from sklearn.manifold import TSNE
 from torch_geometric.utils import degree
 import re
 import cv2
+import csv
 
 from Dataset_Obj import *
 from Graph_Nets import GCN, GIN, GAT, train, accuracy
@@ -88,12 +89,19 @@ def split_data_by_viewpoint(joints_file, save = True):
     return norm, mod, h_mod
 
 #Replace this and draw joints on frame with version found in demo for higher hr net
-def click_event(event, x, y, flags, params):
-  
+def ground_truth_event(event, x, y, flags, params):
+    
+    print("does this work?", params[0])
+    row = params[0]
+    estimate = params[1]
+
     # checking for left mouse clicks
     if event == cv2.EVENT_LBUTTONDOWN:
         # displaying the coordinates
         print(x, y)
+        #Keep original depth value as dummy
+        row.append([x, y, estimate[2]])
+        return
     if event == cv2.EVENT_RBUTTONDOWN:
         quit()
 
@@ -160,7 +168,7 @@ def load(file = "image_data.csv"):
     #Print array to check
     return joints
 
-def create_ground_truths(image_path, joints):
+def create_ground_truths(image_path, joints, save = True):
     
     joint_iter = 0
     ground_truth_joints = []
@@ -183,30 +191,31 @@ def create_ground_truths(image_path, joints):
                 img = cv2.imread(os.path.join(subdir,file))
                 img = draw_joints_on_frame(img, joints[joint_iter], use_depth_as_colour = False, metadata = 3, colour = (0, 0, 255))
                 cv2.imshow('image',img)
-                cv2.setMouseCallback('image with raw joints', click_event, img)
-                cv2.waitKey(0)  
+                #Go through 18 points for every image
+                
+                for i in range (0, 17):
+                    cv2.setMouseCallback('image with raw joints', ground_truth_event, img, params = [ground_truth_row, joints[joint_iter]])
+                    cv2.waitKey(0)  
 
+                ground_truth_joints.append(ground_truth_row)
                 joint_iter += 1
-        ground_truth_row.append(ground_truth_joints)
         
-        #Draw image with corresponding joints
-
-        #Mouse event to register first click as suitable or not (add result to array of 0s and 1s)
-
-        #Mouse event to register 18 clicks in same order as joints
-
-        #assign coordinates of these clicks to array (len num images × (18 +3)) with metadata
-
-        #Save new coordinates, reload them and display for debug along with old coordinates.
-
-        #Iterate through images one last time, saving according to 1 in index to return only acceptable coordinates for both regular and hand-crafted coordinates
-
-
+        if save:
+            with open("ground_truth_dataset_pixels.csv","w+", newline='') as my_csv:
+                csvWriter = csv.writer(my_csv,delimiter=',')
+                csvWriter.writerows(ground_truth_joints)
+        
 
 def main():
     print(f"Torch version: {torch.__version__}")
     print(f"Cuda available: {torch.cuda.is_available()}")
     print(f"Torch geometric version: {torch_geometric.__version__}")
+
+    #Split data by viewpoint
+    split_data_by_viewpoint("pixel_data_absolute.csv")
+    
+    #Create ground truths
+    create_ground_truths("../simple-HigherHRNet/Images", 'pixel_data_absolute.csv')
 
     #Create dataset
     dataset = JointDataset('./', 'pixel_data_absolute.csv').shuffle()
