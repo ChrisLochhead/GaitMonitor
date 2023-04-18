@@ -59,51 +59,28 @@ def split_data_by_viewpoint(joints_file, save = True):
     #Initialize 3 viewpoint arrays
     normal_viewpoint = []
     mod_viewpoint = []
-    heavy_mod_viewpoint = []
 
     colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','Joint_4','Joint_5','Joint_6','Joint_7',
           'Joint_8','Joint_9','Joint_10','Joint_11','Joint_12','Joint_13','Joint_14','Joint_15','Joint_16', 'Joint_17'] 
     
     dataset_master = pd.read_csv(joints_file, names=colnames, header=None)
 
-    current_instance = 0
     for index, row in dataset_master.iterrows():
-        current_instance = row[2]
-        if current_instance == 0:
+        #The last one is greater than this: this means a new instance is found.
+        if row[0] <= 29:
             normal_viewpoint.append(row)
-        elif current_instance == 1:
+        else:
             mod_viewpoint.append(row)
-        elif current_instance == 2:
-            heavy_mod_viewpoint.append(row)
 
     norm = pd.DataFrame(normal_viewpoint, columns = colnames)
     mod = pd.DataFrame(mod_viewpoint, columns = colnames)
-    h_mod = pd.DataFrame(heavy_mod_viewpoint, columns = colnames)
 
     #Save and return final joints and view in excel to see if they worked
     if save:
         norm.to_csv("gait_dataset_pixels_norm_view.csv",index=False, header=False)
         mod.to_csv("gait_dataset_pixels_mod_view.csv",index=False, header=False)
-        h_mod.to_csv("gait_dataset_pixels_h_mod_view.csv",index=False, header=False)
 
-    return norm, mod, h_mod
-
-#Replace this and draw joints on frame with version found in demo for higher hr net
-def ground_truth_event(event, x, y, flags, params):
-    
-    print("does this work?", params[0])
-    row = params[0]
-    estimate = params[1]
-
-    # checking for left mouse clicks
-    if event == cv2.EVENT_LBUTTONDOWN:
-        # displaying the coordinates
-        print(x, y)
-        #Keep original depth value as dummy
-        row.append([x, y, estimate[2]])
-        return
-    if event == cv2.EVENT_RBUTTONDOWN:
-        quit()
+    return norm, mod
 
 def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 3, colour = (0, 0, 255)):
 
@@ -168,13 +145,44 @@ def load(file = "image_data.csv"):
     #Print array to check
     return joints
 
-def create_ground_truths(image_path, joints, save = True):
+#Replace this and draw joints on frame with version found in demo for higher hr net
+def ground_truth_event(event, x, y, flags, params):
+        # checking for left mouse clicks
+    if event == cv2.EVENT_LBUTTONDOWN:
+        row = params[0]
+        estimate = params[1]
+        good_frame = params[2]
+        index = params[3]
+        create_grounds = params[4]
+        # displaying the coordinates
+        print(x, y)
+        #Keep original depth value as dummy
+        if index == 0:
+            good_frame.append([1])
+            print("this is a good frame")
+
+        if create_grounds == True:
+            row.append([x, y, estimate[2]])
+
+        return
+    if event == cv2.EVENT_RBUTTONDOWN:
+        good_frame = params[2]
+        index = params[3]
+        if index == 0:
+            good_frame.append([0])
+            print("this is a bad frame")
+            return
+        #else:
+        #    quit()
+
+def create_ground_truths(image_path, joints, save = True, create_grounds = False, start_point = 2):
     
     joint_iter = 0
     ground_truth_joints = []
+    is_good_frame = []
     class_no = 0
-    joints = load("jointfile_.txt")
-    
+    joints = load("pixel_data_absolute.csv")
+    directory_iterator = -1
     for iterator, (subdir, dirs, files) in enumerate(os.walk(image_path)):
         dirs.sort(key=numericalSort)
         #Assign the class
@@ -183,30 +191,79 @@ def create_ground_truths(image_path, joints, save = True):
                 class_no += 1
             else:
                 class_no = 0
-
-        if len(files) > 0:
+        
+        if len(files) > 0 and directory_iterator >= start_point:
             for file_iter, file in enumerate(sorted(files, key = numericalSort)):
+                print("in file iterator: directory: ", directory_iterator)
                 #Assign the meta data
                 ground_truth_row = [iterator, file_iter, class_no]
                 img = cv2.imread(os.path.join(subdir,file))
                 img = draw_joints_on_frame(img, joints[joint_iter], use_depth_as_colour = False, metadata = 3, colour = (0, 0, 255))
                 cv2.imshow('image',img)
+
                 #Go through 18 points for every image
                 
-                for i in range (0, 17):
-                    cv2.setMouseCallback('image with raw joints', ground_truth_event, img, params = [ground_truth_row, joints[joint_iter]])
-                    cv2.waitKey(0)  
+                for i in range (0, 18):
+                    print("frame: ", file_iter, " of ", len(files))
+                    print("total frame: ", joint_iter, "of ", len(joints), "corresponding: ", len(is_good_frame))
 
+                    cv2.setMouseCallback('image', ground_truth_event, [ground_truth_row, joints[joint_iter], is_good_frame, i, create_grounds])
+                    #Only iterate 18 times if actually setting ground truths
+                    key = cv2.waitKey(0)  
+                    if key == 113:
+                        quit()
+                    elif key == 115:
+                        print("SAVING PROGRESS: ")
+                        with open('image_deletion_mask.csv', 'a+', newline='') as f:
+                            mywriter = csv.writer(f, delimiter = ",")
+                            mywriter.writerows(is_good_frame)          
+
+                    if create_grounds == False:
+                        break
+
+                    if i == 0 and is_good_frame[-1] == False:
+                        break                   
                 ground_truth_joints.append(ground_truth_row)
                 joint_iter += 1
-        
+
+        #iterate joint iter regardless of start point
+        elif len(files)> 0:
+            for file_iter, file in enumerate(sorted(files, key = numericalSort)):
+                joint_iter += 1
+
+        directory_iterator +=1
+        print("saving instance")
         if save:
-            with open("ground_truth_dataset_pixels.csv","w+", newline='') as my_csv:
+            with open("ground_truth_dataset_pixels.csv","a+", newline='') as my_csv:
                 csvWriter = csv.writer(my_csv,delimiter=',')
                 csvWriter.writerows(ground_truth_joints)
-        
 
-def main():
+            with open('image_deletion_mask.csv', 'a+', newline='') as f:
+                mywriter = csv.writer(f, delimiter = ",")
+                mywriter.writerows(is_good_frame)          
+
+def run_image_deletion_mask(image_data, joint_data, mask):
+
+    proc_images = []
+    proc_joints = []
+    for i, image in enumerate(image_data):
+        if mask[i] == True:
+            proc_images.append(image)
+            proc_joints.append(joint_data[i])
+    
+    for i, row in enumerate(proc_joints):
+        print("saving instance: ", str(float(row[0])))
+        if row[1] < 10:
+            file_no = str(0) + str(row[1])
+        else:
+            file_no = str(row[1])
+
+        directory = "./Manually_Processed_Images/Instance_" + str(float(row[0]))
+        print("i is: ", i , len(image_data), len(joint_data))
+        os.makedirs(directory, exist_ok = True)
+        cv2.imwrite(directory + "/" + file_no + ".jpg", image_data[i])
+        
+def run_ground_truths():
     print(f"Torch version: {torch.__version__}")
     print(f"Cuda available: {torch.cuda.is_available()}")
     print(f"Torch geometric version: {torch_geometric.__version__}")
@@ -215,8 +272,17 @@ def main():
     split_data_by_viewpoint("pixel_data_absolute.csv")
     
     #Create ground truths
-    create_ground_truths("../simple-HigherHRNet/Images", 'pixel_data_absolute.csv')
+    create_ground_truths("../simple-HigherHRNet/EDA/Finished_Data/Images", 'pixel_data_absolute.csv')
 
+    #Remove images marked for removal
+    run_image_deletion_mask("../simple-HigherHRNet/EDA/Finished_Data/Images", "pixel_data_absolute.csv", "image_deletion_mask")
+
+def run_GCN_training():
+    print(f"Torch version: {torch.__version__}")
+    print(f"Cuda available: {torch.cuda.is_available()}")
+    print(f"Torch geometric version: {torch_geometric.__version__}")
+
+   
     #Create dataset
     dataset = JointDataset('./', 'pixel_data_absolute.csv').shuffle()
     assess_data(dataset)
@@ -257,4 +323,4 @@ def main():
     run_3d_animation(fig, (embeddings, dataset, losses, accuracies, ax, train_loader))
 
 if __name__ == "__main__":
-    main()
+    run_ground_truths()

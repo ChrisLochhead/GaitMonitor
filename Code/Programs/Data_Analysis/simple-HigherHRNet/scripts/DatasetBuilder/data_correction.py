@@ -28,6 +28,25 @@ def apply_joint_occlusion(file, save = False, debug = False):
         print("SAVING")
         new_dataframe.to_csv("./EDA/Gait_Pixel_Dataset_Occluded.csv",index=False, header=False)      
 
+def remove_empty_frames(joint_data, image_data):
+    cleaned_joints = []
+    cleaned_images = []
+    for i, row in enumerate(joint_data):
+        print("joint: ", i, "of : ", len(joint_data))
+        empty_coords = 0
+        for j, coord in enumerate(row):
+            if j > 2:
+                if all(v == 0 for v in coord) == True:
+                    empty_coords += 1
+        
+        #Remove all empty coord frames to hopefully catch some outliers at the cost of some frames
+        if empty_coords < 1:
+            cleaned_joints.append(row)
+            cleaned_images.append(image_data[i])
+    
+    return cleaned_joints, cleaned_images
+            
+
 def correct_joints_data(image_file, joint_file, save = False, pixels = True):
 
     #Get raw images and corresponding joint info
@@ -37,8 +56,9 @@ def correct_joints_data(image_file, joint_file, save = False, pixels = True):
 
     finished_joint_data = []
     
+    print("first lens: ", len(image_data), len(joint_data))
     #Remove last n frames to avoid weird behaviour
-    n_removed_frames = 6
+    #n_removed_frames = 6
 
     print("running frame occlusion", len(joint_data))
     #Occlude area where not walking properly
@@ -54,16 +74,19 @@ def correct_joints_data(image_file, joint_file, save = False, pixels = True):
     print("occlusion: ", occlusion_box_metres)
     occlusion_box_metres = [[occlusion_box_metres[0][0],occlusion_box_metres[0][1],occlusion_box_metres[1][0],occlusion_box_metres[1][1]]]
     
-    if pixels:
-        image_data, joint_data = occlude_area_in_frame(occlusion_box_pixels, joint_data, image_data)
-    else:
-        image_data, joint_data = occlude_area_in_frame(occlusion_box_metres, joint_data, image_data)
+    #Occlusion function too sensitive: also removes empty frames
+    #if pixels:
+    #    image_data, joint_data = occlude_area_in_frame(occlusion_box_pixels, joint_data, image_data)
+    #else:
+    #    image_data, joint_data = occlude_area_in_frame(occlusion_box_metres, joint_data, image_data)
 
     #Fix any incorrect depth data
     print("detecting outlier values ", len(joint_data))
     joint_data = normalize_outlier_values(joint_data, image_data)
 
     print("Removing empty frames", len(joint_data))
+    joint_data, image_data = remove_empty_frames(joint_data, image_data)
+    print("removed lens: ", len(joint_data), len(image_data))
 
     for i, row in enumerate(joint_data):
         finished_joint_data.append(copy.deepcopy(row))
@@ -76,9 +99,10 @@ def correct_joints_data(image_file, joint_file, save = False, pixels = True):
             else:
                 file_no = str(row[1])
 
-            #directory = "./EDA/Finished_Data/Images/Instance_" + str(float(row[0]))
-            #os.makedirs(directory, exist_ok = True)
-            #cv2.imwrite(directory + "/" + file_no + ".jpg", image_data[i])
+            directory = "./EDA/Finished_Data/Images/Instance_" + str(float(row[0]))
+            print("i is: ", i , len(image_data), len(joint_data))
+            os.makedirs(directory, exist_ok = True)
+            cv2.imwrite(directory + "/" + file_no + ".jpg", image_data[i])
 
     #Fix head coordinates on what's left
     normalize_head_coords(joint_data, image_data)
@@ -86,7 +110,7 @@ def correct_joints_data(image_file, joint_file, save = False, pixels = True):
     print("finished length of joints: ", len(finished_joint_data))
     #Finally finish joints
     if save:
-        with open("./EDA/Finished_Data/metres_data_absolute.csv","w+", newline='') as my_csv:
+        with open("./EDA/Finished_Data/pixel_data_absolute.csv","w+", newline='') as my_csv:
             csvWriter = csv.writer(my_csv,delimiter=',')
             csvWriter.writerows(finished_joint_data)
 

@@ -8,7 +8,7 @@ from scripts.DatasetBuilder.data_correction import correct_joints_data, apply_jo
 def main():
 
     #Process data from EDA into perfect form
-    #correct_joints_data("./Images", "./EDA/gait_dataset_metres.csv", save=True, pixels=False)
+    correct_joints_data("./Images", "./EDA/gait_dataset_pixels.csv", save=True, pixels=True)
     #Test:
     #print("Correction processing sucessfully completed, testing resulting images and joints...")
     #load_and_overlay_joints(directory="./EDA/Finished_Data/Images/", joint_file="./EDA/Finished_Data/pixel_data_absolute.csv", ignore_depth=False, plot_3D=True)
@@ -38,7 +38,7 @@ def main():
     #Draw calculated velocities
     #run_velocity_debugger("./EDA/Finished_Data/Images/", "./EDA/Finished_Data/pixel_data_relative.csv", save= True, debug=False)
 
-    run_images("./Images", exclude_2D=False, start_point=0)
+    #run_images("./Images", exclude_2D=False, start_point=0)
 
     #run_depth_sample("./DepthExamples", "depth_examples.csv")
     #run_video()
