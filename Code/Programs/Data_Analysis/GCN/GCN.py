@@ -154,28 +154,40 @@ def ground_truth_event(event, x, y, flags, params):
         good_frame = params[2]
         index = params[3]
         create_grounds = params[4]
+        appended = params[5]
         # displaying the coordinates
         print(x, y)
         #Keep original depth value as dummy
         if index == 0:
-            good_frame.append([1])
+            if appended == False:
+                good_frame.append([1])
+                params[5] = True
+            else:
+                good_frame[-1]= [1]
             print("this is a good frame")
-
+            print("returning appended  = ", appended, params[5])
         if create_grounds == True:
             row.append([x, y, estimate[2]])
 
-        return
+        return params[5]
     if event == cv2.EVENT_RBUTTONDOWN:
         good_frame = params[2]
         index = params[3]
+        appended = params[5]
         if index == 0:
-            good_frame.append([0])
+            if appended == False:
+                good_frame.append([0])
+                params[5] = True
+            else:
+                good_frame[-1] = [0]
             print("this is a bad frame")
-            return
+
+            print("returning appended  = ", appended, params[5])
+            return params[5]
         #else:
         #    quit()
 
-def create_ground_truths(image_path, joints, save = True, create_grounds = False, start_point = 2):
+def create_ground_truths(image_path, joints, save = True, create_grounds = False, start_point = 3):
     
     joint_iter = 0
     ground_truth_joints = []
@@ -206,10 +218,11 @@ def create_ground_truths(image_path, joints, save = True, create_grounds = False
                 for i in range (0, 18):
                     print("frame: ", file_iter, " of ", len(files))
                     print("total frame: ", joint_iter, "of ", len(joints), "corresponding: ", len(is_good_frame))
-
-                    cv2.setMouseCallback('image', ground_truth_event, [ground_truth_row, joints[joint_iter], is_good_frame, i, create_grounds])
-                    #Only iterate 18 times if actually setting ground truths
-                    key = cv2.waitKey(0)  
+                    appended = False
+                    while appended == False:
+                        appended = cv2.setMouseCallback('image', ground_truth_event, [ground_truth_row, joints[joint_iter], is_good_frame, i, create_grounds, appended])
+                        #Only iterate 18 times if actually setting ground truths
+                        key = cv2.waitKey(0)  
                     if key == 113:
                         quit()
                     elif key == 115:
