@@ -11,7 +11,47 @@ import csv
 from Dataset_Obj import *
 from Graph_Nets import GCN, GIN, GAT, train, accuracy
 from Render import *
-                    
+
+def render_joints(image, joints, delay = False, use_depth = True, metadata = 3, colour = (255, 0, 0)):
+    tmp_image = copy.deepcopy(image)
+    tmp_image = draw_joints_on_frame(tmp_image, joints, use_depth_as_colour=use_depth, metadata = metadata, colour=colour)
+    cv2.imshow('Joint Utilities Image',tmp_image)
+
+    cv2.setMouseCallback('Joint Utilities Image', click_event, tmp_image)
+    if delay:
+        cv2.waitKey(0) & 0xff
+
+def click_event(event, x, y, flags, params):
+  
+    # checking for left mouse clicks
+    if event == cv2.EVENT_LBUTTONDOWN:
+        # displaying the coordinates
+        print(x, y)
+    if event == cv2.EVENT_RBUTTONDOWN:
+        quit()
+
+#Add function to outline velocity change by drawing arrow based on velocity of -1 and +1 frame
+def load_images(folder, ignore_depth = True):
+    image_data = []
+    directory = os.fsencode(folder)
+    for subdir_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
+        dirs.sort(key=numericalSort)
+        print("current subdirectory in utility function: ", subdir)
+        #Ignore base folder and instance 1 (not in dataset)
+        if subdir_iter >= 1:
+            for i, file in enumerate(files):
+                if i >= len(files) / 2 and ignore_depth:
+                    break
+                file_name = os.fsdecode(file)
+                sub_dir = os.fsdecode(subdir)
+                
+                #display with openCV original image, overlayed with corresponding joints
+                raw_image = cv2.imread(sub_dir + "/" + file_name, cv2.IMREAD_COLOR)
+                image_data.append(raw_image)
+    
+    return image_data
+
+
 def assess_data(dataset):
     print("Dataset type: ", type(dataset), type(dataset[0]))
     print('------------')
@@ -277,11 +317,13 @@ def load_mask(mask_path):
     return data
 
 
-def run_image_deletion_mask(image_data, joint_data, mask_path):
+def run_image_deletion_mask(image_file, joint_file, mask_path):
 
     proc_images = []
     proc_joints = []
     mask = load_mask(mask_path)
+    image_data = load_images(image_file)
+    joint_data = load(joint_file)
 
     for i, image in enumerate(image_data):
         if mask[i] == True:
@@ -306,13 +348,16 @@ def run_image_deletion_mask(image_data, joint_data, mask_path):
             csvWriter = csv.writer(my_csv,delimiter=',')
             csvWriter.writerows(proc_joints)
 
+        display_images_and_joints("./Manually_Processed_Images/MPI_pixels_omit.csv", "./Manually_Processed_Images/")
+
 def display_images_and_joints(joint_file, image_file):
-    joint_data = load("./EDA/Finished_Data/metres_data_absolute.csv")
-    image_data = load_images("./EDA/Finished_Data/Images/")
+    print("displaying files and joints...")
+    joint_data = load(joint_file)
+    image_data = load_images(image_file)
     image_iter = 0
     for j in joint_data:
-        #render_joints(image_data[image_iter], rel_joint_data[image_iter], delay=True)
-        plot3D_joints(j, pixel = False)
+        render_joints(image_data[image_iter], joint_data[image_iter], delay=True)
+        #plot3D_joints(j, pixel = False)
         image_iter += 1
 
 def run_ground_truths():
@@ -328,7 +373,7 @@ def run_ground_truths():
 
     #Remove images marked for removal
     run_image_deletion_mask("../simple-HigherHRNet/EDA/Finished_Data/Images", "pixel_data_absolute.csv", "image_deletion_mask.csv")
-
+    
 def run_GCN_training():
     print(f"Torch version: {torch.__version__}")
     print(f"Cuda available: {torch.cuda.is_available()}")

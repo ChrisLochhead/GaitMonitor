@@ -1,0 +1,6 @@
+Data layout:
+
+0-14: Normal elevation, normal angle. first 5 normal walk, next 5 limp, next 5 stagger.
+15-29: Normal elevation, alternate angle.
+30-44: Alternate elevation, normal angle.
+45-59: Alternate elevation, alternate angle.
