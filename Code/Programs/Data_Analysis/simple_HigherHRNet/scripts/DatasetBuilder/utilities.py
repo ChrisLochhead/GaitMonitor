@@ -93,6 +93,7 @@ def load_images(folder, ignore_depth = True):
     directory = os.fsencode(folder)
     for subdir_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
         dirs.sort(key=numericalSort)
+        print("types: ", type(subdir), type(dirs), type(files))
         print("current subdirectory in utility function: ", subdir)
         #Ignore base folder and instance 1 (not in dataset)
         if subdir_iter >= 1:

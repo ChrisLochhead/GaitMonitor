@@ -7,6 +7,7 @@ from torch_geometric.utils import degree
 import re
 import cv2
 import csv
+from pathlib import Path
 
 from Dataset_Obj import *
 from Graph_Nets import GCN, GIN, GAT, train, accuracy
@@ -36,6 +37,7 @@ def load_images(folder, ignore_depth = True):
     directory = os.fsencode(folder)
     for subdir_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
         dirs.sort(key=numericalSort)
+        print("types: ", type(subdir), type(dirs), type(files))
         print("current subdirectory in utility function: ", subdir)
         #Ignore base folder and instance 1 (not in dataset)
         if subdir_iter >= 1:
@@ -90,7 +92,7 @@ def create_dataloaders(dataset, train = 0.8, val = 0.9, test = 0.9):
 
 def numericalSort(value):
     numbers = re.compile(r'(\d+)')
-    parts = numbers.split(value)
+    parts = numbers.split(str(value))
     parts[1::2] = map(int, parts[1::2])
     return parts
 
@@ -316,21 +318,45 @@ def load_mask(mask_path):
     
     return data
 
+def interpolate_joints(joints_1, joints_2):
+    int_joints = [joints_1[0], joints_1[1] + 1, joints_1[2]]
+    print("joint: ", joints_1)
+    for i, joint in enumerate(joints_1):
+        if i > 2:
+            int_joints.append([(joint[0]+joints_2[i][0])/2, \
+                                        (joint[1]+joints_2[i][1])/2, \
+                                        (joint[2]+joints_2[i][2])/2])
+    return int_joints
+                                    
 
-def run_image_deletion_mask(image_file, joint_file, mask_path):
+def run_image_deletion_mask(image_file, joint_file, mask_path, interpolate = True):
 
     proc_images = []
     proc_joints = []
     mask = load_mask(mask_path)
-    image_data = load_images(image_file)
+    image_data = load_images(image_file, ignore_depth=False)
     joint_data = load(joint_file)
 
+    print("len images: ", len(image_data))
     for i, image in enumerate(image_data):
-        if mask[i] == True:
+        print("value found: ", mask[i])
+        if mask[i] == 1:
             proc_images.append(image)
             proc_joints.append(joint_data[i])
-    
-    for i, row in enumerate(proc_joints):
+        #Interpolate a new frame of joints, check not first or last value
+        elif mask[i] == 0 and i > 0 and i < len(image_data) - 1 and interpolate == True:
+            #Check the before and after are both positive examples
+            if mask[i-1] == 1 and mask[i + 1] == 1:
+                #Finally, check both are in the same instance
+                if joint_data[i-1][0] == joint_data[i+1][0]:
+                    proc_images.append(image)
+                    #Interpolate joints
+                    proc_joints.append(interpolate_joints(joint_data[i-1], joint_data[i+1]))
+                    print("lens: ", len(proc_joints), len(proc_images))
+                    #render_joints(image, joint_data[i], delay=True)
+
+
+    for j, row in enumerate(proc_joints):
         print("saving instance: ", str(float(row[0])))
         if row[1] < 10:
             file_no = str(0) + str(row[1])
@@ -339,24 +365,34 @@ def run_image_deletion_mask(image_file, joint_file, mask_path):
 
         #Save Images
         directory = "./Manually_Processed_Images/Instance_" + str(float(row[0]))
-        print("i is: ", i , len(image_data), len(joint_data))
+        print("i is: ", j , len(proc_images), len(proc_joints))
+        print("saving: ", directory + "/" + file_no + ".jpg")
         os.makedirs(directory, exist_ok = True)
-        cv2.imwrite(directory + "/" + file_no + ".jpg", image_data[i])
+        cv2.imwrite(directory + "/" + file_no + ".jpg", proc_images[j])
 
-        #Save joints
-        with open("./Manually_Processed_Images/MPI_pixels_omit.csv","w+", newline='') as my_csv:
-            csvWriter = csv.writer(my_csv,delimiter=',')
-            csvWriter.writerows(proc_joints)
+    #Save joints
+    with open("MPI_pixels_omit.csv","w+", newline='') as my_csv:
+        csvWriter = csv.writer(my_csv,delimiter=',')
+        csvWriter.writerows(proc_joints)
 
-        display_images_and_joints("./Manually_Processed_Images/MPI_pixels_omit.csv", "./Manually_Processed_Images/")
+    display_images_and_joints("MPI_pixels_omit.csv", "./Manually_Processed_Images/", "image_deletion_mask.csv")
 
-def display_images_and_joints(joint_file, image_file):
+def display_images_and_joints(joint_file, image_file, mask_file = None):
     print("displaying files and joints...")
     joint_data = load(joint_file)
-    image_data = load_images(image_file)
+    image_data = load_images(image_file, ignore_depth=False)
+    if mask_file:
+        mask = load_mask(mask_file)
+    print("lens: ", len(joint_data), len(image_data))
     image_iter = 0
-    for j in joint_data:
-        render_joints(image_data[image_iter], joint_data[image_iter], delay=True)
+    for index, j in enumerate(joint_data):
+        if mask_file:
+            if mask[index] == 1:
+                render_joints(image_data[image_iter], j, delay=True, use_depth=False, colour=(0,255,0))
+            else:
+                render_joints(image_data[image_iter], j, delay=True, use_depth=False, colour=(255,255,0))
+        else:
+            render_joints(image_data[image_iter], j, delay=True)
         #plot3D_joints(j, pixel = False)
         image_iter += 1
 
@@ -364,6 +400,7 @@ def run_ground_truths():
     print(f"Torch version: {torch.__version__}")
     print(f"Cuda available: {torch.cuda.is_available()}")
     print(f"Torch geometric version: {torch_geometric.__version__}")
+    #display_images_and_joints("MPI_pixels_omit.csv", "./Manually_Processed_Images/")
 
     #Split data by viewpoint
     #split_data_by_viewpoint("pixel_data_absolute.csv")
@@ -372,7 +409,8 @@ def run_ground_truths():
     #create_ground_truths("../simple-HigherHRNet/EDA/Finished_Data/Images", 'pixel_data_absolute.csv')
 
     #Remove images marked for removal
-    run_image_deletion_mask("../simple-HigherHRNet/EDA/Finished_Data/Images", "pixel_data_absolute.csv", "image_deletion_mask.csv")
+    images_path = "./Images"
+    run_image_deletion_mask(images_path, "pixel_data_absolute.csv", "image_deletion_mask.csv")
     
 def run_GCN_training():
     print(f"Torch version: {torch.__version__}")
