@@ -1,13 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 import torch_geometric
-from torch_geometric.loader import DataLoader
-from sklearn.manifold import TSNE
-from torch_geometric.utils import degree
-import re
-import cv2
-import csv
-from pathlib import Path
+
 
 from Dataset_Obj import *
 from Graph_Nets import GCN, GIN, GAT, train, accuracy
@@ -21,7 +15,7 @@ def run_GCN_training():
 
    
     #Create dataset
-    dataset = JointDataset('./', 'pixel_data_absolute.csv').shuffle()
+    dataset = JointDataset('./', 'MPI_pixels_omit_relative.csv').shuffle()
     assess_data(dataset)
 
     train_loader, val_loader, test_loader = create_dataloaders(dataset)
@@ -60,4 +54,6 @@ def run_GCN_training():
     run_3d_animation(fig, (embeddings, dataset, losses, accuracies, ax, train_loader))
 
 if __name__ == "__main__":
-    run_ground_truths()
+    #run_ground_truths()
+
+    run_GCN_training()
