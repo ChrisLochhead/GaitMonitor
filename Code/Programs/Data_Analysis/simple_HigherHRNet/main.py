@@ -8,7 +8,7 @@ from scripts.DatasetBuilder.data_correction import correct_joints_data, apply_jo
 def main():
 
     #Process data from EDA into perfect form
-    correct_joints_data("./Images", "./EDA/gait_dataset_pixels.csv", save=True, pixels=True)
+    #correct_joints_data("./Images", "./EDA/gait_dataset_pixels.csv", save=True, pixels=True)
     #Test:
     #print("Correction processing sucessfully completed, testing resulting images and joints...")
     #load_and_overlay_joints(directory="./EDA/Finished_Data/Images/", joint_file="./EDA/Finished_Data/pixel_data_absolute.csv", ignore_depth=False, plot_3D=True)
@@ -26,8 +26,8 @@ def main():
 
 
     #Experimental creating hand crafted features
-    #create_hcf_dataset("./EDA/Finished_Data/pixel_data_absolute.csv", "./EDA/Finished_Data/pixel_data_relative.csv", \
-    #                    "./EDA/Finished_Data/pixel_velocity_absolute.csv", "./EDA/Finished_Data/Images")
+    create_hcf_dataset("../EDA/Finished_Data/pixel_data_absolute.csv", "../EDA/Finished_Data/pixel_data_relative.csv", \
+                        "../EDA/Finished_Data/pixel_velocity_absolute.csv", "../EDA/Finished_Data/Images")
 
     #Create dataset with chest joints
     #create_dataset_with_chestpoint("./EDA/gait_dataset_pixels.csv", "./Images")

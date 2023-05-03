@@ -4,6 +4,7 @@ from torch_geometric.loader import DataLoader
 import re
 import cv2
 import csv
+import math
 from Dataset_Obj import *
 from Render import *
 
@@ -185,6 +186,23 @@ global_append = None
 
 #Replace this and draw joints on frame with version found in demo for higher hr net
 def ground_truth_event(event, x, y, flags, params):
+    global added_coord
+        # checking for left mouse clicks
+    if event == cv2.EVENT_LBUTTONDOWN:
+        row = params[0]
+        estimate = params[1]
+        # displaying the coordinates
+        print(x, y)
+        #Keep original depth value as dummy
+        if added_coord == False:
+            row.append([x, y, estimate[2]])
+        else:
+            print("replacing selection: ")
+            row[-1] = [x, y, estimate[2]]
+        added_coord = True
+
+#Replace this and draw joints on frame with version found in demo for higher hr net
+def frame_select_event(event, x, y, flags, params):
     global global_append
         # checking for left mouse clicks
     if event == cv2.EVENT_LBUTTONDOWN:
@@ -199,7 +217,6 @@ def ground_truth_event(event, x, y, flags, params):
         if index == 0:
             if global_append == None:
                 good_frame.append([1])
-                #params[5] = True
                 global_append = True
             else:
                 good_frame[-1]= [1]
@@ -208,25 +225,19 @@ def ground_truth_event(event, x, y, flags, params):
         if create_grounds == True:
             row.append([x, y, estimate[2]])
 
-        #return params[5]
     if event == cv2.EVENT_RBUTTONDOWN:
         good_frame = params[2]
         index = params[3]
         if index == 0:
             if global_append == None:
                 good_frame.append([0])
-                #params[5] = True
                 global_append = True
             else:
                 good_frame[-1] = [0]
             print("this is a bad frame")
-
             print("returning appended  = ", global_append)
-            #return params[5]
-        #else:
-        #    quit()
 
-def create_ground_truths(image_path, joints, save = True, create_grounds = False, start_point = 42): #Start point is -1 because first folder is empty
+def select_good_frames(image_path, joints, save = True, create_grounds = False, start_point = 42): #Start point is -1 because first folder is empty
     global global_append
     joint_iter = 0
     ground_truth_joints = []
@@ -252,34 +263,27 @@ def create_ground_truths(image_path, joints, save = True, create_grounds = False
                 img = draw_joints_on_frame(img, joints[joint_iter], use_depth_as_colour = False, metadata = 3, colour = (0, 0, 255))
                 cv2.imshow('image',img)
 
-                #Go through 18 points for every image
-                
-                for i in range (0, 18):
-                    print("section: ", start_point, directory_iterator)
-                    print("frame: ", file_iter, " of ", len(files))
-                    print("total frame: ", joint_iter, "of ", len(joints), "corresponding: ", len(is_good_frame))
-                    while global_append == None:
-                        cv2.setMouseCallback('image', ground_truth_event, [ground_truth_row, joints[joint_iter], is_good_frame, i, create_grounds])
-                        #Only iterate 18 times if actually setting ground truths
-                        print("appended: ", global_append)
-                        key = cv2.waitKey(0)  
-                    global_append = None
-                    print("key: ", key)
-                    if key == 113:
-                        print("trying to quit?")
-                        quit()
-                    elif key == 115:
-                        print("SAVING PROGRESS: ")
-                        with open('image_deletion_mask.csv', 'a+', newline='') as f:
-                            mywriter = csv.writer(f, delimiter = ",")
-                            mywriter.writerows(is_good_frame)   
-                            is_good_frame = []       
+                print("section: ", start_point, directory_iterator)
+                print("frame: ", file_iter, " of ", len(files))
+                print("total frame: ", joint_iter, "of ", len(joints), "corresponding: ", len(is_good_frame))
+                while global_append == None:
+                    cv2.setMouseCallback('image', frame_select_event, [ground_truth_row, joints[joint_iter], is_good_frame, i, create_grounds])
+                    #Only iterate 18 times if actually setting ground truths
+                    print("appended: ", global_append)
+                    key = cv2.waitKey(0)  
+                global_append = None
+                print("key: ", key)
+                if key == 113:
+                    print("trying to quit?")
+                    quit()
+                elif key == 115:
+                    print("SAVING PROGRESS: ")
+                    with open('image_deletion_mask.csv', 'a+', newline='') as f:
+                        mywriter = csv.writer(f, delimiter = ",")
+                        mywriter.writerows(is_good_frame)   
+                        is_good_frame = []       
 
-                    if create_grounds == False:
-                        break
-
-                    if i == 0 and is_good_frame[-1] == False:
-                        break                   
+                    break                   
                 ground_truth_joints.append(ground_truth_row)
                 joint_iter += 1
 
@@ -301,6 +305,115 @@ def create_ground_truths(image_path, joints, save = True, create_grounds = False
                 mywriter.writerows(is_good_frame) 
                 is_good_frame = []         
 
+def communicate_ground_truths(scores):
+    means = []
+    for i, joint_score in enumerate(scores):
+        print("score before: ", joint_score)
+        score = joint_score[3:]
+        print("score after", score)
+        means.append(np.mean(score))
+    
+    total_mean = np.mean(means)
+    total_std  = np.std(means)
+
+    print("Total mean: ", total_mean, " total std: ", total_std)
+
+def evaluate_ground_truths(predictions, ground_truths, images):
+    similarity_scores = []
+    for i, pred in enumerate(predictions):
+        for j, truth in enumerate(ground_truths):
+            similarity_score = []
+            #If instance and sequence no are identical, they are the same image
+            if pred[0] == ground_truths[0] and pred[1] == ground_truths[1]:
+                similarity_score = [pred[0], pred[1], pred[2]]
+                cv2.imshow('Corresponding image: ',images[i])
+                for k, coords in enumerate(pred):
+                    #Ignore metadata
+                    if k > 2:
+                        similarity_score.append(math.dist(pred(k), truth(k)))
+        if len(similarity_score) > 0:
+            similarity_scores.append(similarity_score)
+    
+    #Save scores to csv
+    with open('similarity_scores.csv', 'a+', newline='') as f:
+        mywriter = csv.writer(f, delimiter = ",")
+        mywriter.writerows(similarity_scores)   
+        similarity_scores = []       
+
+joint_dict = {
+0: "nose",
+1: "left eye",
+2: "right eye",
+3: "left ear",
+4: "right ear",
+5: "left shoulder",
+6: "right shoulder",
+7: "left elbow",
+8: "right elbow",
+9: "left hand",
+10: "right hand",
+11: "left hip",
+12: "right hip",
+13: "left knee",
+14: "right knee", 
+15: "left foot", #18
+16: "right foot" }
+
+added_coord = False
+
+def create_ground_truths(image_path, joints, save = True, create_grounds = False, start_point = -1, file_start_point = 0): #Start point is -1 because first folder is empty
+    global joint_dict
+    global added_coord
+
+    joint_iter = 0
+    ground_truth_joints = []
+    class_no = 0
+    joints = load("pixel_data_absolute.csv")
+    directory_iterator = -1
+    for iterator, (subdir, dirs, files) in enumerate(os.walk(image_path)):
+        dirs.sort(key=numericalSort)
+        #Assign the class
+        if iterator + 1 % 5 == 0:
+            if class_no < 2:
+                class_no += 1
+            else:
+                class_no = 0
+        
+        if len(files) > 0 and directory_iterator >= start_point:
+            for file_iter, file in enumerate(sorted(files, key = numericalSort)):
+                if file_iter < file_start_point:
+                    continue
+                print("in file iterator: directory: ", directory_iterator)
+                #Assign the meta data
+                ground_truth_row = [iterator, file_iter, class_no]
+                img = cv2.imread(os.path.join(subdir,file))
+                #img = draw_joints_on_frame(img, joints[joint_iter], use_depth_as_colour = False, metadata = 3, colour = (0, 0, 255))
+                cv2.imshow('image',img)
+
+                #For each of the 18 joints in the frame
+                for i in range(0, 17):
+                    while added_coord == False:
+                        print("add joint: ", joint_dict[i])
+                        cv2.setMouseCallback('image', ground_truth_event, [ground_truth_row, joints[joint_iter]])
+                        key = cv2.waitKey(0)  
+                    added_coord = False
+
+                ground_truth_joints.append(ground_truth_row)
+                print("SAVING PROGRESS: ")
+                with open('ground_truths.csv', 'a+', newline='') as f:
+                    mywriter = csv.writer(f, delimiter = ",")
+                    mywriter.writerows(ground_truth_joints)   
+                    ground_truth_joints = []       
+                
+                joint_iter += 1
+
+        #iterate joint iter regardless of start point
+        elif len(files)> 0:
+            for file_iter, file in enumerate(sorted(files, key = numericalSort)):
+                joint_iter += 1
+
+        directory_iterator +=1
+
 def load_mask(mask_path):
     data = []
     with open(mask_path, newline='') as csvfile:
@@ -321,7 +434,7 @@ def interpolate_joints(joints_1, joints_2):
                                         (joint[1]+joints_2[i][1])/2, \
                                         (joint[2]+joints_2[i][2])/2])
     return int_joints
-                                    
+
 
 def run_image_deletion_mask(image_file, joint_file, mask_path, interpolate = True):
 
@@ -400,8 +513,12 @@ def run_ground_truths():
     #split_data_by_viewpoint("pixel_data_absolute.csv")
     
     #Create ground truths
-    #create_ground_truths("../simple-HigherHRNet/EDA/Finished_Data/Images", 'pixel_data_absolute.csv')
+    print("creating ground truths")
+    create_ground_truths("./Images", 'pixel_data_absolute.csv')
+
+    #Create "perfect" frame dataset
+    #select_good_frames("../simple-HigherHRNet/EDA/Finished_Data/Images", 'pixel_data_absolute.csv')
 
     #Remove images marked for removal
-    images_path = "./Images"
-    run_image_deletion_mask(images_path, "pixel_data_absolute.csv", "image_deletion_mask.csv")
+    #images_path = "./Images"
+    #run_image_deletion_mask(images_path, "pixel_data_absolute.csv", "image_deletion_mask.csv")

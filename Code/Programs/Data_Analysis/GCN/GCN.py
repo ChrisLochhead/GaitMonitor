@@ -54,6 +54,6 @@ def run_GCN_training():
     run_3d_animation(fig, (embeddings, dataset, losses, accuracies, ax, train_loader))
 
 if __name__ == "__main__":
-    #run_ground_truths()
+    run_ground_truths()
 
-    run_GCN_training()
+    #run_GCN_training()
