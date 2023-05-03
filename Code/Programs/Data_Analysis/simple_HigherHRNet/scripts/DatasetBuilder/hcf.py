@@ -7,6 +7,7 @@ from scripts.DatasetBuilder.utilities import load, load_images
 from scripts.DatasetBuilder.render import render_joints
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D   
+from scipy.interpolate import make_interp_spline, BSpline
 
 joint_connections = [[15, 13], [13, 11], # left foot to hip 
                      [16, 14], [14, 12], # right foot to hip
@@ -61,6 +62,7 @@ def build_knee_joint_data(gait_cycle):
 
     return [l_angles, r_angles]
 
+
 def interpolate_knee_data(x, y, scale = 5000):
     curr_length = len(x)
     inter_length = (curr_length -1) * scale
@@ -86,12 +88,10 @@ def interpolate_knee_data(x, y, scale = 5000):
     
     print("final lens: ", len(inter_data), len(inter_indices))
     return inter_data, inter_indices
-            
-
 
 def chart_knee_data(gait_cycle_angles):
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
+    #fig = plt.figure()
+    #ax = fig.add_subplot(111)
 
 
     l_x = gait_cycle_angles[0]
@@ -106,14 +106,33 @@ def chart_knee_data(gait_cycle_angles):
     l_x, l_y = interpolate_knee_data(l_x, l_y)
     r_x, r_y = interpolate_knee_data(r_x, r_y)
 
-    #Chart data
-    l_line = Line2D(l_y, l_x, color="Cyan")
-    r_line = Line2D(r_y, r_x, color="Blue")
-    ax.add_line(l_line)
-    ax.add_line(r_line)
-    ax.set_xlim(min(l_y), max(l_y))
-    ax.set_ylim(min(l_x), max(l_x))
+
+
+    print("showing original")
+    plt.figure()
+    plt.plot(l_y,l_x)
+    plt.plot(r_y,r_x)
     plt.show()
+
+
+    print("showing poly")
+    plt.figure()
+    poly = np.polyfit(l_y,l_x,8)
+    poly_alt = np.polyfit(r_y, r_x, 8)
+    poly_l = np.poly1d(poly)(l_y)
+    poly_r = np.poly1d(poly_alt)(r_y)
+    plt.plot(l_y,poly_l)
+    plt.plot(r_y,poly_r)
+    plt.show()
+    
+    #Chart data
+    #l_line = Line2D(l_y, l_x, color="Cyan")
+    #r_line = Line2D(r_y, r_x, color="Blue")
+    #ax.add_line(l_line)
+    #ax.add_line(r_line)
+    #ax.set_xlim(min(l_y), max(l_y))
+    #ax.set_ylim(min(l_x), max(l_x))
+    #plt.show()
 
 
 #Get cycles in each instance of 5 frames each
@@ -378,7 +397,7 @@ def create_hcf_dataset(jointfile, rel_jointfile, abs_veljointfile, folder, save 
 
     #Experiment with getting and then charting knee data
     for i in range(len(gait_cycles)):
-        if i <= 5:
+        if i <= 2:
             angles = build_knee_joint_data(gait_cycles[i])
             chart_knee_data(angles)
     return
