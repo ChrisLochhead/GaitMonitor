@@ -106,13 +106,11 @@ def chart_knee_data(gait_cycle_angles):
     l_x, l_y = interpolate_knee_data(l_x, l_y)
     r_x, r_y = interpolate_knee_data(r_x, r_y)
 
-
-
-    print("showing original")
-    plt.figure()
-    plt.plot(l_y,l_x)
-    plt.plot(r_y,r_x)
-    plt.show()
+    #print("showing original")
+    #plt.figure()
+    #plt.plot(l_y,l_x)
+    #plt.plot(r_y,r_x)
+    #plt.show()
 
 
     print("showing poly")
@@ -124,15 +122,6 @@ def chart_knee_data(gait_cycle_angles):
     plt.plot(l_y,poly_l)
     plt.plot(r_y,poly_r)
     plt.show()
-    
-    #Chart data
-    #l_line = Line2D(l_y, l_x, color="Cyan")
-    #r_line = Line2D(r_y, r_x, color="Blue")
-    #ax.add_line(l_line)
-    #ax.add_line(r_line)
-    #ax.set_xlim(min(l_y), max(l_y))
-    #ax.set_ylim(min(l_x), max(l_x))
-    #plt.show()
 
 
 #Get cycles in each instance of 5 frames each

@@ -29,8 +29,8 @@ def plot3D_joints(joints, pixel = True, metadata = 3):
     # get colormap from seaborn
     #424 by 240
     if pixel:
-        ax.set_xlim([0, 240])
-        ax.set_ylim([0, 424])
+        ax.set_xlim([0, 1500])
+        ax.set_ylim([0, 500])
         ax.set_zlim3d([0, 255])
     else:
         ax.set_xlim([-200, 200])

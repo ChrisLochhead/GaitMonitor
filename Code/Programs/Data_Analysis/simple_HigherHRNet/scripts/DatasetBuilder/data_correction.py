@@ -18,6 +18,92 @@ from scripts.DatasetBuilder.utilities import load, load_images, get_3D_coords
 from scripts.DatasetBuilder.demo import *   
 from scripts.DatasetBuilder.render import * 
 
+#normalization function
+#[x′ i, y′ i ] = [ imgwidth 2 ∗ xi − xmin xmax − xmin , imgheight 2 ∗ yi − ymin ymax − ymin ]
+def normalize_joint_scales(joints, images, save = True, save_name = "normalized_pixel_data_absolute"):
+    norm_joints = []
+    #Photo dimensions in pixels
+    width = 424
+    height = 240
+
+ 
+    for i, instance in enumerate(joints):
+        #Add metadata
+        norm_joint_row = [instance[0], instance[1], instance[2]]
+
+        for j, joint in enumerate(instance):
+            #Ignore metadata
+            if j <= 2:
+                continue
+            
+            #2D Calculations for when avoiding depth sensor data
+            all_x = [item[0] for j, item in enumerate(instance) if j > 2]
+            all_y = [item[1] for j, item in enumerate(instance) if j > 2]
+            min_x = min(all_x)
+            max_x = max(all_x)
+            min_y = min(all_y)
+            max_y = max(all_y)
+
+            #Using depth sensor
+            #norm_joint = [(joint[0] * joint[2])/255,# 
+            #              (joint[1] * joint[2])/255,# this works poorly with bad depth data.
+            #             joint[2]]
+            
+            #If not using depth sensor
+            norm_joint = [((width * 2) * (joint[0] - min_x)/(max_x - min_x) )/10,
+                          ((height * 2) * (joint[1] - min_y)/(max_y - min_y))/10,
+                          joint[2]]
+            
+            norm_joint_row.append(norm_joint)
+        norm_joints.append(norm_joint_row)
+        if i == 7:
+            [print("\n n_coord : ", c, coord) for c, coord in enumerate(norm_joint_row)]
+
+            [print("\n coord : ", c, coord) for c, coord in enumerate(instance)]
+        #print("normal: ", instance)
+        render_joints(images[i], norm_joint_row, delay=True, use_depth=True)
+        render_joints(images[i], instance, delay=True, use_depth=True)
+    new_dataframe = pd.DataFrame(norm_joints, columns = colnames)
+
+    if save:
+        #Convert to dataframe 
+        print("SAVING")
+        new_dataframe.to_csv("../EDA/Finished_Data/" + save_name + ".csv",index=False, header=False)     
+
+
+        
+
+
+def create_joint_angle_dataset():
+    pass
+
+#TODO
+#Test normalization works,
+#convert normalized data into relative
+#build angle dataset (with absolute)
+#rebuild velocity with normalized absolute dataset
+#Combine all 3 into one super dataset
+#Construct region-based datasets (2 and 5 step)
+#Test all in EDA 
+#Test all in GCN
+
+#Back to work on GAN
+
+#Bone angle dataset (behavioural)
+#Position data (spatial)
+#Velocity (temporal)
+#Regional (2 and 5 tier hierarchy)
+
+'''
+Example dataset
+
+0, 1, 0 [pos.x, pos.y, pos.z,
+         vel.x, vel.y, vel.z,
+         angle_0, angle_1, angle_2] * 18
+'''
+def create_conmbined_dataset():
+    pass
+
 def apply_joint_occlusion(file, save = False, debug = False):
     dataset = load(file)
     occluded_data = compensate_depth_occlusion(occlusion_boxes, dataset, debug=debug) 

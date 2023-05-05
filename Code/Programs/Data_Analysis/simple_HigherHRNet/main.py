@@ -2,7 +2,7 @@
 from scripts.DatasetBuilder.demo import *
 from scripts.DatasetBuilder.hcf import create_hcf_dataset 
 from scripts.DatasetBuilder.render import * 
-from scripts.DatasetBuilder.data_correction import correct_joints_data, apply_joint_occlusion
+from scripts.DatasetBuilder.data_correction import correct_joints_data, apply_joint_occlusion, normalize_joint_scales
 
 
 def main():
@@ -25,9 +25,13 @@ def main():
     #    image_iter += 1
 
 
+    joint_data = load("../EDA/Finished_Data/MPI_pixels_omit.csv")
+    image_data = load_images("../EDA/Finished_Data/Images/")
+    normalize_joint_scales(joint_data, image_data)
+
     #Experimental creating hand crafted features
-    create_hcf_dataset("../EDA/Finished_Data/pixel_data_absolute.csv", "../EDA/Finished_Data/pixel_data_relative.csv", \
-                        "../EDA/Finished_Data/pixel_velocity_absolute.csv", "../EDA/Finished_Data/Images")
+    #create_hcf_dataset("../EDA/Finished_Data/pixel_data_absolute.csv", "../EDA/Finished_Data/pixel_data_relative.csv", \
+    #                    "../EDA/Finished_Data/pixel_velocity_absolute.csv", "../EDA/Finished_Data/Images")
 
     #Create dataset with chest joints
     #create_dataset_with_chestpoint("./EDA/gait_dataset_pixels.csv", "./Images")
