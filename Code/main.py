@@ -1,30 +1,16 @@
 #Standard packages
 import os, sys
-import cv2
-from pynput.keyboard import Key, Listener, KeyCode
-import numpy as np
-import matplotlib.pyplot as MPL
+from pynput.keyboard import Listener
 import datetime
 import torch
 
 #Local files
-import init_directories
-import capture
-import ImageProcessor
-#from Utilities import remove_block_images, remove_background_images, generate_labels, unravel_FFGEI, create_HOGFFGEI, generate_instance_lengths, extract_ttest_metrics, create_contingency_table
-#import GEI
-#import LocalResnet
-#import Experiment_Functions
-#import File_Decimation
-#import Ensemble
+from Programs.Data_Recording import Capture as capture
+from Programs.Data_Processing.Model_Based.Utilities import numericalSort
 import re
 
 #Torch
 import torch
-from torchvision.transforms import ToTensor, Lambda
-
-#Scipy for T-test
-from scipy import stats
 
 #MaskCNN only works on the PC version of this app, the Jetson Nano doesn't support python 3.7
 if sys.version_info[:3] > (3, 7, 0):
@@ -42,12 +28,6 @@ current_menu = 0
 selected_function = None 
 capture_paused = False
 restart_time = None
-
-def numericalSort(value):
-    numbers = re.compile(r'(\d+)')
-    parts = numbers.split(value)
-    parts[1::2] = map(int, parts[1::2])
-    return parts
 
 def reorder_folders(path):
     for iterator, (subdir, dirs, files) in enumerate(os.walk(path)):
@@ -73,9 +53,6 @@ def run_camera(path="./Images/Instances/", v=0):
     return out_condition
     #except:
     #    main("No camera detected, returning to main menu")
-
-def get_silhouettes(v =1):
-    ImageProcessor.get_silhouettes('./Images/Instances', verbose=v)
     
 def reset_capture_timer():
     print("empty")
