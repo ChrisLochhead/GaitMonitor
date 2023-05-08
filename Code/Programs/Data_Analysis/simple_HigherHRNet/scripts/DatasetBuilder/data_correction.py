@@ -78,7 +78,6 @@ def create_joint_angle_dataset():
     pass
 
 #TODO
-#Test normalization works,
 #convert normalized data into relative
 #build angle dataset (with absolute)
 #rebuild velocity with normalized absolute dataset

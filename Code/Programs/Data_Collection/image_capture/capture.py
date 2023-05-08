@@ -13,11 +13,17 @@ import copy
 import File_Decimation
 import datetime
 import csv
-#import deep_privacy
 
 break_program = False
-pause_program = False
-save_intrinsics = True 
+pause_program = False 
+save_instrinsics = True
+
+#Colour tags for console
+class c_colours:
+    CYAN = '\033[96m'
+    BLUE = '\033[94m'
+    RED = '\033[91m'
+    GREEN = '\033[92m'
 
 def on_press(key):
     global break_program
@@ -35,6 +41,7 @@ class Camera:
     def __init__(self, depth = True):
         global break_program
         break_program = False
+
         # Configure depth and color streams
         self.pipeline = rs.pipeline()
         self.file_count = 0
@@ -56,7 +63,7 @@ class Camera:
         self.align = rs.align(rs.stream.color)
 
     def retrieve_image(self):
-        global save_intrinsics
+        global save_instrinsics
         # Get frameset of color and depth
         frames = self.pipeline.wait_for_frames()
     
@@ -66,28 +73,20 @@ class Camera:
         depth_frame = aligned_frames.get_depth_frame()  # aligned_depth_frame is a 640x480 depth image
         color_frame = aligned_frames.get_color_frame()
 
-        if save_intrinsics == True:
+        if save_instrinsics == True:
             processed_depth_frame = self.dec_filter.process(depth_frame)
             depth_profile = processed_depth_frame.get_profile()
             video_profile = depth_profile.as_video_stream_profile()
             intr = video_profile.get_intrinsics()
             print("these are the intrinsics: ", intr)
-            print(intr.width)
-            print(intr.height)
-            print(intr.ppx)
-            print(intr.ppy)
-            print(intr.fx)
-            print(intr.fy)
-            print(intr.model)
-            print(intr.coeffs)
 
-            intrinsics_array = [intr.width, intr.height, intr.ppx, intr.ppy, intr.fx, intr.fy, intr.model, intr.coeffs]
+            intrinsics_array = [intr.width, intr.height, intr.ppx, intr.ppy, intr.fx, intr.fy, intr.model, intr.coeffs] 
             #Save intrinsics to a .csv file
             with open("depth_intrinsics.csv","w+", newline='') as my_csv:
                 csvWriter = csv.writer(my_csv,delimiter=',')
                 csvWriter.writerow(intrinsics_array)
-
-            save_intrinsics = False
+            
+            save_instrinsics = False
 
         # Convert images to numpy arrays
         depth_img = np.asanyarray(depth_frame.get_data())
@@ -147,7 +146,7 @@ class Camera:
                 #Check if data overloaded and if so conduct a purge
                 if self.file_count >= self.file_limit:
                     #Purge and upload data
-                    print("purging data: ", self.file_count)
+                    #print("purging data: ", self.file_count)
                     File_Decimation.decimate()
                     self.file_count = 0
 
@@ -161,22 +160,27 @@ class Camera:
                     color_img = self.retrieve_color_image()
 
                 # Plot detected objects
-                refined_img = Image.fromarray(color_img)
-                refined_img = refined_img.resize((224, 224))
+                if depth:
+                    refined_img = Image.fromarray(col_only)
+                else:
+                    refined_img = Image.fromarray(color_img)
+                    
+                refined_img = refined_img.resize((480, 480))
+
 
                 #Only scan for humans every 3 frames, or 5 seconds after a human was detected.
                 if verbose > 0:
-                    if i%3 == 0 and record_timer == 0.0 or time.time() - record_timer >= 5.0:
-
+                    if i%3 == 0 and record_timer == 0.0 or time.time() - record_timer >= 10.0:
+                        
+                        print(c_colours.GREEN + "Searching for Humans")
                         #Get humans
                         objs = JetsonYolo.get_objs_from_frame(np.asarray(refined_img), False)
                         seen_human = False
 
                         #If a human found in the frame, notify of the detection and start the record timer
                         if len(objs) > 0:
-                            print("human detected: ", objs_last_frame)
+                            print(c_colours.CYAN + "human detected: ", objs_last_frame)
                             if objs_last_frame == 0:
-                                print("human detected")
                                 seen_human = True
                                 record_timer = time.time()
 
@@ -186,11 +190,11 @@ class Camera:
                       
                         #give a 20 frame delay before declaring no humans detected to account for temporary blips 
                         if len(objs) == 0:
-                            print("no human detected")
+                            #print("no human detected")
                             frames_since_last += 1
                             #If it's been more than 20 frames, it's not a blip, set human detection to 0
-                            if frames_since_last > 20:
-                                print("pretending cant see: ", frames_since_last)
+                            if frames_since_last > 5:
+                                print( c_colours.RED + "pretending cant see: ", frames_since_last)
                                 objs_last_frame = 0
                             else:
                                 print("setting objs last frame to 1", frames_since_last)
@@ -199,7 +203,6 @@ class Camera:
                         #Recheck for existence of human after blips
                         if objs_last_frame == 0:
                             if len(objs) > 0:
-                                print("secondary person found after blip fix")
                                 seen_human = True
                                 record_timer = time.time()
                                 frames_since_last = 0
@@ -207,13 +210,13 @@ class Camera:
                         #Debug
                         debug_img, not_used = JetsonYolo.plot_obj_bounds(objs, np.asarray(refined_img))
 
-                    refined_img = np.asarray(debug_img)
+                refined_img = np.asarray(debug_img)
 
                 i += 1
                 #Print FPS
                 if i%10 == 0 and verbose > 0:
                     st = time.time()
-                    print('FPS: ' + str(i/(st - s0)))
+                    #print('FPS: ' + str(i/(st - s0)))
                 #Show images
                 if verbose > 0:
                     cv2.imshow('RealSense', refined_img)
@@ -265,7 +268,7 @@ class Camera:
                         record_timer = 0.0
                         for image_data in current_image_array:
                             if verbose > 0:
-                                print("dumping buffer")
+                                print(c_colours.RED + "dumping buffer")
                             if depth:
                                 cv2.imwrite(local_path + image_data[2], image_data[0])
                                 depim_name = 'dep-' + image_data[2]
@@ -287,16 +290,10 @@ class Camera:
 
             try:
                 cv2.destroyAllWindows()
-                print("exiting here 1")
                 return pause_program
             except:
                 print("program ended, listener closing")
-                print("exiting here 2")
                 return pause_program
             finally:
-                print("exiting here 3", pause_program)
                 return pause_program
-                print("surely not making it here 3")
-            #    quit()
-        print("does it get here somehow? probs not")
   
