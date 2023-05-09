@@ -5,7 +5,8 @@ from torch_geometric.data import Data
 from torch_geometric.data import Dataset
 import os
 from tqdm import tqdm
-from Programs.Data_Processing.Model_Based.Utilities import joint_connections
+import Programs.Data_Processing.Model_Based.Utilities
+import Programs.Data_Processing.Model_Based.Render
 
 class JointDataset(Dataset):
     def __init__(self, root, filename, test=False, transform=None, pre_transform=None):
@@ -41,7 +42,7 @@ class JointDataset(Dataset):
 
     def process(self):
         self.data = pd.read_csv(self.raw_paths[0], header=None)#.reset_index()
-        self.data = convert_to_literals(self.data)
+        self.data = Render.convert_to_literals(self.data)
         coo_matrix = get_COO_matrix()
 
         for index, row in tqdm(self.data.iterrows(), total=self.data.shape[0]):
@@ -76,27 +77,15 @@ class JointDataset(Dataset):
 
 def get_COO_matrix():
   res = [[],[]]
-  for connection in joint_connections:
+  for connection in Utilities.joint_connections:
     #Once for each of the 3 coords in each connection
     for i in range(0, 3):
         res[0] += [connection[0], connection[1]]
         res[1] += [connection[1], connection[0]]
   return res
 
-import ast 
-import copy 
 
-def convert_to_literals(data):
-    for i,  (index, row) in enumerate(data.iterrows()):
-        for col_index, col in enumerate(row):
-            if col_index >= 3:
-                tmp = ast.literal_eval(row[col_index])
-                data.iat[i, col_index] = copy.deepcopy(tmp)
-            else:
-                data.iat[i, col_index] = int(data.iat[i, col_index])
 
-    return data
-            
 #Input here would be each row
 def data_to_graph(row, coo_matrix):
     refined_row = row.iloc[3:]

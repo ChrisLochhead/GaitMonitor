@@ -1,8 +1,5 @@
 import cv2
 import numpy as np
-from Programs.Machine_Learning.Model_Based.Simple_HigherHRNet import SimpleHigherHRNet
-from Programs.Machine_Learning.Model_Based.Simple_HigherHRNet.misc.visualization import check_video_rotation, draw_points_and_skeleton
-
 import csv
 import os 
 import csv

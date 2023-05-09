@@ -3,8 +3,7 @@ import numpy as np
 import torch
 from collections import defaultdict
 
-from misc import visualization
-
+from Programs.Machine_Learning.Model_Based.Simple_HigherHRNet.misc import visualization
 
 def py_max_match(scores):
     m = munkres.Munkres()

@@ -5,9 +5,9 @@ import numpy as np
 import torch
 from torchvision.transforms import transforms
 
-from models.higherhrnet import HigherHRNet
-from misc.HeatmapParser import HeatmapParser
-from misc.utils import (get_multi_scale_size, resize_align_multi_scale, get_multi_stage_outputs, aggregate_results,
+from Programs.Machine_Learning.Model_Based.Simple_HigherHRNet.models.higherhrnet import HigherHRNet
+from Programs.Machine_Learning.Model_Based.Simple_HigherHRNet.misc.HeatmapParser import HeatmapParser
+from Programs.Machine_Learning.Model_Based.Simple_HigherHRNet.misc.utils import (get_multi_scale_size, resize_align_multi_scale, get_multi_stage_outputs, aggregate_results,
                         get_final_preds)
 
 

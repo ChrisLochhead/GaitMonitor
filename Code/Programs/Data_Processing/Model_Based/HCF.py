@@ -3,8 +3,8 @@ import csv
 import copy
 import math
 import numpy as np
-from Programs.Data_Processing.Model_Based.Utilities import load, load_images, joint_connections
-from Programs.Data_Processing.Model_Based.Render import render_joints
+from Programs.Data_Processing.Model_Based.Utilities import load, load_images
+from Programs.Data_Processing.Model_Based.Render import render_joints, joint_connections
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D   
 from scipy.interpolate import make_interp_spline, BSpline

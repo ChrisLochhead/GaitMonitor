@@ -4,7 +4,6 @@ import re, seaborn as sns
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.colors import ListedColormap
-from Programs.Data_Processing.Model_Based.Utilities import joint_connections
 #%%capture
 from IPython.display import display, HTML
 from matplotlib import animation
@@ -15,8 +14,16 @@ import numpy as np
 import networkx as nx
 from torch_geometric.utils import to_networkx
 
-from Dataset_Obj import get_COO_matrix
+from Programs.Data_Processing.Model_Based.Dataset_Obj import get_COO_matrix
 
+joint_connections = [[15, 13], [13, 11], # left foot to hip 
+                     [16, 14], [14, 12], # right foot to hip
+                     [11, 0], [12, 0], # hips to origin
+                     [9, 7], [7, 5], # left hand to shoulder
+                     [10, 8], [6, 8], #right hand to shoulder
+                     [5, 0], [6, 0], # Shoulders to origin
+                     [1, 3], [2, 4], # ears to eyes
+                     [3, 0], [4, 0]]# Eyes to origin
 
 def plot_graph(data):
     G = process_data_to_graph(data, get_COO_matrix())
@@ -134,8 +141,8 @@ def plot3D_joints(joints, pixel = True, metadata = 3):
     # get colormap from seaborn
     #424 by 240
     if pixel:
-        ax.set_xlim([0, 1500])
-        ax.set_ylim([0, 500])
+        ax.set_xlim([0, 424])
+        ax.set_ylim([0, 240])
         ax.set_zlim3d([0, 255])
     else:
         ax.set_xlim([-200, 200])

@@ -1,12 +1,11 @@
-
-from Data_Processing.Model_Based.DatasetBuilder.demo import *
-from Data_Processing.Model_Based.DatasetBuilder.hcf import create_hcf_dataset 
-from Data_Processing.Model_Based.DatasetBuilder.render import * 
-from Data_Processing.Model_Based.DatasetBuilder.data_correction import correct_joints_data, apply_joint_occlusion, normalize_joint_scales
-from Data_Processing.Model_Based.DatasetBuilder.utilities import load, load_images
+#import init_directories
+from Programs.Data_Processing.Model_Based.Demo import *
+from Programs.Data_Processing.Model_Based.HCF import create_hcf_dataset
+from Programs.Data_Processing.Model_Based.Render import *
+from Programs.Data_Processing.Model_Based.Data_Correction import correct_joints_data, apply_joint_occlusion, normalize_joint_scales
+from Programs.Data_Processing.Model_Based.Utilities import load, load_images
 
 def main():
-
     #Process data from EDA into perfect form
     #correct_joints_data("./Images", "./EDA/gait_dataset_pixels.csv", save=True, pixels=True)
     #Test:
@@ -25,9 +24,9 @@ def main():
     #    image_iter += 1
 
 
-    joint_data = load("../EDA/Finished_Data/MPI_pixels_omit.csv")
-    image_data = load_images("../EDA/Finished_Data/Images/")
-    normalize_joint_scales(joint_data, image_data)
+    #joint_data = load("../EDA/Finished_Data/MPI_pixels_omit.csv")
+    #image_data = load_images("../EDA/Finished_Data/Images/")
+    #normalize_joint_scales(joint_data, image_data)
 
     #Experimental creating hand crafted features
     #create_hcf_dataset("../EDA/Finished_Data/pixel_data_absolute.csv", "../EDA/Finished_Data/pixel_data_relative.csv", \
@@ -42,7 +41,7 @@ def main():
     #Draw calculated velocities
     #run_velocity_debugger("./EDA/Finished_Data/Images/", "./EDA/Finished_Data/pixel_data_relative.csv", save= True, debug=False)
 
-    #run_images("./Images", exclude_2D=False, start_point=0)
+    run_images("./Code/Datasets/Cleaned Home Images_Chris", "./Code/Datasets/Office_Dataset", exclude_2D=False, start_point=0)
 
     #run_depth_sample("./DepthExamples", "depth_examples.csv")
     #run_video()

@@ -9,7 +9,8 @@ import ast
 from ast import literal_eval
 import pyrealsense2 as rs
 import re
-
+#from Render import render_joints, plot3D_joints 
+from Programs.Data_Processing.Model_Based.Render import render_joints, plot3D_joints
 '''order of joints:
 
 0,1,2 are meta data:
@@ -36,19 +37,98 @@ actual: Format
 No chest
 '''   
 
-joint_connections = [[15, 13], [13, 11], # left foot to hip 
-                     [16, 14], [14, 12], # right foot to hip
-                     [11, 0], [12, 0], # hips to origin
-                     [9, 7], [7, 5], # left hand to shoulder
-                     [10, 8], [6, 8], #right hand to shoulder
-                     [5, 0], [6, 0], # Shoulders to origin
-                     [1, 3], [2, 4], # ears to eyes
-                     [3, 0], [4, 0]]# Eyes to origin
-
 colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','Joint_4','Joint_5','Joint_6','Joint_7',
     'Joint_8','Joint_9','Joint_10','Joint_11','Joint_12','Joint_13','Joint_14','Joint_15','Joint_16', 'Joint_17'] 
 
+#Occlusion co-ordinates for home recording dataset
 occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
+
+
+def generate_relative_sequence_data(sequences, rel_data):
+    rel_sequence_data = []
+    iterator = 0
+    for i, sequence in enumerate(sequences):
+        rel_sequence = []
+        for j, frame in enumerate(sequence):
+            rel_sequence.append(rel_data[iterator])
+            iterator += 1
+        rel_sequence_data.append(rel_sequence)
+
+    print("relative sequence data lengths: ", [len(s) for s in rel_sequence_data])
+    print("total length: ", len(rel_sequence_data)
+          )
+    return rel_sequence_data
+
+
+def convert_to_sequences(abs_data):
+    pass
+    #Iterate through abs_data, get head coords at 5 after first frame and 5 before last
+    sequences = []
+    sequence = []
+    for i, joint in enumerate(abs_data):
+        if i < len(abs_data) - 1:
+            #If this number in sequence is a higher number than the next, then the next is a new
+            #Instance
+            if joint[1] > abs_data[i + 1][1]:
+                sequence.append(joint)
+                sequences.append(sequence)
+                sequence = []
+            else:        
+                sequence.append(joint)
+        else:
+            #Just add last one to sequence
+            sequence.append(joint)
+
+    print("created sequence dataset.")
+    print("length of sequences: ", [len(s) for s in sequences])
+    return sequences
+
+def create_flipped_joint_dataset(rel_data, abs_data, images, save = False):
+    sequence_data = convert_to_sequences(abs_data)
+    rel_sequence_data = generate_relative_sequence_data(sequence_data, rel_data)
+
+    flipped_data = []
+    for i, seq in enumerate(rel_sequence_data):
+
+        #Get first and last head positions (absolute values)
+        first = sequence_data[i][5]
+        last = sequence_data[i][-5]
+
+        #This is going from right to left: the ones we want to flip
+        if first[0] > last[0]:
+            print("flipping joint sequence: ", i)
+            for joints in seq:
+                flipped_joints = []
+                for j, joint in enumerate(joints):
+                    #Flip X value on each individual co-ordinate
+                    flipped_joints.append([-joint[0], joint[1], joint[2]])
+                #Append flipped joints instance to the list
+                flipped_data.append(flipped_joints)
+
+        else:
+        #Just add the data sequentially for the joints already going from left to right.
+            for joints in seq:
+                flipped_data.append(joints)
+
+    
+    #Illustrate results
+    for k, joints in enumerate(flipped_data):
+        if k > 20:
+            render_joints(images[k], abs_data[k], delay=True)
+            plot3D_joints(joints)
+
+    
+    if save:
+        save_dataset(flipped_data, "Flipped_Data.csv")
+
+    return flipped_data
+
+def save_dataset(data, name, colnames = colnames):
+    new_dataframe = pd.DataFrame(data, columns = colnames)
+    #Convert to dataframe 
+    print("SAVING")
+    new_dataframe.to_csv(name,index=False, header=False)     
+
 
 def get_3D_coords(coords_2d, dep_img, pts3d_net = True, dilate = True, meta_data = 3):
 
@@ -109,11 +189,10 @@ def load_images(folder, ignore_depth = True):
     
     return image_data
 
-def make_intrinsics(intrinsics_file = "depth_intrinsics.csv"):
+def make_intrinsics(intrinsics_file = "Code/depth_intrinsics.csv"):
         '''
         Avoid having to read a bagfile to get the camera intrinsics
         '''
-
         with open(intrinsics_file, newline='') as csvfile:
             data_struct = list(csv.reader(csvfile))
 

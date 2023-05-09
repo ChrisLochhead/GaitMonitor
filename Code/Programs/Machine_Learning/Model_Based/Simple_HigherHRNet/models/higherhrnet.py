@@ -1,6 +1,7 @@
 import torch
 from torch import nn
-from models.modules import BasicBlock, Bottleneck
+from Programs.Machine_Learning.Model_Based.Simple_HigherHRNet.models.modules import BasicBlock, Bottleneck
+
 
 
 class StageModule(nn.Module):

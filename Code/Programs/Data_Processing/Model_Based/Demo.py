@@ -105,7 +105,7 @@ def load_and_overlay_joints(directory = "./Images", joint_file = "./EDA/gait_dat
 
 def run_image(image_name, single = True, save = False, directory = None, model= None, image_no = 0):
     if model == None:
-        model = SimpleHigherHRNet(32, 17, "./weights/pose_higher_hrnet_w32_512.pth")
+        model = SimpleHigherHRNet.SimpleHigherHRNet(32, 17, "./weights/pose_higher_hrnet_w32_512.pth")
     image = cv2.imread(image_name, cv2.IMREAD_COLOR)
 
     #apply joints to image for visualisation
@@ -185,9 +185,10 @@ def run_depth_sample(folder_name, joints_info):
 
 #Exclude 2D depth coord calculations to just get pixel data and depth value, otherwise it will return actual distances good for ML but
 #not possible to properly display for debugging without re-projecting back to pixel data.
-def run_images(folder_name, exclude_2D = False, write_mode = "w+", start_point = 0):
-    directory = os.fsencode(folder_name)
-    model = SimpleHigherHRNet(32, 17, "./weights/pose_higher_hrnet_w32_512.pth")
+def run_images(folder_name, out_folder, exclude_2D = False, write_mode = "w+", start_point = 0):
+    directory = os.fsencode(folder_name)#
+    print("dir: ", os.getcwd())
+    model = SimpleHigherHRNet.SimpleHigherHRNet(32, 17, "./Code/Programs/Machine_Learning/Model_Based/Simple_HigherHRNet/weights/pose_higher_hrnet_w32_512.pth")
     file_iter = 0
     subdir_iter = -1
     data_class = 0
@@ -221,12 +222,13 @@ def run_images(folder_name, exclude_2D = False, write_mode = "w+", start_point =
             print("Sub directory: ", sub_dir, " Instance: ", file_iter - count_in_directory)
             print("subdir iter: ", subdir_iter)
 
+            #Not currently used, only for saving images with overlaid joints
             out_directory = "./example_imgs/"
-            
             os.makedirs(out_directory, exist_ok=True)
 
              #Get joints from initial image
-            image, joints = run_image(sub_dir + "/" + file_name, single=False, save = True, directory=out_directory + sub_dir, model=model, image_no = file_iter)
+            image, joints = run_image(sub_dir + "/" + file_name, single=False, save = False, 
+                                      directory=out_directory + sub_dir, model=model, image_no = file_iter)
 
             # Get corresponding depth image, this is always same index += half the length of the instance
             dep_image = cv2.imread(sub_dir + "/" + os.fsdecode(files[int(f + (len(files)/2))]), cv2.IMREAD_ANYDEPTH)
@@ -262,30 +264,24 @@ def run_images(folder_name, exclude_2D = False, write_mode = "w+", start_point =
             file_iter += 1
         subdir_iter +=1
 
-        print("new subdirectory??")
-
         #Save after every folder
-        if os.path.exists("./EDA/gait_dataset_pixels.csv"):
+        if os.path.exists(out_folder + "/Absolute_Data.csv"):
             write_mode = "a"
         else:
             write_mode = "w+"
 
         #Save to .csv
-        print("SAVING")
+        print("SAVING", write_mode)
 
-        with open("./EDA/gait_dataset_pixels.csv",write_mode, newline='') as my_csv:
+        with open("Absolute_Data.csv", write_mode, newline='') as my_csv:
             csvWriter = csv.writer(my_csv,delimiter=',')
             csvWriter.writerows(joints_file)
             joints_file = []
-        with open("./EDA/gait_dataset_metres.csv",write_mode, newline='') as my_csv:
+        with open("Absolute_Data_Metres.csv",write_mode, newline='') as my_csv:
             csvWriter = csv.writer(my_csv,delimiter=',')
             csvWriter.writerows(joints_file_metres)
             joints_file_metres = []
 
-        #Debug
-        #if subdir_iter >= 4:
-        #    print("BREAKING")
-        #    break
         file_iter = 0
 
 def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, debug = False):
