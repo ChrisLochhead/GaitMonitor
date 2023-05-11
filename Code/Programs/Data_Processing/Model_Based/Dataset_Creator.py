@@ -1,7 +1,22 @@
-from Utilities import save_dataset
+from Programs.Data_Processing.Model_Based.Utilities import save_dataset, load, load_images, save_images
+from Programs.Data_Processing.Model_Based.Data_Correction import correct_joints_data, normalize_joint_scales, remove_empty_frames, apply_class_labels
 
-def create_abs_dataset():
-    pass
+def assign_class_labels(num_switches, num_classes, joint_file, joint_output):
+    joint_data = load(joint_file)
+    joint_data = apply_class_labels(num_switches, num_classes, joint_data)
+    save_dataset(joint_data, joint_output)
+    return joint_data
+
+def process_empty_frames(joint_file, image_file, joint_output, image_output):
+    joint_data = load(joint_file)
+    image_data = load_images(image_file)
+    print("loading in data: ", len(joint_data), len(image_data))
+    joint_data, image_data = remove_empty_frames(joint_data, image_data)
+    print("full frame count: ", len(image_data), len(joint_data))
+    save_dataset(joint_data, joint_output)
+    save_images(joint_data, image_data, image_output)
+
+    return joint_data, image_data
 
 def create_relative_dataset(abs_data):
     rel_data = []

@@ -122,13 +122,13 @@ def remove_empty_frames(joint_data, image_data):
             cleaned_images.append(image_data[i])
     
     return cleaned_joints, cleaned_images
-            
 
+#Remember to remove this function after all done
 def correct_joints_data(image_file, joint_file, save = False, pixels = True):
 
     #Get raw images and corresponding joint info
     joint_data = load(joint_file)
-   #print("joint data: ", joint_data)
+    #print("joint data: ", joint_data)
     image_data = load_images(image_file, ignore_depth=True)
 
     finished_joint_data = []

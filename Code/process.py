@@ -2,9 +2,8 @@
 from Programs.Data_Processing.Model_Based.Demo import *
 from Programs.Data_Processing.Model_Based.HCF import create_hcf_dataset
 from Programs.Data_Processing.Model_Based.Render import *
-from Programs.Data_Processing.Model_Based.Data_Correction import correct_joints_data, apply_joint_occlusion, normalize_joint_scales
-from Programs.Data_Processing.Model_Based.Utilities import load, load_images
-
+from Programs.Data_Processing.Model_Based.Utilities import load, load_images, save_dataset
+from Programs.Data_Processing.Model_Based.Dataset_Creator import process_empty_frames, assign_class_labels
 def main():
     #Process data from EDA into perfect form
     #correct_joints_data("./Images", "./EDA/gait_dataset_pixels.csv", save=True, pixels=True)
@@ -12,39 +11,65 @@ def main():
     #print("Correction processing sucessfully completed, testing resulting images and joints...")
     #load_and_overlay_joints(directory="./EDA/Finished_Data/Images/", joint_file="./EDA/Finished_Data/pixel_data_absolute.csv", ignore_depth=False, plot_3D=True)
 
-    #Visualize metre's images to make sure they are proportional, especially regarding depth.
-    #Get raw images and corresponding joint info
-    #joint_data = load("./EDA/Finished_Data/metres_data_absolute.csv")
-    #image_data = load_images("./EDA/Finished_Data/Images/")
-    #rel_joint_data = load("./EDA/Finished_Data/pixel_data_absolute.csv")
-    #image_iter = 0
-    #for j in joint_data:
-    #    #render_joints(image_data[image_iter], rel_joint_data[image_iter], delay=True)
-    #    plot3D_joints(j, pixel = False)
-    #    image_iter += 1
-
-
-    #joint_data = load("../EDA/Finished_Data/MPI_pixels_omit.csv")
-    #image_data = load_images("../EDA/Finished_Data/Images/")
-    #normalize_joint_scales(joint_data, image_data)
 
     #Experimental creating hand crafted features
     #create_hcf_dataset("../EDA/Finished_Data/pixel_data_absolute.csv", "../EDA/Finished_Data/pixel_data_relative.csv", \
     #                    "../EDA/Finished_Data/pixel_velocity_absolute.csv", "../EDA/Finished_Data/Images")
 
-    #Create dataset with chest joints
-    #create_dataset_with_chestpoint("./EDA/gait_dataset_pixels.csv", "./Images")
-    
-    #Demonstrate occlusion fixing
-    #apply_joint_occlusion("./EDA/gait_dataset_pixels.csv", save = True, debug=True)
 
     #Draw calculated velocities
     #run_velocity_debugger("./EDA/Finished_Data/Images/", "./EDA/Finished_Data/pixel_data_relative.csv", save= True, debug=False)
 
-    run_images("./Code/Datasets/Cleaned Home Images_Chris", "./Code/Datasets/Office_Dataset", exclude_2D=False, start_point=0)
+############################################# PIPELINE ##################################################################
 
-    #run_depth_sample("./DepthExamples", "depth_examples.csv")
-    #run_video()
+    #Extract joints from images
+    #run_images("./Code/Datasets/Office Images_Chris", "./Code/Datasets/Office_Dataset/", exclude_2D=False, start_point=0)
+
+    
+    #Sort class labels (for 0ffice Images_chris this is 20-0, 20-1, 20-2)
+    joint_data = assign_class_labels(num_switches=20, num_classes=2, 
+                                    joint_file="./Code/Datasets/Joint_Data/Office_Dataset/Absolute_Data.csv",
+                                    joint_output="./Code/Datasets/Joint_Data/Office_Dataset/Absolute_Data(1_classes applied).csv")
+    #Remove empty frames
+    joint_data, image_data = process_empty_frames(joint_file="./Code/Datasets/Joint_Data/Office_Dataset/Absolute_Data(1_classes applied).csv",
+                                                  image_file="./Code/Datasets/Office Images_Chris/Raw Images/",
+                                                  joint_output="./Code/Datasets/Joint_Data/Office_Dataset/Absolute_Data(2_empty frames removed).csv",
+                                                  image_output="./Code/Datasets/Office Images_Chris/2_Empty Frames Removed/")
+
+
+    #Normalize outliers
+        #Function implemented in correct_joints_data()
+        #Stick in dataset_creator
+
+    #Normalize size (use absolute dataset)
+        #joint_data = load("../EDA/Finished_Data/MPI_pixels_omit.csv")
+        #image_data = load_images("../EDA/Finished_Data/Images/")
+        #normalize_joint_scales(joint_data, image_data)
+        #Stick in dataset_creator
+
+    #Create relative dataset
+        #Stick in dataset_creator
+
+    #Create velocity dataset
+        #Stick in dataset_creator
+
+    #Create joint angles data
+        #Stick in dataset_creator
+
+    #Create regions data
+        #Stick in dataset_creator
+
+    #Create HCF dataset
+        #Create ground truth
+        #Stick in dataset_creator
+
+    #Combine datasets (relative, velocity, joint angles, regions)
+        #Stick in dataset_creator       
+
+#########################################################################################################################
+
+
+
 if __name__ == '__main__':
     #Main menu
     main()

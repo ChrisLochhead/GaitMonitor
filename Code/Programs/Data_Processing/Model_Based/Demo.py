@@ -190,7 +190,7 @@ def run_images(folder_name, out_folder, exclude_2D = False, write_mode = "w+", s
     print("dir: ", os.getcwd())
     model = SimpleHigherHRNet.SimpleHigherHRNet(32, 17, "./Code/Programs/Machine_Learning/Model_Based/Simple_HigherHRNet/weights/pose_higher_hrnet_w32_512.pth")
     file_iter = 0
-    subdir_iter = -1
+    subdir_iter = -3
     data_class = 0
     #Format for the joints file
     #Instance Number: Sequence number: Class : Joint positions 1 - 17
@@ -265,10 +265,10 @@ def run_images(folder_name, out_folder, exclude_2D = False, write_mode = "w+", s
         subdir_iter +=1
 
         #Save after every folder
-        if os.path.exists(out_folder + "/Absolute_Data.csv"):
+        if os.path.exists("Absolute_Data.csv"):
             write_mode = "a"
         else:
-            write_mode = "w+"
+            write_mode = "w"
 
         #Save to .csv
         print("SAVING", write_mode)

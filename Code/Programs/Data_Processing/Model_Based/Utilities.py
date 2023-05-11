@@ -256,10 +256,46 @@ def blacken_frame(frame):
     blank_frame = np.zeros((dimensions[0],dimensions[1], 3), dtype= np.uint8)
     return blank_frame
 
+def apply_class_labels(num_switches, num_classes, joint_data):
+    switch_iterator = 0
+    current_class = 0
+    for i, row in enumerate(joint_data):
+        if switch_iterator == num_switches:
+            current_class += 1
+            if current_class > num_classes:
+                current_class = 0
+            
+            switch_iterator = 0
 
-def save(joints):
+        joint_data[i][2] = current_class
+
+        #if there is at least one more datapoint next
+        if i < len(joint_data) - 1:
+            if joint_data[i][1] > joint_data[i+1][1]:
+                switch_iterator  += 1
+    
+    return joint_data
+
+def save_images(joint_data, image_data, directory):
+
+    for i, row in enumerate(joint_data):
+
+        print("saving instance: ", str(float(row[0])))
+        #Make sure it saves numbers properly (not going 0, 1, 10, 11 etc...)
+        if row[1] < 10:
+            file_no = str(0) + str(row[1])
+        else:
+            file_no = str(row[1])
+
+        folder = str(directory) + "Instance_" + str(float(row[0]))
+        print("directory: ", directory)
+        os.makedirs(folder, exist_ok = True)
+        print("saving this: ", folder + "/" + file_no + ".jpg" )
+        cv2.imwrite(folder + "/" + file_no + ".jpg", image_data[i])
+
+def save(joints, name):
     # open the file in the write mode
-    with open('image_data.csv', 'w', newline='') as outfile:
+    with open(name, 'w', newline='') as outfile:
         writer = csv.writer(outfile)
 
         #Save the joints as a CSV
