@@ -10,7 +10,7 @@ from ast import literal_eval
 import pyrealsense2 as rs
 import re
 #from Render import render_joints, plot3D_joints 
-from Programs.Data_Processing.Model_Based.Render import render_joints, plot3D_joints
+import Programs.Data_Processing.Model_Based.Render as Render
 '''order of joints:
 
 0,1,2 are meta data:
@@ -43,6 +43,57 @@ colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','
 #Occlusion co-ordinates for home recording dataset
 occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
 
+def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, debug = False):
+    
+    #Add meta data to the start of the row
+    joint_velocities = [joints_current[0], joints_current[1], joints_current[2]]
+
+    #Convert to numpy arrays instead of lists
+    joints_previous = list_to_arrays(joints_previous)
+    joints_current = list_to_arrays(joints_current)
+    joints_next = list_to_arrays(joints_next)
+
+    #-3 to account for metadata at front
+    for i in range(3, len(joints_current)):
+        if len(joints_next) > 1:
+            direction_vector_after = subtract_lists(joints_next[i], joints_current[i])
+            #Unit vector
+            unit_vector_after = get_unit_vector(direction_vector_after)
+            end_point_after = [joints_current[i][0] + (unit_vector_after[0]), joints_current[i][1] + (unit_vector_after[1]), joints_current[i][2] + (unit_vector_after[2])]
+            direction_after = subtract_lists(end_point_after, [joints_current[i][0], joints_current[i][1], joints_current[i][2]])
+
+        else:
+            direction_after = [0,0,0]
+
+        if len(joints_previous) > 1:
+            direction_vector_before = subtract_lists(joints_previous[i], joints_current[i])
+            #Unit vector
+            unit_vector_before = get_unit_vector(direction_vector_before)
+            end_point_before = [joints_current[i][0] + (unit_vector_before[0]), joints_current[i][1] + (unit_vector_before[1]), joints_current[i][2] + (unit_vector_before[2])]
+            direction_before = subtract_lists([joints_current[i][0], joints_current[i][1], joints_current[i][2]], end_point_before)
+        else:
+            direction_before = [0,0,0]
+
+        if len(joints_previous) > 0 and len(joints_next) > 0:
+            smoothed_direction = divide_lists(direction_after, direction_before, 2) 
+        else:
+            smoothed_direction = direction_after + direction_before
+            
+        #Remove noise:
+        for j in range(0, 3):
+            if smoothed_direction[j] < 0.01 and smoothed_direction[j] > -0.01:
+                smoothed_direction[j] = np.float64(0.0)
+
+        if debug:
+            x = int((smoothed_direction[1] * 40) + joints_current[i][1])
+            y = int((smoothed_direction[0] * 40) + joints_current[i][0])
+            image_direction = [int((smoothed_direction[1] * 40) + joints_current[i][1]),  int((smoothed_direction[0] * 40) + joints_current[i][0])]
+
+            image = cv2.arrowedLine(image, [int(joints_current[i][1]), int(joints_current[i][0])] , image_direction,
+                                            (0,255,0), 4) 
+        joint_velocities.append(smoothed_direction)
+
+    return joint_velocities
 
 def generate_relative_sequence_data(sequences, rel_data):
     rel_sequence_data = []
@@ -53,13 +104,21 @@ def generate_relative_sequence_data(sequences, rel_data):
             rel_sequence.append(rel_data[iterator])
             iterator += 1
         rel_sequence_data.append(rel_sequence)
-
-    print("relative sequence data lengths: ", [len(s) for s in rel_sequence_data])
-    print("total length: ", len(rel_sequence_data)
-          )
     return rel_sequence_data
 
+def process_data_input(joint_source, image_source):
+    if isinstance(joint_source, str):
+        joints = load(joint_source)
+    else:
+        joints = joint_source
+    
+    if isinstance(image_source, str):
+        images = load_images(image_source)
+    else:
+        images = image_source
 
+    return joints, images
+        
 def convert_to_sequences(abs_data):
     pass
     #Iterate through abs_data, get head coords at 5 after first frame and 5 before last
@@ -78,50 +137,13 @@ def convert_to_sequences(abs_data):
         else:
             #Just add last one to sequence
             sequence.append(joint)
+    #Add last sequence which is the remainder
+    sequences.append(sequence)
 
     print("created sequence dataset.")
     print("length of sequences: ", [len(s) for s in sequences])
+    print("length in total: ", len(sequences))
     return sequences
-
-def create_flipped_joint_dataset(rel_data, abs_data, images, save = False):
-    sequence_data = convert_to_sequences(abs_data)
-    rel_sequence_data = generate_relative_sequence_data(sequence_data, rel_data)
-
-    flipped_data = []
-    for i, seq in enumerate(rel_sequence_data):
-
-        #Get first and last head positions (absolute values)
-        first = sequence_data[i][5]
-        last = sequence_data[i][-5]
-
-        #This is going from right to left: the ones we want to flip
-        if first[0] > last[0]:
-            print("flipping joint sequence: ", i)
-            for joints in seq:
-                flipped_joints = []
-                for j, joint in enumerate(joints):
-                    #Flip X value on each individual co-ordinate
-                    flipped_joints.append([-joint[0], joint[1], joint[2]])
-                #Append flipped joints instance to the list
-                flipped_data.append(flipped_joints)
-
-        else:
-        #Just add the data sequentially for the joints already going from left to right.
-            for joints in seq:
-                flipped_data.append(joints)
-
-    
-    #Illustrate results
-    for k, joints in enumerate(flipped_data):
-        if k > 20:
-            render_joints(images[k], abs_data[k], delay=True)
-            plot3D_joints(joints)
-
-    
-    if save:
-        save_dataset(flipped_data, "Flipped_Data.csv")
-
-    return flipped_data
 
 def save_dataset(data, name, colnames = colnames):
     new_dataframe = pd.DataFrame(data, columns = colnames)

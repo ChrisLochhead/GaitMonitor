@@ -15,6 +15,7 @@ import networkx as nx
 from torch_geometric.utils import to_networkx
 
 from Programs.Data_Processing.Model_Based.Dataset_Obj import get_COO_matrix
+import Programs.Data_Processing.Model_Based.Utilities as Utilities
 
 joint_connections = [[15, 13], [13, 11], # left foot to hip 
                      [16, 14], [14, 12], # right foot to hip
@@ -127,7 +128,7 @@ def filter_coords(joints, index, metadata = 3):
     
     return coords
 
-def plot3D_joints(joints, pixel = True, metadata = 3):
+def plot3D_joints(joints, pixel = True, metadata = 3, x_rot = 90, y_rot = 180):
     # generate data
     x = filter_coords(joints, 0)
     y = filter_coords(joints, 1)
@@ -154,7 +155,7 @@ def plot3D_joints(joints, pixel = True, metadata = 3):
     plt.gca().invert_zaxis()
     #z forward -90, 180
     #on the corner -175, 120
-    ax.view_init(90, 180)
+    ax.view_init(x_rot, y_rot)
 
     cmap = ListedColormap(sns.color_palette("husl", 256).as_hex())
 
@@ -183,12 +184,44 @@ def plot3D_joints(joints, pixel = True, metadata = 3):
     # save
     #plt.savefig("scatter_hue", bbox_inches='tight')
 
+def render_joints_series(image_source, joints, size, delay = True, use_depth = True, plot_3D = False, x_rot = 90, y_rot= 180):
+    
+    joints, images = Utilities.process_data_input(joints, image_source)
+        
+    for i in range(size):
+        if plot_3D:
+            plot3D_joints(joints[i], x_rot=x_rot, y_rot=y_rot)
+        else:
+            render_joints(images[i], joints[i], delay, use_depth)
+            cv2.destroyWindow("Joint Utilities Image")
+
 def render_joints(image, joints, delay = False, use_depth = True, metadata = 3, colour = (255, 0, 0)):
     tmp_image = copy.deepcopy(image)
     tmp_image = draw_joints_on_frame(tmp_image, joints, use_depth_as_colour=use_depth, metadata = metadata, colour=colour)
     cv2.imshow('Joint Utilities Image',tmp_image)
 
     cv2.setMouseCallback('Joint Utilities Image', click_event, tmp_image)
+    if delay:
+        cv2.waitKey(0) & 0xff
+
+def render_velocity_series(joint_data, velocity_data, image_data, size):
+    for i in range(size):
+        render_velocities(joint_data[i], velocity_data[i], image_data[i])
+
+def render_velocities(joint_data, velocity_data, image_data, delay = True, metadata = 3):
+    for i, coord in enumerate(joint_data):
+        if i >= metadata:
+            #x = int((velocity_data[1] * 40) + coord[1])
+            #y = int((velocity_data[0] * 40) + coord[0])
+            #print("velocity data: ", velocity_data)
+            image_direction = [int((velocity_data[i][1] * 40) + coord[1]),
+                                 int((velocity_data[i][0] * 40) + coord[0])]
+
+            image = cv2.arrowedLine(image_data, [int(coord[1]), int(coord[0])] , image_direction,
+                                            (0,255,0), 4) 
+
+    cv2.imshow('Joint Utilities Image',image)
+    cv2.setMouseCallback('Joint Utilities Image', click_event, image)
     if delay:
         cv2.waitKey(0) & 0xff
 

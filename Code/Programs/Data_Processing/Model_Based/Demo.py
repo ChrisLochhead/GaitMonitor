@@ -7,7 +7,8 @@ import csv
 import pandas as pd
 from ast import literal_eval
 
-from Programs.Data_Processing.Model_Based.Utilities import *
+#from Programs.Data_Processing.Model_Based.Utilities import *
+import Programs.Data_Processing.Model_Based.Utilities as Utilities
 from Programs.Data_Processing.Model_Based.Render import *
 from Programs.Machine_Learning.Model_Based.Simple_HigherHRNet import SimpleHigherHRNet
 
@@ -53,7 +54,7 @@ def get_joints_from_frame(model, frame, anonymous = True):
     joints = model.predict(frame)
 
     if anonymous:
-        frame = blacken_frame(frame)
+        frame = Utilities.blacken_frame(frame)
 
     for person in joints:
 
@@ -74,13 +75,13 @@ def get_joints_from_frame(model, frame, anonymous = True):
     return frame, joints
 
 def load_and_overlay_joints(directory = "./Images", joint_file = "./EDA/gait_dataset_pixels.csv", ignore_depth = True, plot_3D = False):
-    joints = load(joint_file)
+    joints = Utilities.load(joint_file)
     #print("joints: ", joints)
     subdir_iter = 1
     joint_iter = 0
     for i, (subdir, dirs, files) in enumerate(os.walk(directory)):
         #print("current subdirectory in overlay function: ", subdir)
-        dirs.sort(key=numericalSort)
+        dirs.sort(key=Utilities.numericalSort)
         for j, file in enumerate(files):
             #Ignore depth images which are second half
             if j >= len(files)/2 and ignore_depth:
@@ -143,7 +144,7 @@ def run_depth_sample(folder_name, joints_info):
 
     directory = os.fsencode(folder_name)
     for subdir, dirs, files in os.walk(directory):
-        dirs.sort(key=numericalSort)
+        dirs.sort(key=Utilities.numericalSort)
         for i, file in enumerate(files):
             #Ignore depth images which are second half
             if i >= len(files)/2:
@@ -168,7 +169,7 @@ def run_depth_sample(folder_name, joints_info):
 
             #Apply depth changes to data, firstly with 2d images using z as colour
             #Need corresponding depth image not raw
-            refined_joint_set, rjs_metres = get_3D_coords(joint_set, depth_image)
+            refined_joint_set, rjs_metres = Utilities.get_3D_coords(joint_set, depth_image)
             refined_joint_image = draw_joints_on_frame(raw_image, refined_joint_set, use_depth_as_colour=True)
             cv2.imshow('image with refined joints (excl 2D)',refined_joint_image)
             cv2.setMouseCallback('image with refined joints (excl 2D)', click_event, refined_joint_image)
@@ -176,7 +177,7 @@ def run_depth_sample(folder_name, joints_info):
 
 
             #display again with 3d positions including altered X and Y
-            final_joint_set, fjs_metres = get_3D_coords(joint_set, depth_image)
+            final_joint_set, fjs_metres = Utilities.get_3D_coords(joint_set, depth_image)
             final_joint_image = draw_joints_on_frame(raw_image, fjs_metres, use_depth_as_colour=True)
             cv2.imshow('image with refined joints (incl 2D)',final_joint_image)
             cv2.setMouseCallback('image with refined joints (incl 2D)', click_event, final_joint_image)
@@ -198,7 +199,7 @@ def run_images(folder_name, out_folder, exclude_2D = False, write_mode = "w+", s
     joints_file_metres = []
 
     for directory_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
-        dirs.sort(key=numericalSort)
+        dirs.sort(key=Utilities.numericalSort)
 
         #Skip any instances already recorded
         if directory_iter < start_point:
@@ -239,7 +240,7 @@ def run_images(folder_name, out_folder, exclude_2D = False, write_mode = "w+", s
                     joints = [ [0,0,0] for _ in range(17) ]
             
             if len(joints) > 0:
-                refined_joints, refined_joints_metres = get_3D_coords(joints[0], dep_image, meta_data=0)
+                refined_joints, refined_joints_metres = Utilities.get_3D_coords(joints[0], dep_image, meta_data=0)
             else:
                 refined_joints = [ [0,0,0] for _ in range(17) ]
                 refined_joints_metres = [ [0,0,0] for _ in range(17) ]
@@ -284,73 +285,15 @@ def run_images(folder_name, out_folder, exclude_2D = False, write_mode = "w+", s
 
         file_iter = 0
 
-def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, debug = False):
-    
-    #Add meta data to the start of the row
-    joint_velocities = [joints_current[0], joints_current[1], joints_current[2]]
-
-    #Convert to numpy arrays instead of lists
-    joints_previous = list_to_arrays(joints_previous)
-    joints_current = list_to_arrays(joints_current)
-    joints_next = list_to_arrays(joints_next)
-
-    #-3 to account for metadata at front
-    for i in range(3, len(joints_current)):
-        if len(joints_next) > 1:
-            direction_vector_after = subtract_lists(joints_next[i], joints_current[i])
-            #Unit vector
-            unit_vector_after = get_unit_vector(direction_vector_after)
-            end_point_after = [joints_current[i][0] + (unit_vector_after[0]), joints_current[i][1] + (unit_vector_after[1]), joints_current[i][2] + (unit_vector_after[2])]
-            direction_after = subtract_lists(end_point_after, [joints_current[i][0], joints_current[i][1], joints_current[i][2]])
-
-        else:
-            direction_after = [0,0,0]
-
-        if len(joints_previous) > 1:
-            direction_vector_before = subtract_lists(joints_previous[i], joints_current[i])
-            #Unit vector
-            unit_vector_before = get_unit_vector(direction_vector_before)
-            end_point_before = [joints_current[i][0] + (unit_vector_before[0]), joints_current[i][1] + (unit_vector_before[1]), joints_current[i][2] + (unit_vector_before[2])]
-            direction_before = subtract_lists([joints_current[i][0], joints_current[i][1], joints_current[i][2]], end_point_before)
-        else:
-            direction_before = [0,0,0]
-
-        if len(joints_previous) > 0 and len(joints_next) > 0:
-            smoothed_direction = divide_lists(direction_after, direction_before, 2) 
-        else:
-            smoothed_direction = direction_after + direction_before
-            
-        #Remove noise:
-        for j in range(0, 3):
-            if smoothed_direction[j] < 0.01 and smoothed_direction[j] > -0.01:
-                smoothed_direction[j] = np.float64(0.0)
-
-        if debug:
-            x = int((smoothed_direction[1] * 40) + joints_current[i][1])
-            y = int((smoothed_direction[0] * 40) + joints_current[i][0])
-            image_direction = [int((smoothed_direction[1] * 40) + joints_current[i][1]),  int((smoothed_direction[0] * 40) + joints_current[i][0])]
-
-            image = cv2.arrowedLine(image, [int(joints_current[i][1]), int(joints_current[i][0])] , image_direction,
-                                            (0,255,0), 4) 
-        joint_velocities.append(smoothed_direction)
-
-    if debug:
-        # Displaying the image 
-        cv2.imshow("velocity vector", image) 
-        cv2.setMouseCallback("velocity vector", click_event, image)
-        cv2.waitKey(0) & 0xff
-
-    return joint_velocities
-
 def create_dataset_with_chestpoint(jointfile, folder, save = True, debug = False):
-    joint_data = load(jointfile)
-    image_data = load_images(folder)
+    joint_data = Utilities.load(jointfile)
+    image_data = Utilities.load_images(folder)
 
     chest_dataset = []
 
     for i, joints in enumerate(joint_data):
         chest_dataset_row = list(joints)
-        chest_datapoint = midpoint(joints[9], joints[8])
+        chest_datapoint = Utilities.midpoint(joints[9], joints[8])
         chest_dataset_row.append(chest_datapoint)
         chest_dataset.append(chest_dataset_row)
 
@@ -367,8 +310,8 @@ def create_dataset_with_chestpoint(jointfile, folder, save = True, debug = False
 
 def run_velocity_debugger(folder, jointfile, save = False, debug = False):
         
-        joint_data = load(jointfile)
-        image_data = load_images(folder, ignore_depth=False)
+        joint_data = Utilities.load(jointfile)
+        image_data = Utilities.load_images(folder, ignore_depth=False)
         velocity_dataset = []
         for i, joints in enumerate(joint_data):
             if i+1 < len(joint_data) and i > 0:
@@ -378,7 +321,7 @@ def run_velocity_debugger(folder, jointfile, save = False, debug = False):
             elif i+1 >= len(joint_data) and i > 0:
                 velocity_dataset.append(plot_velocity_vectors(image_data[i], joint_data[i - 1], joints, [0], debug=debug))
         
-        new_dataframe = pd.DataFrame(velocity_dataset, columns = colnames)
+        new_dataframe = pd.DataFrame(velocity_dataset, columns = Utilities.colnames)
         if save:
                 #Convert to dataframe 
             new_dataframe.to_csv("./EDA/Finished_Data/pixel_velocity_relative.csv",index=False, header=False)

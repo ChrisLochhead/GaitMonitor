@@ -5,6 +5,7 @@ import os
 import csv
 import copy
 import pandas as pd
+import math
 
 from Programs.Data_Processing.Model_Based.Utilities import load, load_images, get_3D_coords
 from Programs.Data_Processing.Model_Based.Demo import *   
@@ -12,7 +13,7 @@ from Programs.Data_Processing.Model_Based.Render import *
 
 #normalization function
 #[x′ i, y′ i ] = [ imgwidth 2 ∗ xi − xmin xmax − xmin , imgheight 2 ∗ yi − ymin ymax − ymin ]
-def normalize_joint_scales(joints, images, save = True, save_name = "normalized_pixel_data_absolute"):
+def normalize_joint_scales(joints, images):
     norm_joints = []
     #Photo dimensions in pixels
     width = 424
@@ -48,21 +49,14 @@ def normalize_joint_scales(joints, images, save = True, save_name = "normalized_
             
             norm_joint_row.append(norm_joint)
         norm_joints.append(norm_joint_row)
-        if i == 7:
-            [print("\n n_coord : ", c, coord) for c, coord in enumerate(norm_joint_row)]
-
-            [print("\n coord : ", c, coord) for c, coord in enumerate(instance)]
+        #if i == 7:
+        #    [print("\n n_coord : ", c, coord) for c, coord in enumerate(norm_joint_row)]
+        #   [print("\n coord : ", c, coord) for c, coord in enumerate(instance)]
         #print("normal: ", instance)
-        render_joints(images[i], norm_joint_row, delay=True, use_depth=True)
-        render_joints(images[i], instance, delay=True, use_depth=True)
-    new_dataframe = pd.DataFrame(norm_joints, columns = colnames)
+        #render_joints(images[i], norm_joint_row, delay=True, use_depth=True)
+        #render_joints(images[i], instance, delay=True, use_depth=True)
 
-    if save:
-        #Convert to dataframe 
-        print("SAVING")
-        new_dataframe.to_csv("../EDA/Finished_Data/" + save_name + ".csv",index=False, header=False)     
-
-
+    return norm_joints
         
 
 
@@ -94,16 +88,43 @@ Example dataset
 '''
 def create_conmbined_dataset():
     pass
+  
 
-def apply_joint_occlusion(file, save = False, debug = False):
-    dataset = load(file)
-    occluded_data = compensate_depth_occlusion(occlusion_boxes, dataset, debug=debug) 
+def trim_frames(joint_data, image_data, trim):
+    trimmed_joints = []
+    trimmed_images = []
 
-    new_dataframe = pd.DataFrame(occluded_data, columns = colnames)
-    if save:
-        #Convert to dataframe 
-        print("SAVING")
-        new_dataframe.to_csv("./EDA/Gait_Pixel_Dataset_Occluded.csv",index=False, header=False)      
+    for i, row in enumerate(joint_data):
+        #General case
+        print("start: ", row[1])
+        found_end = False
+        if i < len(joint_data) - trim - 1:
+            for j in range(trim):
+                if joint_data[i][1] > joint_data[i+j][1]:
+                    print("this is true: ", joint_data[i][1], joint_data[i + j][1])
+                    found_end = True
+                elif joint_data[i][1] < joint_data[i-j][1]:
+                    found_end = True
+                    print("or this is true: ", joint_data[i][1], joint_data[i - j][1])
+                else:
+                    print("neither is true", found_end)
+            
+        else:
+            found_end = True
+            print("calling this perhaps?")
+
+        #Only append those not within the trim range
+        if found_end == False:
+            print("row is being added: ", row[1])
+            trimmed_joints.append(row)
+            trimmed_images.append(image_data[i])
+            print(len(trimmed_images), len(trimmed_joints))
+        else:
+            print("not adding instance: ", row[1], found_end)
+            
+        print("instance: ", row[0], row[1], found_end)
+
+    return trimmed_joints, trimmed_images
 
 def remove_empty_frames(joint_data, image_data):
     cleaned_joints = []
@@ -289,11 +310,50 @@ def occlude_area_in_frame(occlusion_box, joint_data, image_data):
 
     return refined_image_data, refined_joint_data
 
+def normalize_outlier_values(joint_data, image_data, tolerance = 100):
+    joint_data, image_data = Utilities.process_data_input(joint_data, image_data)
 
-def normalize_outlier_values(joints_data, image_data, plot3d = True):
+    for i, row in enumerate(joint_data):
+        #Get row median to distinguish which of joint pairs are the outlier
+        x_coords = [coord[0] for j, coord in enumerate(row) if j > 2]
+        y_coords = [coord[1] for k, coord in enumerate(row) if k > 2]
+        med_coord = [np.median(x_coords), np.median(y_coords)]
+
+        #render_joints(image_data[i], joint_data[i], delay = True)
+        for l, coord in enumerate(row):
+            #Ignore metadata
+            if l > 2:
+                for j_index in joint_connections:
+                    outlier_reassigned = False
+                    #Found connection
+                    joint_0_coord = [row[j_index[0] + 3][0], row[j_index[0] + 3][1]]
+                    joint_1_coord = [row[j_index[1] + 3][0], row[j_index[1] + 3][1]]
+                    if l - 3 == j_index[0] or l - 3 == j_index[1]:
+                        if math.dist(joint_0_coord, joint_1_coord) > tolerance:
+                            print("found an outlier")
+                            #Work out which of the two is the outlier
+                            if math.dist(med_coord, joint_0_coord) > math.dist(med_coord, joint_1_coord):
+                                #Just set outlier to it's neighbour to reduce damage done by outlier without getting rid of frame
+                                #I could replace this in future with the ground truth relative distance for a better approximation
+                                joint_data[i][j_index[0] + 3] = [joint_1_coord[0], joint_1_coord[1], row[j_index[1] + 3][2]]
+                                outlier_reassigned = True
+                            else:
+                                joint_data[i][j_index[1] + 3] = [joint_0_coord[0], joint_0_coord[1], row[j_index[0] + 3][2]]
+                                outlier_reassigned = True
+
+                    #Stop looping after first re-assignment: some joints have multiple connections.
+                    if outlier_reassigned:
+                        break
+
+        #render_joints(image_data[i], joint_data[i], delay = True)               
+
+    return joint_data
+    
+
+def normalize_outlier_depths(joints_data, image_data, plot3d = True):
     for i, row in enumerate(joints_data):
 
-        print("before")
+        #print("before")
         #render_joints(image_data[i], row, delay = True)
         #plot3D_joints(row)
         depth_values = []
@@ -349,61 +409,8 @@ def normalize_outlier_values(joints_data, image_data, plot3d = True):
                         joints_data[i][indice][2] = quartiles[2]
                      #   print("resetting connection joint depth with median", indice)
                         continue
-        print("after corrections")
+        #print("after corrections")
         #render_joints(image_data[i], row, delay = True)
         #plot3D_joints(row)
     
     return joints_data
-#3: nose
-#4: left eye
-#5: right eye
-#6: left ear
-#7: right ear
-def normalize_head_coords(joints_data, image_data):
-
-    for i, row in enumerate(joints_data):
-
-        #print("before")
-        #render_joints(image_data[i], row, delay = True)
-
-        face_joints = []
-        null_counter = 0
-        face_joints_depth_mean = 0
-        null_positions = [0,0,0,0,0]
-        for j, coord in enumerate(row):
-            if j > 2 and j < 8:
-                face_joints.append(coord)
-                for v in face_joints:
-                    #print("coords here: ", v)
-                    if v[0] <= 5 and v[1] <= 5:
-                        #print("finding null here")
-                        null_counter += 1
-                        null_positions[j - 3] = 1
-                        face_joints_depth_mean += v[2]
-                face_joints_depth_mean = face_joints_depth_mean / 5                  
-
-        #If more than one is out of place but it's not every one of them, correct the broken ones
-        if null_counter > 0 and null_counter < 5:
-            normalize_scalar = 4# len(face_joints) - null_counter
-            mean = [0,0,0]
-            for f in face_joints:
-                #print("adding mean: ", mean, f)
-                mean = add_lists(mean, f)
-
-            #print("dividing result", mean, normalize_scalar)
-            mean = divide_list(mean, normalize_scalar) 
-            #print("result", mean) 
-
-            #print("getting here?")
-            #Re-iterate through correcting the broken face joints
-            for k, coord in enumerate(row):
-                if k > 2 and k < 8:
-                    if null_positions[k - 3] == 1:
-                        #print("applying new joints data value", joints_data[i][k])
-                        joints_data[i][k] = mean
-                        #print("value now", joints_data[i][k])
-
-        
-        #print("after", null_counter)
-        #render_joints(image_data[i], joints_data[i], delay = True)
-
