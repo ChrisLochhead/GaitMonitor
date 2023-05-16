@@ -6,6 +6,7 @@ import csv
 import copy
 import pandas as pd
 import math
+from tqdm import tqdm
 
 from Programs.Data_Processing.Model_Based.Utilities import load, load_images, get_3D_coords
 from Programs.Data_Processing.Model_Based.Demo import *   
@@ -20,7 +21,7 @@ def normalize_joint_scales(joints, images):
     height = 240
 
  
-    for i, instance in enumerate(joints):
+    for i, instance in enumerate(tqdm(joints)):
         #Add metadata
         norm_joint_row = [instance[0], instance[1], instance[2]]
 
@@ -94,43 +95,31 @@ def trim_frames(joint_data, image_data, trim):
     trimmed_joints = []
     trimmed_images = []
 
-    for i, row in enumerate(joint_data):
+    for i, row in enumerate((pbar:= tqdm(joint_data))):
+        pbar.set_postfix_str(i)
         #General case
-        print("start: ", row[1])
         found_end = False
         if i < len(joint_data) - trim - 1:
             for j in range(trim):
                 if joint_data[i][1] > joint_data[i+j][1]:
-                    print("this is true: ", joint_data[i][1], joint_data[i + j][1])
                     found_end = True
                 elif joint_data[i][1] < joint_data[i-j][1]:
-                    found_end = True
-                    print("or this is true: ", joint_data[i][1], joint_data[i - j][1])
-                else:
-                    print("neither is true", found_end)
-            
+                    found_end = True            
         else:
             found_end = True
-            print("calling this perhaps?")
 
         #Only append those not within the trim range
         if found_end == False:
-            print("row is being added: ", row[1])
             trimmed_joints.append(row)
             trimmed_images.append(image_data[i])
-            print(len(trimmed_images), len(trimmed_joints))
-        else:
-            print("not adding instance: ", row[1], found_end)
-            
-        print("instance: ", row[0], row[1], found_end)
+
 
     return trimmed_joints, trimmed_images
 
 def remove_empty_frames(joint_data, image_data):
     cleaned_joints = []
     cleaned_images = []
-    for i, row in enumerate(joint_data):
-        print("joint: ", i, "of : ", len(joint_data))
+    for i, row in enumerate(tqdm(joint_data)):
         empty_coords = 0
         for j, coord in enumerate(row):
             if j > 2:
@@ -313,7 +302,7 @@ def occlude_area_in_frame(occlusion_box, joint_data, image_data):
 def normalize_outlier_values(joint_data, image_data, tolerance = 100):
     joint_data, image_data = Utilities.process_data_input(joint_data, image_data)
 
-    for i, row in enumerate(joint_data):
+    for i, row in enumerate(tqdm(joint_data)):
         #Get row median to distinguish which of joint pairs are the outlier
         x_coords = [coord[0] for j, coord in enumerate(row) if j > 2]
         y_coords = [coord[1] for k, coord in enumerate(row) if k > 2]
@@ -330,7 +319,6 @@ def normalize_outlier_values(joint_data, image_data, tolerance = 100):
                     joint_1_coord = [row[j_index[1] + 3][0], row[j_index[1] + 3][1]]
                     if l - 3 == j_index[0] or l - 3 == j_index[1]:
                         if math.dist(joint_0_coord, joint_1_coord) > tolerance:
-                            print("found an outlier")
                             #Work out which of the two is the outlier
                             if math.dist(med_coord, joint_0_coord) > math.dist(med_coord, joint_1_coord):
                                 #Just set outlier to it's neighbour to reduce damage done by outlier without getting rid of frame
@@ -351,7 +339,7 @@ def normalize_outlier_values(joint_data, image_data, tolerance = 100):
     
 
 def normalize_outlier_depths(joints_data, image_data, plot3d = True):
-    for i, row in enumerate(joints_data):
+    for i, row in enumerate(tqdm(joints_data)):
 
         #print("before")
         #render_joints(image_data[i], row, delay = True)

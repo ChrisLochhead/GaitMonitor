@@ -17,14 +17,54 @@ from torch_geometric.utils import to_networkx
 from Programs.Data_Processing.Model_Based.Dataset_Obj import get_COO_matrix
 import Programs.Data_Processing.Model_Based.Utilities as Utilities
 
+                    #Bottom dataset
 joint_connections = [[15, 13], [13, 11], # left foot to hip 
                      [16, 14], [14, 12], # right foot to hip
                      [11, 0], [12, 0], # hips to origin
+
+                    #Top dataset
                      [9, 7], [7, 5], # left hand to shoulder
                      [10, 8], [6, 8], #right hand to shoulder
                      [5, 0], [6, 0], # Shoulders to origin
                      [1, 3], [2, 4], # ears to eyes
                      [3, 0], [4, 0]]# Eyes to origin
+
+
+
+def chart_knee_data(gait_cycle_angles):
+    #fig = plt.figure()
+    #ax = fig.add_subplot(111)
+
+
+    l_x = gait_cycle_angles[0]
+    l_y = [i for i in range(len(l_x))]
+
+    r_x = gait_cycle_angles[1]
+    r_y = [i for i in range(len(r_x))]
+
+    print("length x: ", len(l_x), len(l_y), l_y)
+
+    #Potentially add interpolation code here to give more examples for a smoother chart
+    l_x, l_y = Utilities.interpolate_knee_data(l_x, l_y)
+    r_x, r_y = Utilities.interpolate_knee_data(r_x, r_y)
+
+    #print("showing original")
+    #plt.figure()
+    #plt.plot(l_y,l_x)
+    #plt.plot(r_y,r_x)
+    #plt.show()
+
+
+    print("showing poly")
+    plt.figure()
+    poly = np.polyfit(l_y,l_x,8)
+    poly_alt = np.polyfit(r_y, r_x, 8)
+    poly_l = np.poly1d(poly)(l_y)
+    poly_r = np.poly1d(poly_alt)(r_y)
+    plt.plot(l_y,poly_l)
+    plt.plot(r_y,poly_r)
+    plt.show()
+
 
 def plot_graph(data):
     G = process_data_to_graph(data, get_COO_matrix())
@@ -214,8 +254,8 @@ def render_velocities(joint_data, velocity_data, image_data, delay = True, metad
             #x = int((velocity_data[1] * 40) + coord[1])
             #y = int((velocity_data[0] * 40) + coord[0])
             #print("velocity data: ", velocity_data)
-            image_direction = [int((velocity_data[i][1] * 40) + coord[1]),
-                                 int((velocity_data[i][0] * 40) + coord[0])]
+            image_direction = [int((velocity_data[i][1] * 5) + coord[1]),
+                                 int((velocity_data[i][0] * 5) + coord[0])]
 
             image = cv2.arrowedLine(image_data, [int(coord[1]), int(coord[0])] , image_direction,
                                             (0,255,0), 4) 

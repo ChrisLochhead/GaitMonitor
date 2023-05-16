@@ -9,6 +9,8 @@ import ast
 from ast import literal_eval
 import pyrealsense2 as rs
 import re
+from tqdm import tqdm
+import math
 #from Render import render_joints, plot3D_joints 
 import Programs.Data_Processing.Model_Based.Render as Render
 '''order of joints:
@@ -42,6 +44,103 @@ colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','
 
 #Occlusion co-ordinates for home recording dataset
 occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
+
+def dot(vA, vB):
+    return vA[0]*vB[0]+vA[1]*vB[1]
+
+def ang(lineA, lineB):
+    # Get nicer vector form
+    vA = [(lineA[0][0]-lineA[1][0]), (lineA[0][1]-lineA[1][1])]
+    vB = [(lineB[0][0]-lineB[1][0]), (lineB[0][1]-lineB[1][1])]
+    # Get dot prod
+    dot_prod = dot(vA, vB)
+    # Get magnitudes
+    magA = dot(vA, vA)**0.5
+    magB = dot(vB, vB)**0.5
+    # Get cosine value
+    cos_ = dot_prod/magA/magB
+    # Get angle in radians and then convert to degrees
+    angle = math.acos(dot_prod/magB/magA)
+    # Basically doing angle <- angle mod 360
+    ang_deg = math.degrees(angle)%360
+    
+    if ang_deg-180>=0:
+        # As in if statement
+        return 360 - ang_deg
+    else: 
+        
+        return ang_deg
+
+def build_knee_joint_data(gait_cycle):
+    l_angles = []
+    r_angles = []
+
+    for i, frame in enumerate(gait_cycle):
+        #Left hip to left knee, left knee to left foot
+        lh_lk = [frame[14], frame[16]]
+        lk_lf = [frame[16], frame[18]]
+
+        #Right hip to right knee, right knee to right foot
+        rh_rk = [frame[15], frame[17]]
+        rk_rf = [frame[17], frame[19]]
+
+        l_angles.append(ang(lh_lk, lk_lf))
+        r_angles.append(ang(rh_rk, rk_rf))
+
+    return [l_angles, r_angles]
+
+def interpolate_knee_data(x, y, scale = 5000):
+    curr_length = len(x)
+    inter_length = (curr_length -1) * scale
+    inter_data = []
+    inter_indices = [i for i in range(inter_length + curr_length)]
+    for i, instance in enumerate(x):
+        #print("appending initial: ", instance)
+        inter_data.append(instance)
+        #Don't do it for final instance
+        if i < len(x) - 1:
+            angle_change = abs(instance - x[i + 1])
+            #inter_changes = np.logspace(np.log(x[i+1]), np.log(instance), scale, base=np.exp(1))
+
+            for j in range(1, scale + 1):
+                #print("interpolating from ", instance, " to ", x[i + 1])
+                #print("current: ", j, " of 4. Value is: ", inter_changes[j-1])
+                if instance < x[i+1]:
+                    inter_data.append(instance + ((angle_change / scale) * j))
+                    #print("added value: ", instance + ((angle_change/scale) * j))
+                else:
+                    inter_data.append(instance - ((angle_change / scale) * j))
+                    #print("added value: ", instance - ((angle_change/scale) * j))
+    
+    print("final lens: ", len(inter_data), len(inter_indices))
+    return inter_data, inter_indices
+
+def split_by_class_and_instance(data):
+    norm, limp, stag = split_by_class(data)
+    normal_instances = split_class_by_instance(norm)
+    limp_instances = split_class_by_instance(limp)
+    stagger_instances = split_class_by_instance(stag)
+
+    return normal_instances, limp_instances, stagger_instances
+
+#Split classes into instances, work out how to know where one ends and next begins (using sequencing)
+def split_class_by_instance(data):
+    filtered_data = []
+    instance = []
+    current_frame = 0
+    last_frame = 0
+    print("length of data: ", len(data))
+    for i, row in enumerate(data):
+        last_frame = current_frame
+        current_frame = data[i][1]
+        
+        if current_frame < last_frame:
+            filtered_data.append(copy.deepcopy(instance))
+            instance = []
+
+        instance.append(row)
+            
+    return filtered_data
 
 def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, debug = False):
     
@@ -106,6 +205,22 @@ def generate_relative_sequence_data(sequences, rel_data):
         rel_sequence_data.append(rel_sequence)
     return rel_sequence_data
 
+#Split data into the three classes
+def split_by_class(data):
+    regular = []
+    limp = []
+    stagger = []
+    for index, row in enumerate(data):
+        if data[index][2] == 0:
+            regular.append(copy.deepcopy(row))
+        if data[index][2] == 1:
+            limp.append(copy.deepcopy(row))
+        if data[index][2] == 2:
+            stagger.append(copy.deepcopy(row))
+
+    return regular, limp, stagger
+           
+
 def process_data_input(joint_source, image_source):
     if isinstance(joint_source, str):
         joints = load(joint_source)
@@ -139,16 +254,12 @@ def convert_to_sequences(abs_data):
             sequence.append(joint)
     #Add last sequence which is the remainder
     sequences.append(sequence)
-
-    print("created sequence dataset.")
-    print("length of sequences: ", [len(s) for s in sequences])
-    print("length in total: ", len(sequences))
     return sequences
 
 def save_dataset(data, name, colnames = colnames):
+    print("Saving joints")
     new_dataframe = pd.DataFrame(data, columns = colnames)
     #Convert to dataframe 
-    print("SAVING")
     new_dataframe.to_csv(name,index=False, header=False)     
 
 
@@ -195,11 +306,10 @@ def load_images(folder, ignore_depth = True):
     directory = os.fsencode(folder)
     for subdir_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
         dirs.sort(key=numericalSort)
-        print("types: ", type(subdir), type(dirs), type(files))
-        print("current subdirectory in utility function: ", subdir)
         #Ignore base folder and instance 1 (not in dataset)
         if subdir_iter >= 1:
-            for i, file in enumerate(files):
+            for i, file in enumerate((pbar:= tqdm(files))):
+                pbar.set_postfix_str(file)
                 if i >= len(files) / 2 and ignore_depth:
                     break
                 file_name = os.fsdecode(file)
@@ -300,9 +410,10 @@ def apply_class_labels(num_switches, num_classes, joint_data):
 
 def save_images(joint_data, image_data, directory):
 
-    for i, row in enumerate(joint_data):
+    print("Saving images")
+    for i, row in enumerate((pbar := tqdm(joint_data))):
 
-        print("saving instance: ", str(float(row[0])))
+        pbar.set_postfix_str("Instance_" + str(float(row[0])))
         #Make sure it saves numbers properly (not going 0, 1, 10, 11 etc...)
         if row[1] < 10:
             file_no = str(0) + str(row[1])
@@ -310,9 +421,7 @@ def save_images(joint_data, image_data, directory):
             file_no = str(row[1])
 
         folder = str(directory) + "Instance_" + str(float(row[0]))
-        print("directory: ", directory)
         os.makedirs(folder, exist_ok = True)
-        print("saving this: ", folder + "/" + file_no + ".jpg" )
         cv2.imwrite(folder + "/" + file_no + ".jpg", image_data[i])
 
 def save(joints, name):

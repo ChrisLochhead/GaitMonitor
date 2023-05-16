@@ -21,6 +21,22 @@ import torch_geometric
 
     #Now I have a heirarchical pyramid of information at different levels of complexity. 
 
+#TODO for completion:
+    #Finish data processing pipeline 
+    #Each node should contain position, velocity, angles etc as described somewhere else (need to re-find this)
+    #Create HCF: using existing data, create a "ground truth" average of all the "Normal" recordings, then make the HCF of all of these the
+    #distance from the averages
+    #Create variational autoencoder - this will reduce the dimensionality of the joint features
+        #Create feature set for full body, then top and bottom, then 4 limbs + core for a total of 8 feature vectors (experiment with size)
+    
+    #Append HCF to this vector when passing through a GCN, firstly passing through a different network with a different loss function (normal attention network)
+    #Experiment with and without HCF 
+
+    #After this I have something novel, the next step is to compare it. Find papers that try and use skeletal data to infer disease progression, of those
+    #find datasets I can use and tables in the original papers I can copy/paste and see how the results look.
+
+    #If the results are SOTA, we have our first paper :) 
+    
 #Experiments:
 
     #Test the accuracy doing the following:
