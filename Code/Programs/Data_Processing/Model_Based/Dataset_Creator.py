@@ -14,15 +14,27 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joint_output):
 
     combined_dataset = []
     for i, row in enumerate(tqdm(rel_data)):
-        pass
-
+        #Metadata is the same as usual
+        combined_row = row[0:3]
+        for j, joint in enumerate(row):
+            if j > 2:
+                print("row before: ", combined_row)
+                combined_row.append([joint, vel_data[i][j], angle_data[i][j]])
+                print("row after: ", combined_row)
+        
+        print("final combined row: ", combined_row)
+        combined_dataset.append(combined_row)
+    
     print("Completing combined dataset.")
-    Utilities.save_dataset(combine_datasets, joint_output)
+    Utilities.save_dataset(combined_dataset, joint_output)
     return combined_dataset
 
-def create_ground_truth_dataset(abs_data, rel_data, vel_data, hcf_data images):
+
+def create_ground_truth_dataset(abs_data, rel_data, vel_data, hcf_data, images, joint_output):
     #Intuition: just averaging data will do little to outline potential discriminating data, especially with absolute data, rel or velocities.
     #Instead 
+    print("Creating ground truth datasets...")
+
     abs_data, images = Utilities.process_data_input(abs_data, images)
     rel_data, _ = Utilities.process_data_input(rel_data, None)
     vel_data, _ = Utilities.process_data_input(vel_data, None)
@@ -33,13 +45,37 @@ def create_ground_truth_dataset(abs_data, rel_data, vel_data, hcf_data images):
     vel_norm, vel_limp, vel_stag = Utilities.split_by_class_and_instance(vel_data)
 
     #For each instance calculate the hand-crafted feature vectors, then get the average across them
-    hcf_normal_ground = create_hcf_dataset(normal, rel_norm, vel_norm, images)
-    hcf_limp_ground = create_hcf_dataset(limp, rel_limp, rel_stag, images)
-    hcf_stag_ground = create_hcf_dataset(stagger, vel_limp, vel_stag, images)
+    hcf_normal_data = create_hcf_dataset(normal, rel_norm, vel_norm, images)
+    hcf_limp_data = create_hcf_dataset(limp, rel_limp, rel_stag, images)
+    hcf_stag_data = create_hcf_dataset(stagger, vel_limp, vel_stag, images)
 
-    #Calculate difference from every instance in the normal hcf dataset form the three ground truths. Save the dataset
-    #As each attribute being a coordinate of its distance from all 3 ground truths. The more advanced way to do this would be through use of an autoencoder.
-    #  
+
+    #From these datasets, create an average, this will be the actual average
+    #right now, to be replaced with an autoencoder function later and compared.
+    hcf_normal_ground = Utilities.create_average_data_sample(hcf_normal_data)
+    hcf_limp_ground = Utilities.create_average_data_sample(hcf_limp_data)
+    hcf_stag_ground = Utilities.create_average_data_sample(hcf_stag_data)
+
+    #Taking the calculated average, subtract this from every original value to 
+    # produce an array of hand crafted features detailing the distance of each 
+    # value from it's nearest class. This could be done by averaging the 
+    # datasets, or passing the datasets through an autoencoder to create a 
+    #representation that's a bit more meaningful.
+    ground_truth_dataset = []
+    #Enumerate standard HCF data
+    for i, row in enumerate(hcf_data):
+        ground_truth_row  = row[0:3]
+        for j, value in enumerate(row):
+            if j > 2:
+                ground_truth_row.append([value - hcf_normal_ground[i][j],
+                                         value - hcf_limp_ground[i][j],
+                                         value - hcf_stag_ground[i][j]])
+        
+        ground_truth_dataset.append(ground_truth_row)
+    
+    Utilities.save_dataset(ground_truth_dataset, joint_output)
+    print("Ground truth dataset created")
+    return ground_truth_dataset
 
 def assign_class_labels(num_switches, num_classes, joint_file, joint_output):
     joint_data = Utilities.load(joint_file)
@@ -93,6 +129,7 @@ def create_relative_dataset(abs_data, image_data, joint_output):
         #print("after")
         #Render.render_joints(image_data[i], rel_row, True)
         #Render.plot3D_joints(rel_row, x_rot=-90, y_rot=180)
+
     Utilities.save_dataset(rel_data, joint_output)
     print("relative dataset completed.")
     return rel_data
@@ -136,7 +173,7 @@ def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output):
         if first[3][1] > last[3][1]:
             for joints in seq:
                 #Append with metadata
-                flipped_joints = [joints[0], joints[1], joints[2]]
+                flipped_joints = joints[0:3]
                 for j, joint in enumerate(joints):
                     #Flip X value on each individual co-ordinate
                     if j > 2:
@@ -187,7 +224,7 @@ def create_joint_angle_dataset(abs_data, joint_output):
     joint_angle_dataset = []
     for i, joints in enumerate(tqdm(abs_data)):
         #Add metadata to list and ignore
-        joint_angles = [joints[0], joints[1], joints[2]]
+        joint_angles = joints[0:3]
         if i > 2:
             for j, coords in enumerate(joints):
                 #This should end up length 2 every time.
@@ -224,7 +261,7 @@ def create_disjointed_angle_dataset(abs_data, joint_output):
     joint_angle_dataset = []
     for i, joints in enumerate(tqdm(abs_data)):
         #Add metadata to list and ignore
-        joint_angles = [joints[0], joints[1], joints[2]]
+        joint_angles = joints[0:3]
         if i > 2:
             for j, coords in enumerate(joints):
                 #This should end up length 2 every time.
@@ -253,8 +290,8 @@ def create_2_regions_dataset(abs_data, joint_output, images):
     bottom_dataset = []
 
     for i, joints in enumerate(tqdm(abs_data)):
-        top_row = [joints[0], joints[1], joints[2]]
-        bottom_row = [joints[0], joints[1], joints[2]]
+        top_row = joints[0:3]
+        bottom_row = joints[0:3]
         #Append the mid-hip to bottom row in place of the origin
         bottom_row.append(math.dist(joints[14], joints[15]))
         print("the distance between the hips is : ", joints[14], joints[15], bottom_row[-1])
@@ -291,7 +328,7 @@ def create_5_regions_dataset(abs_data, joint_output, images):
         region_rows = [[],[],[],[],[]]
         #Append metadata to each region
         for region in region_rows:
-            region.append(joints[0], joints[1], joints[2])
+            region.append(joints[0:3])
         
         region_rows[0].append(joints[3:7]) # Head joints
         region_rows[1].append(joints[8, 10, 12]) # Right arm
@@ -384,7 +421,7 @@ def create_hcf_dataset(joints, rel_joints, abs_veljoints, images, joints_output)
     gait_cycles_dataset = []
     for i, cycle in enumerate(gait_cycles):
         #Add metadata
-        hcf_cycle = [cycle[0][0], cycle[0][1], cycle[0][2]]
+        hcf_cycle = cycle[0][0:3]#[0], cycle[0][1], cycle[0][2]]
         #hcf_cycle.append(cadences[i])
         hcf_cycle.append(feet_heights[i][0])
         hcf_cycle.append(feet_heights[i][1])

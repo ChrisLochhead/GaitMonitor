@@ -42,6 +42,9 @@ No chest
 colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','Joint_4','Joint_5','Joint_6','Joint_7',
     'Joint_8','Joint_9','Joint_10','Joint_11','Joint_12','Joint_13','Joint_14','Joint_15','Joint_16', 'Joint_17'] 
 
+hcf_colnames = ['Instance', 'No_In_Sequence', 'Class', 'Feet_height_0', 'Feet_height_1', "Time_LOG_0", "Time_LOG_1",
+                "Time_not_moving", 'Speed','Stride_gap_avg', 'Stride_gap_max', 'Stride_length_ratio']
+
 #Occlusion co-ordinates for home recording dataset
 occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
 
@@ -141,6 +144,20 @@ def split_class_by_instance(data):
         instance.append(row)
             
     return filtered_data
+
+#Returns a list of average values in a dataset
+def create_average_data_sample(data):
+    dataset_size = len(data)
+    running_total = data[0]
+    for i, row in enumerate(data):
+        if i > 0:
+            running_total = [sum(x) for x in zip(running_total, row)]
+            print("new running total: ", running_total)
+            print("after combining ", data[i-1])
+            print("with ", data[i])
+        
+    average = [x / dataset_size for x in running_total]
+    return average
 
 def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, debug = False):
     
