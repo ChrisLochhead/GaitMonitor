@@ -20,16 +20,24 @@ import Programs.Data_Processing.Model_Based.Utilities as Utilities
                     #Bottom dataset
 joint_connections = [[15, 13], [13, 11], # left foot to hip 
                      [16, 14], [14, 12], # right foot to hip
-                     [11, 0], [12, 0], # hips to origin
+                     [11, 0], [12, 0], # hips to origin #total of 7 including mid-hip
 
                     #Top dataset
                      [9, 7], [7, 5], # left hand to shoulder
                      [10, 8], [6, 8], #right hand to shoulder
                      [5, 0], [6, 0], # Shoulders to origin
                      [1, 3], [2, 4], # ears to eyes
-                     [3, 0], [4, 0]]# Eyes to origin
+                     [3, 0], [4, 0]]# Eyes to origin = total of 11
 
+bottom_joint_connection = [[5, 3], [3, 1], # left foot to hip 
+                     [6, 4], [4, 2], # right foot to hip
+                     [1, 0], [2, 0]] # hips to origin 
 
+top_joint_connections = [[9, 7], [7, 5], # left hand to shoulder
+                     [10, 8], [6, 8], #right hand to shoulder
+                     [5, 0], [6, 0], # Shoulders to origin
+                     [1, 3], [2, 4], # ears to eyes
+                     [3, 0], [4, 0]]# Eyes to origin = total of 11
 
 def chart_knee_data(gait_cycle_angles):
     #fig = plt.figure()
@@ -254,8 +262,8 @@ def render_velocities(joint_data, velocity_data, image_data, delay = True, metad
             #x = int((velocity_data[1] * 40) + coord[1])
             #y = int((velocity_data[0] * 40) + coord[0])
             #print("velocity data: ", velocity_data)
-            image_direction = [int((velocity_data[i][1] * 5) + coord[1]),
-                                 int((velocity_data[i][0] * 5) + coord[0])]
+            image_direction = [int((velocity_data[i][1] * 40) + coord[1]),
+                                 int((velocity_data[i][0] * 40) + coord[0])]
 
             image = cv2.arrowedLine(image_data, [int(coord[1]), int(coord[0])] , image_direction,
                                             (0,255,0), 4) 
@@ -278,9 +286,20 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
 
     tmp_frame = copy.deepcopy(frame)
     tmp_joints = copy.deepcopy(joints)
+    connections = joint_connections
+    print("length of joints: ", len(tmp_joints))
 
-    for joint_pair in joint_connections:
+    #Top region
+    if len(tmp_joints) == 14:
+        connections = top_joint_connections 
+    #Bottom region
+    elif len(tmp_joints) == 10:
+        connections = bottom_joint_connection
+
+
+    for joint_pair in connections:
             #Draw links between joints
+            print("joint pair: ", joint_pair)
             tmp_a = tmp_joints[joint_pair[1] + metadata]
             tmp_b = tmp_joints[joint_pair[0] + metadata]
             start = [int(float(tmp_a[1])), int(float(tmp_a[0]))]

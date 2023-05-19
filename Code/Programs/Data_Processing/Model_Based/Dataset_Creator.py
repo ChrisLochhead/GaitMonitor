@@ -19,7 +19,7 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joint_output):
         for j, joint in enumerate(row):
             if j > 2:
                 print("row before: ", combined_row)
-                combined_row.append([joint, vel_data[i][j], angle_data[i][j]])
+                combined_row.append([joint, vel_data[i][j], [angle_data[i][j]]])
                 print("row after: ", combined_row)
         
         print("final combined row: ", combined_row)
@@ -219,68 +219,59 @@ def create_velocity_dataset(joint_data, image_data, joint_output):
     return velocity_dataset
 
 
-def create_joint_angle_dataset(abs_data, joint_output):
+def create_joint_angle_dataset(abs_data, images, joint_output):
     print("Creating joint angle dataset (integrated)...")
     joint_angle_dataset = []
     for i, joints in enumerate(tqdm(abs_data)):
         #Add metadata to list and ignore
         joint_angles = joints[0:3]
-        if i > 2:
-            for j, coords in enumerate(joints):
-                #This should end up length 2 every time.
-                coord_angles = []
+        for j, coords in enumerate(joints):
+            #This should end up length 2 every time.
+            if j > 2:
+                coord_angles = None
+                connected_joints = []
                 for joint in Render.joint_connections:
                     #Find the connections for every joint and build a dataset on that. different joints have different numbers of connections:
                     #minimum 1 (the 6 extremities) and maximum 6 (origin). Strategy is find the first connection of each, then for those with only
                     #one connection, replace the connection with an angle between itself and the origin. (In future, maybe fill third slot with distance
                     # from origin?)
-                    if len(coord_angles) == 2:
-                        print("found enough connections for joint: ", str(j - 3))
-                        break
+                    #if len(connected_joints) == 2:
+                    #    break
                     #Found a connection to this joint
-                    elif joint[0] == j - 3:
-                        coord_angles.append(Utilities.ang(coords, joints[joint[1]]))
-                    elif joint[1] == j -3:
-                        coord_angles.append(Utilities.ang(coords, joints[joint[1]]))
+                    if joint[0] == j - 3:
+                        connected_joints.append(joints[joint[1]+3])
+                    elif joint[1] == j - 3:
+                        connected_joints.append(joints[joint[0]+3])
 
-                #By here the coord angles should have at least 1
-                print("coord angle count: ", len(coord_angles), " this is joint: ", str(j-3))
-                if len(coord_angles) != 2:
-                    print("this should be length one: ", len(coord_angles), " this is joint: ", str(j-3))
-                    #Append with the angle between this co-ordinate and the origin instead. 
-                    coord_angles.append(Utilities.ang(coords, joints[3]))
-            joint_angles.append(coord_angles)
+                #This will only apply for hands and feet which have 1 joint connection
+                if len(connected_joints) < 2:
+                    #Append with the angle between the head and the joint, and the joint and it's connection. This
+                    #Should give rough relational angle between the extremities and the origin.
+
+                    #Append a slight offset incase the any of the co-ordinates are identical
+                    if coords == connected_joints[0]:
+                        coords[0] += 1
+                        coords[1] += 1
+
+                    coord_angles = Utilities.ang([coords, joints[3]], [coords, connected_joints[0]])
+                #And this will only apply for the head joint with 6 connections
+                elif len(connected_joints) > 2:
+                    print("appending head ", i)
+                    #Append with the angle between the head and the mid-rif, connected by the right hip
+                    coord_angles = Utilities.ang([coords, joints[15]], [coords, Utilities.midpoint(joints[15], joints[14])])
+                    pass
+                #This is normal case for the majority of the joints, get the angle between it's two connections.
+                else:
+                    #Append a slight offset incase the any of the co-ordinates are identical
+                    if coords == connected_joints[0] or coords == connected_joints[1]:
+                        coords[0] += 1
+                        coords[1] += 1
+
+                    coord_angles = Utilities.ang([coords, connected_joints[0]], [coords, connected_joints[1]])
+                joint_angles.append(coord_angles)
         joint_angle_dataset.append(joint_angles)
     Utilities.save_dataset(joint_angle_dataset, joint_output)
     print("Joint angle dataset (integrated) Completed.")
-    return joint_angle_dataset
-
-def create_disjointed_angle_dataset(abs_data, joint_output):
-    abs_data = Utilities.load(abs_data)
-    print("Creating joint angle dataset (disjointed)...")
-    joint_angle_dataset = []
-    for i, joints in enumerate(tqdm(abs_data)):
-        #Add metadata to list and ignore
-        joint_angles = joints[0:3]
-        if i > 2:
-            for j, coords in enumerate(joints):
-                #This should end up length 2 every time.
-                coord_angles = []
-                for joint in Render.joint_connections:
-                    #This disjointed version will pass through it's own network for aggregation and so doesn't need to be of uniform size. simply
-                    #Add up all the angles together. 
-                    #Found a connection to this joint
-                    if joint[0] == j - 3:
-                        coord_angles.append(Utilities.ang(coords, joints[joint[1]]))
-                    elif joint[1] == j -3:
-                        coord_angles.append(Utilities.ang(coords, joints[joint[1]]))
-
-                print("This can be any length between 1-6: ", len(coord_angles))
-                joint_angles.append(coord_angles)
-        joint_angle_dataset.append(joint_angles)
-
-    print("Complete joint angle dataset (disjointed).")
-    Utilities.save_dataset(joint_angle_dataset, joint_output)
     return joint_angle_dataset
 
 def create_2_regions_dataset(abs_data, joint_output, images):
@@ -290,29 +281,34 @@ def create_2_regions_dataset(abs_data, joint_output, images):
     bottom_dataset = []
 
     for i, joints in enumerate(tqdm(abs_data)):
-        top_row = joints[0:3]
-        bottom_row = joints[0:3]
+        top_row = list(joints[0:3])
+        bottom_row = list(joints[0:3])
+
+        print(type(top_row), type(bottom_row), type(joints))
         #Append the mid-hip to bottom row in place of the origin
-        bottom_row.append(math.dist(joints[14], joints[15]))
-        print("the distance between the hips is : ", joints[14], joints[15], bottom_row[-1])
-        Render.render_joints(images[i], bottom_row, delay=True)
+        bottom_row.append(Utilities.midpoint(joints[14], joints[15]))
 
         for j, coords in enumerate(joints):
-            if j >= 13:
+            if j >= 14:
                 bottom_row.append(coords)
             elif j > 2:
                 top_row.append(coords)
-        
-        print("bottom row should be 6 + 1 = 7 for the hips, top row should be 11", len(top_row), len(bottom_row))
+
+        #Render.render_joints(images[i], top_row, delay=True)
         top_dataset.append(top_row)
         bottom_dataset.append(bottom_row)
 
     #Extract correct column names
-    top_colnames = Utilities.colnames[0,1,2]
-    bottom_colnames = Utilities.colnames[0,1,2, "joint_0"]
-    top_colnames.append(Utilities.colnames[2: 13])
-    bottom_colnames.append(Utilities.colnames[14:])
-    print("correct colnames? : ", len(top_colnames), len(bottom_colnames), top_colnames, bottom_colnames)
+    top_colnames = list(Utilities.colnames[0:3])
+    bottom_colnames = list(Utilities.colnames[0:3])
+    bottom_colnames += ["joint_0"]
+
+    print("bottom 1: ", bottom_colnames)
+
+    top_colnames += Utilities.colnames[2: 13]
+    bottom_colnames += Utilities.colnames[14:]
+    print("correct colnames? : ", len(top_colnames), len(bottom_colnames), top_colnames)
+    print("correct? " , bottom_colnames)
 
     Utilities.save_dataset(top_dataset, joint_output + "_top.csv", top_colnames)
     Utilities.save_dataset(bottom_dataset, joint_output + "_bottom.csv", bottom_colnames)
