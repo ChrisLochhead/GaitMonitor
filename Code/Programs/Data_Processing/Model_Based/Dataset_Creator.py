@@ -256,7 +256,6 @@ def create_joint_angle_dataset(abs_data, images, joint_output):
                     coord_angles = Utilities.ang([coords, joints[3]], [coords, connected_joints[0]])
                 #And this will only apply for the head joint with 6 connections
                 elif len(connected_joints) > 2:
-                    print("appending head ", i)
                     #Append with the angle between the head and the mid-rif, connected by the right hip
                     coord_angles = Utilities.ang([coords, joints[15]], [coords, Utilities.midpoint(joints[15], joints[14])])
                     pass
@@ -283,8 +282,6 @@ def create_2_regions_dataset(abs_data, joint_output, images):
     for i, joints in enumerate(tqdm(abs_data)):
         top_row = list(joints[0:3])
         bottom_row = list(joints[0:3])
-
-        print(type(top_row), type(bottom_row), type(joints))
         #Append the mid-hip to bottom row in place of the origin
         bottom_row.append(Utilities.midpoint(joints[14], joints[15]))
 
@@ -303,17 +300,18 @@ def create_2_regions_dataset(abs_data, joint_output, images):
     bottom_colnames = list(Utilities.colnames[0:3])
     bottom_colnames += ["joint_0"]
 
-    print("bottom 1: ", bottom_colnames)
-
     top_colnames += Utilities.colnames[2: 13]
     bottom_colnames += Utilities.colnames[14:]
-    print("correct colnames? : ", len(top_colnames), len(bottom_colnames), top_colnames)
-    print("correct? " , bottom_colnames)
 
     Utilities.save_dataset(top_dataset, joint_output + "_top.csv", top_colnames)
     Utilities.save_dataset(bottom_dataset, joint_output + "_bottom.csv", bottom_colnames)
     print("Regions dataset (top and bottom) completed.")
     return top_dataset, bottom_dataset
+
+def append_specific_joints(my_list, joints, indices):
+    for i in indices:
+        my_list.append(joints[i])
+    return my_list
 
 def create_5_regions_dataset(abs_data, joint_output, images):
     abs_data, images = Utilities.process_data_input(abs_data, images)
@@ -322,19 +320,29 @@ def create_5_regions_dataset(abs_data, joint_output, images):
 
     for i, joints in enumerate(tqdm(abs_data)):
         region_rows = [[],[],[],[],[]]
-        #Append metadata to each region
-        for region in region_rows:
-            region.append(joints[0:3])
         
-        region_rows[0].append(joints[3:7]) # Head joints
-        region_rows[1].append(joints[8, 10, 12]) # Right arm
-        region_rows[2].append(joints[9, 11, 13]) # Left arm
-        region_rows[3].append(joints[14, 16, 18]) # Right leg
-        region_rows[4].append(joints[15, 17, 19]) # Left leg
+        #Append metadata to each region
+        for j, region in enumerate(region_rows):
+            print("region rows: ", region_rows[j], list(joints[0:3]))
+            region_rows[j] = list(joints[0:3])
+        
+        #region_rows[0] += joints[3:8] # Head joints
+        region_rows[0] += [k for index, k in enumerate(joints) if index > 2 and index < 8]
+
+        region_rows[1] = append_specific_joints(region_rows[1], joints, [8,10,12])
+        region_rows[2] = append_specific_joints(region_rows[2], joints, [9,11,13])
+        region_rows[3] = append_specific_joints(region_rows[3], joints, [14,16,18])
+        region_rows[4] = append_specific_joints(region_rows[4], joints, [15,17,19])
+
+        print("lens: ", [len(s) for s in region_rows])
+        
+        #region_rows[2] += [joints[9], joints[11], joints[13]] # Left arm
+        #region_rows[3] += [joints[14], joints[16], joints[18]] # Right leg
+        #region_rows[4] += [joints[15], joints[17], joints[19]] # Left leg
 
         #Check I've got the right coordinates
         for j, region in enumerate(region_rows):
-            print("region ", j)
+            print("region ", j, region)
             Render.render_joints(images[i], region_rows[j], delay=True)
         
         for k, r in enumerate(region_datasets):

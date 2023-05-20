@@ -39,6 +39,11 @@ top_joint_connections = [[9, 7], [7, 5], # left hand to shoulder
                      [1, 3], [2, 4], # ears to eyes
                      [3, 0], [4, 0]]# Eyes to origin = total of 11
 
+head_joint_connections = [[1, 3], [2, 4], # ears to eyes
+                     [3, 0], [4, 0]]# Eyes to origin = 5
+
+limb_connections = [[0, 1], [1, 2]] # From the extremity to the base (i.e the foot - hip or hand - shoulder)
+
 def chart_knee_data(gait_cycle_angles):
     #fig = plt.figure()
     #ax = fig.add_subplot(111)
@@ -295,11 +300,15 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
     #Bottom region
     elif len(tmp_joints) == 10:
         connections = bottom_joint_connection
-
+    #Head region
+    elif len(tmp_joints) == 8:
+        connections = head_joint_connections
+    elif len(tmp_joints) == 6:
+        connections = limb_connections
 
     for joint_pair in connections:
             #Draw links between joints
-            print("joint pair: ", joint_pair)
+            print("joint pair: ", joint_pair, len(tmp_joints), len(connections))
             tmp_a = tmp_joints[joint_pair[1] + metadata]
             tmp_b = tmp_joints[joint_pair[0] + metadata]
             start = [int(float(tmp_a[1])), int(float(tmp_a[0]))]

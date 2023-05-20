@@ -6,6 +6,29 @@ import torch_geometric
 #This is paper 1: 
     #Using Graph Convolutional Networks and Hand-crafted Features to Assess Health via Gait
 
+    #Improvement on STJA-GCN which is direct improvement on 2s-AGCN. 
+
+    #They combine 3 streams after processing, I want to make 1 unified dataset then process through autoencoder to further improve efficiency
+    #Also remove extra head joints
+    #Their data is highly curated
+    #Their data just asks people to simulate abnormalities without weights
+    #They use Attention for joints
+    #They have a great lit review and results table to rob
+    #They don't use multiple regions
+
+    #So idea is now unified dataset of top, bottom, 5 region and whole, process all individual nodes through autoencoders for smaller dataset and less
+    #redundant information. Try and traditionally combine all regions THEN put through ST-AGCN using their attention module.
+    #No hand-crafted module either, fuck em
+    #write lit review involving stgcn, this one and silhouette one
+    #gaitpart asserts that long term dependencies are useless for recognition
+    #Split gait dataset instances by gait cycle, long term dependencies according to gaitset beyond one gait cycle are redundant
+    #like in 2023 paper who use distance metric for ignoring far-enough away joints, region method would solve this (just dont use big main one? ablation
+    # #would test this)
+    #If I use hcf which would be the autoencoded regions, the hcf gait data AND the distance between current and average of "Healthy", this module would be new
+    #That GEI region paper doesnt take joints, takes horizontal cuts, less correlating?
+    ####HAND CRAFTED FEATURES ARE EVERYTHING!!######################
+
+
 #This method must:
     #Be self-supervised i.e. it can label the data itself
     #Detect and identify points of anomaly

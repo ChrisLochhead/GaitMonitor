@@ -50,6 +50,8 @@ def main():
     print("\nStage 4:")
     #render_joints_series(image_data, abs_joint_data, size=10)
 
+
+    #Change format of pre-scale to list of arrays instead of list of lists
     pre_scale = abs_joint_data
 
     #Normalize size (use absolute dataset)
@@ -62,36 +64,35 @@ def main():
     #Create relative dataset
     relative_joint_data = Creator.create_relative_dataset(abs_joint_data, image_data,
                                                  joint_output="./Code/Datasets/Joint_Data/Office_Dataset/6_Relative_Data(relative).csv")
+
     print("\nStage 6:")
     #render_joints_series("None", relative_joint_data, size=5, plot_3D=True, x_rot = -90, y_rot = 180)
 
     #Flip joints so all facing one direction
     flipped_joint_data = Creator.create_flipped_joint_dataset(relative_joint_data, abs_joint_data, image_data,
-                                                               joint_output = "./Code/Datasets/Joint_Data/Office_Dataset/7_Relative_Data(flipped).csv")     
+                                                               joint_output = "./Code/Datasets/Joint_Data/Office_Dataset/7_Relative_Data(flipped).csv") 
+
     print("\nStage 7:")
     #render_joints_series("None", flipped_joint_data, size=5, plot_3D=True, x_rot = -90, y_rot = 180)
 
     #Create velocity dataset
     velocity_data = Creator.create_velocity_dataset(pre_scale, image_data, 
                                                     joint_output="./Code/Datasets/Joint_Data/Office_Dataset/8_Velocity_Data(velocity).csv")
-
     print("\nStage 8:")
     #render_velocity_series(abs_joint_data, velocity_data, image_data, size=20)
 
     flipped_velocity_data = Creator.create_flipped_joint_dataset(velocity_data, abs_joint_data, image_data,
                                                                joint_output = "./Code/Datasets/Joint_Data/Office_Dataset/9_Velocity_Data(flipped).csv")  
-    
     print("\nStage 9: ")
     #Create joint angles data
     joint_angles_data = Creator.create_joint_angle_dataset(abs_joint_data, image_data,
                                                             joint_output="./Code/Datasets/Joint_Data/Office_Dataset/10_Angles_Data(integrated).csv")
-
     print("\nStage 10:")
     #Create regions data
     top_region_dataset, bottom_region_dataset = Creator.create_2_regions_dataset(pre_scale, #CHANGE BACK TO ABS_JOINT_DATA
                                                                                  joint_output="./Code/Datasets/Joint_Data/Office_Dataset/12_2_Region_Data",
                                                                                  images = image_data)
-    regions_data = Creator.create_5_regions_dataset(abs_joint_data,
+    regions_data = Creator.create_5_regions_dataset(pre_scale,
                                                     "./Code/Datasets/Joint_Data/Office_Dataset/13_5_Data_",
                                                       image_data)
     print("\nStage 11:")
