@@ -126,8 +126,11 @@ def interpolate_knee_data(x, y, scale = 5000):
     return inter_data, inter_indices
 
 def split_by_class_and_instance(data):
+    print("data before split: ", data[0])
     norm, limp, stag = split_by_class(data)
+    print("data after split 1: ", norm[0])
     normal_instances = split_class_by_instance(norm)
+    print("data after split 2: ", normal_instances[0])
     limp_instances = split_class_by_instance(limp)
     stagger_instances = split_class_by_instance(stag)
 
@@ -158,12 +161,9 @@ def create_average_data_sample(data):
     running_total = data[0]
     for i, row in enumerate(data):
         if i > 0:
-            running_total = [sum(x) for x in zip(running_total, row)]
-            print("new running total: ", running_total)
-            print("after combining ", data[i-1])
-            print("with ", data[i])
-        
-    average = [x / dataset_size for x in running_total]
+            running_total = [x + y if j > 2 else x for j, (x, y) in enumerate(zip(running_total, row))]
+    
+    average = [x / dataset_size for x in running_total[0]]
     return average
 
 def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, debug = False):

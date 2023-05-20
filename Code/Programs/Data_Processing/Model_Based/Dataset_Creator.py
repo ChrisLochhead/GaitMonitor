@@ -6,7 +6,7 @@ from tqdm import tqdm
 import math
 import copy 
 
-def combine_datasets(rel_data, vel_data, angle_data, images, joint_output):
+def combine_datasets(rel_data, vel_data, angle_data, images, joints_output):
     print("Combining datasets...")
     rel_data, images = Utilities.process_data_input(rel_data, images)
     vel_data, _ = Utilities.process_data_input(vel_data, None)
@@ -18,43 +18,40 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joint_output):
         combined_row = row[0:3]
         for j, joint in enumerate(row):
             if j > 2:
-                print("row before: ", combined_row)
-                combined_row.append([joint, vel_data[i][j], [angle_data[i][j]]])
-                print("row after: ", combined_row)
+                #print("row before: ", combined_row[0:5])
+                combined_row.append([joint, vel_data[i][j], [0,0,angle_data[i][j]]])
+                #print("row after: ", combined_row[0:5])
         
-        print("final combined row: ", combined_row)
+        #print("final combined row: ", combined_row[0:5])
         combined_dataset.append(combined_row)
     
     print("Completing combined dataset.")
-    Utilities.save_dataset(combined_dataset, joint_output)
+    Utilities.save_dataset(combined_dataset, joints_output)
     return combined_dataset
 
 
-def create_ground_truth_dataset(abs_data, rel_data, vel_data, hcf_data, images, joint_output):
+def create_ground_truth_dataset(pre_abs_data, abs_data, rel_data, vel_data, hcf_data, images, joints_output):
     #Intuition: just averaging data will do little to outline potential discriminating data, especially with absolute data, rel or velocities.
     #Instead 
     print("Creating ground truth datasets...")
 
     abs_data, images = Utilities.process_data_input(abs_data, images)
+    pre_abs_data, _ = Utilities.process_data_input(pre_abs_data, None)
     rel_data, _ = Utilities.process_data_input(rel_data, None)
     vel_data, _ = Utilities.process_data_input(vel_data, None)
 
+    #Get HCF features of whole dataset
+    hcf_data = create_hcf_dataset(pre_abs_data, abs_data, rel_data, vel_data, images, None)
+
+
     #Split data by classes
-    normal, limp, stagger = Utilities.split_by_class_and_instance(abs_data)
-    rel_norm, rel_limp, rel_stag = Utilities.split_by_class_and_instance(rel_data)
-    vel_norm, vel_limp, vel_stag = Utilities.split_by_class_and_instance(vel_data)
-
-    #For each instance calculate the hand-crafted feature vectors, then get the average across them
-    hcf_normal_data = create_hcf_dataset(normal, rel_norm, vel_norm, images)
-    hcf_limp_data = create_hcf_dataset(limp, rel_limp, rel_stag, images)
-    hcf_stag_data = create_hcf_dataset(stagger, vel_limp, vel_stag, images)
-
+    normal, limp, stagger = Utilities.split_by_class_and_instance(hcf_data)
 
     #From these datasets, create an average, this will be the actual average
     #right now, to be replaced with an autoencoder function later and compared.
-    hcf_normal_ground = Utilities.create_average_data_sample(hcf_normal_data)
-    hcf_limp_ground = Utilities.create_average_data_sample(hcf_limp_data)
-    hcf_stag_ground = Utilities.create_average_data_sample(hcf_stag_data)
+    hcf_normal_ground = Utilities.create_average_data_sample(normal)
+    hcf_limp_ground = Utilities.create_average_data_sample(limp)
+    hcf_stag_ground = Utilities.create_average_data_sample(stagger)
 
     #Taking the calculated average, subtract this from every original value to 
     # produce an array of hand crafted features detailing the distance of each 
@@ -67,13 +64,13 @@ def create_ground_truth_dataset(abs_data, rel_data, vel_data, hcf_data, images, 
         ground_truth_row  = row[0:3]
         for j, value in enumerate(row):
             if j > 2:
-                ground_truth_row.append([value - hcf_normal_ground[i][j],
-                                         value - hcf_limp_ground[i][j],
-                                         value - hcf_stag_ground[i][j]])
+                ground_truth_row.append([value - hcf_normal_ground[j],
+                                         value - hcf_limp_ground[j],
+                                         value - hcf_stag_ground[j]])
         
         ground_truth_dataset.append(ground_truth_row)
     
-    Utilities.save_dataset(ground_truth_dataset, joint_output)
+    Utilities.save_dataset(ground_truth_dataset, joints_output, Utilities.hcf_colnames)
     print("Ground truth dataset created")
     return ground_truth_dataset
 
@@ -323,7 +320,7 @@ def create_5_regions_dataset(abs_data, joint_output, images):
         
         #Append metadata to each region
         for j, region in enumerate(region_rows):
-            print("region rows: ", region_rows[j], list(joints[0:3]))
+            #print("region rows: ", region_rows[j], list(joints[0:3]))
             region_rows[j] = list(joints[0:3])
         
         #region_rows[0] += joints[3:8] # Head joints
@@ -334,16 +331,9 @@ def create_5_regions_dataset(abs_data, joint_output, images):
         region_rows[3] = append_specific_joints(region_rows[3], joints, [14,16,18])
         region_rows[4] = append_specific_joints(region_rows[4], joints, [15,17,19])
 
-        print("lens: ", [len(s) for s in region_rows])
-        
-        #region_rows[2] += [joints[9], joints[11], joints[13]] # Left arm
-        #region_rows[3] += [joints[14], joints[16], joints[18]] # Right leg
-        #region_rows[4] += [joints[15], joints[17], joints[19]] # Left leg
-
         #Check I've got the right coordinates
-        for j, region in enumerate(region_rows):
-            print("region ", j, region)
-            Render.render_joints(images[i], region_rows[j], delay=True)
+        #for j, region in enumerate(region_rows):
+        #    Render.render_joints(images[i], region_rows[j], delay=True)
         
         for k, r in enumerate(region_datasets):
             r.append(region_rows[k])
@@ -358,15 +348,27 @@ def create_5_regions_dataset(abs_data, joint_output, images):
         else:
             output_cols = col_names
 
-        Utilities.save_dataset(r, joint_output + output_suffixes[i], output_cols)
+        Utilities.save_dataset(r, joint_output + output_suffixes[i] + ".csv", output_cols)
         
     print("Regions dataset (5-tier) completed.")
     return region_datasets
                 
 
+def transform_gait_cycle_data(cycles, data):
+    gait_cycles = []
+    joint_counter = 0
+    for cycle in cycles:
+        new_cycle = []
+        for frame in cycle:
+            new_cycle.append(data[joint_counter])
+            joint_counter += 1
+        gait_cycles.append(copy.deepcopy(new_cycle))
+    
+    return gait_cycles
 
-def create_hcf_dataset(joints, rel_joints, abs_veljoints, images, joints_output):
-    abs_joint_data, images = Utilities.process_data_input(joints, images)
+def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, images, joints_output, check = 0):
+    abs_joint_data, images = Utilities.process_data_input(abs_joints, images)
+    pre_scale, _ = Utilities.process_data_input(pre_abs_joints, None)
     rel_joint_data, _ =  Utilities.process_data_input(rel_joints, None)
     abs_veljoint_data, _ =  Utilities.process_data_input(abs_veljoints, None)
 
@@ -374,7 +376,10 @@ def create_hcf_dataset(joints, rel_joints, abs_veljoints, images, joints_output)
     #Gait cycle has instances of rows: each instance contains an array of rows
     #denoting all of the frames in their respective gait cycle, appended with their
     #metadata at the start
-    gait_cycles = hcf.get_gait_cycles(abs_joint_data, images)
+    #if check == 1:
+    #    print(pre_scale[0])
+
+    pre_gait_cycles = hcf.get_gait_cycles(pre_scale, images)
 
     #Experiment with getting and then charting knee data
     #for i in range(len(gait_cycles)):
@@ -382,16 +387,20 @@ def create_hcf_dataset(joints, rel_joints, abs_veljoints, images, joints_output)
     #        angles = Utilities.build_knee_joint_data(gait_cycles[i])
     #        Utilities.chart_knee_data(angles)
 
-    #Replicate this pattern for the relative gait cycle (if youn run it directly, 
+    #Replicate this pattern for the relative gait cycle and scaled gait data (if youn run it directly, 
     #relative gait will return very marginally different gait cycles.)
-    rel_gait_cycles = []
-    joint_counter = 0
-    for cycle in gait_cycles:
-        new_cycle = []
-        for frame in cycle:
-            new_cycle.append(rel_joint_data[joint_counter])
-            joint_counter += 1
-        rel_gait_cycles.append(copy.deepcopy(new_cycle))
+    gait_cycles = transform_gait_cycle_data(pre_gait_cycles, abs_joint_data)
+    rel_gait_cycles = transform_gait_cycle_data(pre_gait_cycles, rel_joint_data)
+
+    #rel_gait_cycles = []
+    #joint_counter = 0
+    #for cycle in gait_cycles:
+    #    new_cycle = []
+    #    for frame in cycle:
+    #        new_cycle.append(rel_joint_data[joint_counter])
+    #        joint_counter += 1
+    #    rel_gait_cycles.append(copy.deepcopy(new_cycle))
+
 
     print("number of total gait cycles: ", len(gait_cycles))
     #Then for every gait cycle create a new instance with the following features: 
@@ -443,7 +452,8 @@ def create_hcf_dataset(joints, rel_joints, abs_veljoints, images, joints_output)
 
     col_names = ["Instance", "No_In_Sequence", "Class", "Feet_Height_0", "Feet_Height_1",
                  "Time_LOG_0", "Time_LOG_1", "Time_No_Movement", "Speed", "Stride_Gap", "Stride_Length", "Max_Gap"]
-    Utilities.save_dataset(gait_cycles_dataset, joints_output, col_names)
+    if joints_output != None:
+        Utilities.save_dataset(gait_cycles_dataset, joints_output, col_names)
     print("HCF dataset completed.")
     return gait_cycles_dataset
 

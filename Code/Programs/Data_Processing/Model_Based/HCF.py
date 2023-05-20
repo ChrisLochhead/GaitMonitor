@@ -46,12 +46,12 @@ def get_gait_cycles(joint_data, images):
                 gait_cycle.append(row)
             elif row[18][1] > row[19][1] and direction == 1:
                 crossovers += 1
-                print("crossover detected")
+                #print("crossover detected")
                 gait_cycle.append(row)
                 direction = 0
             elif row[18][1] < row[19][1] and direction == 0:
                 crossovers += 1
-                print("crossover detected")
+                #print("crossover detected")
                 gait_cycle.append(row)
                 direction = 1
             else:
@@ -91,7 +91,7 @@ def get_gait_cycles(joint_data, images):
             col = (0,0,255)
         for i, row in enumerate(cycle):
             #Render every frame
-            print("frame ", i, " of ", len(cycle))
+            #print("frame ", i, " of ", len(cycle))
             #render_joints(images[image_iter], row, delay=True, use_depth=False, colour=col)
             image_iter += 1
             
@@ -174,20 +174,20 @@ def get_time_LofG(gait_cycles, velocity_joints, images):
                 + abs(velocity_joints[image_iter][15][0])+ abs(velocity_joints[image_iter][15][1]+ abs(velocity_joints[image_iter][15][2]))
 
 
-            print("velocities: ", left_velocity, right_velocity)
+            #print("velocities: ", left_velocity, right_velocity)
             #Left leg moving, leg is off ground
             if left_velocity > right_velocity and left_velocity >= right_velocity + threshold:
                 frames_off_ground[0] += 1
-                print("left leg off ground")
+                #print("left leg off ground")
                 #render_joints(images[image_iter], joints, delay=True, use_depth=False, colour=(0,0, 255))
             #Right leg moving
             elif right_velocity > left_velocity and right_velocity >= left_velocity + threshold:
                 frames_off_ground[1] += 1
-                print("right leg off ground")
+                #print("right leg off ground")
                 #render_joints(images[image_iter], joints, delay=True, use_depth=False, colour=(0,0, 255))
             #Neither leg moving, this is double support
             else:
-                print("neither leg off ground")
+                #print("neither leg off ground")
                 frames_not_moving += 1
                 #render_joints(images[image_iter], joints, delay=True, use_depth=False, colour=(0,0, 255))
            
