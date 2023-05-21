@@ -251,6 +251,9 @@ def create_joint_angle_dataset(abs_data, images, joint_output):
                         coords[1] += 1
 
                     coord_angles = Utilities.ang([coords, joints[3]], [coords, connected_joints[0]])
+
+                    #Render angle
+                    angle_plot, angle = Render.get_angle_plot([coords, joints[3]], [coords, connected_joints[0]], 1)
                 #And this will only apply for the head joint with 6 connections
                 elif len(connected_joints) > 2:
                     #Append with the angle between the head and the mid-rif, connected by the right hip

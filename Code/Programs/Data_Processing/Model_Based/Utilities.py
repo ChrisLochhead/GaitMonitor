@@ -51,34 +51,15 @@ occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
 def dot(vA, vB):
     return vA[0]*vB[0]+vA[1]*vB[1]
 
-def ang(line1, line2):
-    # Get directional vectors
-    d1 = (line1[1][0] - line1[0][0], line1[1][1] - line1[0][1])
-    d2 = (line2[1][0] - line2[0][0], line2[1][1] - line2[0][1])
-    # Compute dot product
-    p = d1[0] * d2[0] + d1[1] * d2[1]
-    # Compute norms
-    n1 = math.sqrt(d1[0] * d1[0] + d1[1] * d1[1])
-    n2 = math.sqrt(d2[0] * d2[0] + d2[1] * d2[1])
-    # Compute angle
+def slope(x1, y1, x2, y2): # Line slope given two points:
+    return (y2-y1)/(x2-x1)
 
-    denominator = n1 * n2
-    if denominator == 0:
-        denominator = 0.1
-
-    tmp = p / (denominator)
-    #Adjust for extremely small angles from poor data collection:
-    if tmp > 1:
-        tmp = 0.99
-    elif tmp < -1:
-        tmp = -0.99
-
-    ang = math.acos(tmp)
-    # Convert to degrees if you want
-    ang = math.degrees(ang)
-
+def ang(lineA, lineB): 
+    s1 = slope(lineA[0][0], lineA[0][1], lineA[1][0], lineA[1][1])
+    s2 = slope(lineB[0][0], lineB[0][1], lineB[1][0], lineB[1][1])
+    ang = math.degrees(math.atan((s2-s1)/(1+(s2*s1))))
+    print('Angle in degrees = ', ang)
     return ang
-
 
 
 def build_knee_joint_data(gait_cycle):

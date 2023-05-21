@@ -2,6 +2,7 @@ import cv2
 import copy
 import re, seaborn as sns
 from matplotlib import pyplot as plt
+from matplotlib.patches import Arc
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.colors import ListedColormap
 #%%capture
@@ -13,6 +14,7 @@ plt.rcParams['animation.ffmpeg_path'] = "C:/Users/Chris/Desktop/ffmpeg-5.1.2-ful
 import numpy as np
 import networkx as nx
 from torch_geometric.utils import to_networkx
+import math
 
 from Programs.Data_Processing.Model_Based.Dataset_Obj import get_COO_matrix
 import Programs.Data_Processing.Model_Based.Utilities as Utilities
@@ -43,6 +45,25 @@ head_joint_connections = [[1, 3], [2, 4], # ears to eyes
                      [3, 0], [4, 0]]# Eyes to origin = 5
 
 limb_connections = [[0, 1], [1, 2]] # From the extremity to the base (i.e the foot - hip or hand - shoulder)
+
+
+def get_angle_plot(line1, line2, offset = 1, color = None, origin = [0,0], len_x_axis = 1, len_y_axis = 1):
+
+    # Angle between line1 and x-axis
+    slope1 = (line1[1][1] - line1[0][1]) / float(line1[1][0] - line1[0][0])
+    angle1 = abs(math.degrees(math.atan(slope1))) # Taking only the positive angle
+
+
+    # Angle between line2 and x-axis
+    slope2 = (line2[1][1] - line2[0][1]) / float(line2[1][0] - line2[0][0])
+    angle2 = abs(math.degrees(math.atan(slope2)))
+
+    theta1 = min(angle1, angle2)
+    theta2 = max(angle1, angle2)
+
+    angle = theta2 - theta1
+
+    return Arc(origin, len_x_axis*offset, len_y_axis*offset, 0, theta1, theta2, color='r', label = str(angle)+u"\u00b0"), angle
 
 def chart_knee_data(gait_cycle_angles):
     #fig = plt.figure()
@@ -181,7 +202,7 @@ def filter_coords(joints, index, metadata = 3):
     
     return coords
 
-def plot3D_joints(joints, pixel = True, metadata = 3, x_rot = 90, y_rot = 180):
+def plot3D_joints(joints, pixel = True, metadata = 3, x_rot = 90, y_rot = 180, angles = None):
     # generate data
     x = filter_coords(joints, 0)
     y = filter_coords(joints, 1)
@@ -226,6 +247,9 @@ def plot3D_joints(joints, pixel = True, metadata = 3, x_rot = 90, y_rot = 180):
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
+
+    for a in angles:
+        ax.add_patch(a)
 
     # legend
     #-90, 180, 0 angle, azimuth and roll
