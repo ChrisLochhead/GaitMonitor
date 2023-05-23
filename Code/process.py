@@ -33,7 +33,7 @@ def main():
 
     #Display first 2 instances of results
     print("\nStage 2: ")
-    #render_joints_series(image_data, abs_joint_data, size=15)
+    render_joints_series(image_data, abs_joint_data, size=15)
     #render_joints_series(image_data, abs_joint_data, size=15, plot_3D=True)
 
     #Trim start and end frames where joints get confused by image borders

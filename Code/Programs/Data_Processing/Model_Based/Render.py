@@ -311,7 +311,7 @@ def click_event(event, x, y, flags, params):
     if event == cv2.EVENT_RBUTTONDOWN:
         quit()
 
-def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 3, colour = (0, 0, 255)):
+def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 3, colour = (0, 150, 200)):
 
     tmp_frame = copy.deepcopy(frame)
     tmp_joints = copy.deepcopy(joints)
@@ -338,7 +338,7 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
             start = [int(float(tmp_a[1])), int(float(tmp_a[0]))]
             end = [int(float(tmp_b[1])), int(float(tmp_b[0]))]
 
-            cv2.line(tmp_frame, start, end, color = (0,255,0), thickness = 2) 
+            cv2.line(tmp_frame, start, end, color = (255,0,0), thickness = 1) 
 
 
     for i, joint in enumerate(tmp_joints):
