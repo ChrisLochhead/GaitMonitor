@@ -2,6 +2,7 @@
 from Programs.Data_Processing.Model_Based.Demo import *
 #from Programs.Data_Processing.Model_Based.Utilities import load, load_images, save_dataset
 import Programs.Data_Processing.Model_Based.Dataset_Creator as Creator
+import Programs.Data_Processing.Model_Based.HCF as hcf
 
 def main():
 
@@ -33,7 +34,7 @@ def main():
 
     #Display first 2 instances of results
     print("\nStage 2: ")
-    render_joints_series(image_data, abs_joint_data, size=15)
+    #render_joints_series(image_data, abs_joint_data, size=15)
     #render_joints_series(image_data, abs_joint_data, size=15, plot_3D=True)
 
     #Trim start and end frames where joints get confused by image borders
@@ -50,7 +51,11 @@ def main():
     print("\nStage 4:")
     #render_joints_series(image_data, abs_joint_data, size=10)
 
-
+    abs_joint_data = Creator.append_midhip(abs_joint_data, image_data, 
+                                                   joint_output="./Code/Datasets/Joint_Data/Office_Dataset/4.5_Absolute_Data(midhip).csv")
+     
+    print("\nStage 4.5:")
+    #render_joints_series(image_data, abs_joint_data, size=10)
     #Change format of pre-scale to list of arrays instead of list of lists
     pre_scale = abs_joint_data
 
@@ -85,39 +90,42 @@ def main():
                                                                joint_output = "./Code/Datasets/Joint_Data/Office_Dataset/9_Velocity_Data(flipped).csv")  
     print("\nStage 9: ")
     #Create joint angles data
-    joint_angles_data = Creator.create_joint_angle_dataset(abs_joint_data, image_data,
-                                                            joint_output="./Code/Datasets/Joint_Data/Office_Dataset/10_Angles_Data(integrated).csv")
+    joint_bones_data = Creator.create_bone_dataset(abs_joint_data, image_data, 
+                                                   joint_output="./Code/Datasets/Joint_Data/Office_Dataset/10_Bones_Data(integrated).csv")
+    
+    #render_velocity_series(abs_joint_data, joint_bones_data, image_data, size=20)
+
     print("\nStage 10:")
     #Create regions data
     top_region_dataset, bottom_region_dataset = Creator.create_2_regions_dataset(abs_joint_data, #CHANGE BACK TO ABS_JOINT_DATA
-                                                                                 joint_output="./Code/Datasets/Joint_Data/Office_Dataset/12_2_Region_Data",
+                                                                                 joint_output="./Code/Datasets/Joint_Data/Office_Dataset/11_2_Region_Data",
                                                                                  images = image_data)
     regions_data = Creator.create_5_regions_dataset(abs_joint_data,
-                                                    "./Code/Datasets/Joint_Data/Office_Dataset/13_5_Data_",
+                                                    "./Code/Datasets/Joint_Data/Office_Dataset/12_5_Data_",
                                                       image_data)
     print("\nStage 11:", pre_scale[0])
     #Create HCF dataset
     hcf_data = Creator.create_hcf_dataset(pre_scale, abs_joint_data, relative_joint_data, velocity_data, image_data, 
-                               joints_output="./Code/Datasets/Joint_Data/Office_Dataset/14_HCF_Data.csv")
+                               joints_output="./Code/Datasets/Joint_Data/Office_Dataset/13_HCF_Data.csv")
 
     print("\nStage 12:")
     #Create ground truth comparison set
     print("data going into gait cycle extractor: ", pre_scale[0])
     ground_truths = Creator.create_ground_truth_dataset(pre_scale, abs_joint_data, relative_joint_data, velocity_data, hcf_data, image_data,
-                                                        joints_output="./Code/Datasets/Joint_Data/Office_Dataset/15_Ground_Truth_Data.csv")
+                                                        joints_output="./Code/Datasets/Joint_Data/Office_Dataset/14_Ground_Truth_Data.csv")
     
     print("\nStage 13:")
     #Combine datasets (relative, velocity, joint angles, regions)
-    combined_data = Creator.combine_datasets(relative_joint_data, velocity_data, joint_angles_data, image_data,
-                                             joints_output="./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data.csv")
+    combined_data = Creator.combine_datasets(relative_joint_data, velocity_data, joint_bones_data, image_data,
+                                             joints_output="./Code/Datasets/Joint_Data/Office_Dataset/15_Combined_Data.csv")
 
     print("\nStage 14:")
     #Create regions data of combined data
     top_region_dataset, bottom_region_dataset = Creator.create_2_regions_dataset(combined_data, #CHANGE BACK TO ABS_JOINT_DATA
-                                                                                 joint_output="./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_2Region",
+                                                                                 joint_output="./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region",
                                                                                  images = image_data)
     regions_data = Creator.create_5_regions_dataset(combined_data,
-                                                    "./Code/Datasets/Joint_Data/Office_Dataset/18_Combined_Data_5Region",
+                                                    "./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Region",
                                                       image_data)
 #########################################################################################################################
 

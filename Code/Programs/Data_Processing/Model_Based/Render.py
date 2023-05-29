@@ -31,6 +31,17 @@ joint_connections = [[15, 13], [13, 11], # left foot to hip
                      [1, 3], [2, 4], # ears to eyes
                      [3, 0], [4, 0]]# Eyes to origin = total of 11
 
+joint_connections_m_hip = [[15, 13], [13, 11], # left foot to hip 
+                     [16, 14], [14, 12], # right foot to hip
+                     [11, 17], [12, 17], [17,0],# hips to origin #total of 7 including mid-hip
+
+                    #Top dataset
+                     [9, 7], [7, 5], # left hand to shoulder
+                     [10, 8], [6, 8], #right hand to shoulder
+                     [5, 0], [6, 0], # Shoulders to origin
+                     [1, 3], [2, 4], # ears to eyes
+                     [3, 0], [4, 0]]# Eyes to origin = total of 11
+
 bottom_joint_connection = [[5, 3], [3, 1], # left foot to hip 
                      [6, 4], [4, 2], # right foot to hip
                      [1, 0], [2, 0]] # hips to origin 
@@ -65,40 +76,46 @@ def get_angle_plot(line1, line2, offset = 1, color = None, origin = [0,0], len_x
 
     return Arc(origin, len_x_axis*offset, len_y_axis*offset, 0, theta1, theta2, color='r', label = str(angle)+u"\u00b0"), angle
 
-def chart_knee_data(gait_cycle_angles):
+def chart_knee_data(gait_cycles, display = False):
     #fig = plt.figure()
     #ax = fig.add_subplot(111)
+    hcf_coefficients = []
+    for i in range(len(gait_cycles[0])):
+        if i == 0:
+            tits = 4/0
 
+        l_x = gait_cycles[0][i]
+        l_y = [i for i in range(len(l_x))]
 
-    l_x = gait_cycle_angles[0]
-    l_y = [i for i in range(len(l_x))]
+        r_x = gait_cycles[1][i]
+        r_y = [i for i in range(len(r_x))]
 
-    r_x = gait_cycle_angles[1]
-    r_y = [i for i in range(len(r_x))]
+        print("length x: ", len(l_x), len(r_x))
+        print("x values: ", l_x)
+        #Potentially add interpolation code here to give more examples for a smoother chart
+        l_x, l_y = Utilities.interpolate_knee_data(l_x, l_y)
+        r_x, r_y = Utilities.interpolate_knee_data(r_x, r_y)
 
-    print("length x: ", len(l_x), len(l_y), l_y)
+        poly = np.polyfit(l_y,l_x,6)
+        poly_alt = np.polyfit(r_y, r_x, 6)
+        poly_l = np.poly1d(poly)(l_y)
+        poly_r = np.poly1d(poly_alt)(r_y)
 
-    #Potentially add interpolation code here to give more examples for a smoother chart
-    l_x, l_y = Utilities.interpolate_knee_data(l_x, l_y)
-    r_x, r_y = Utilities.interpolate_knee_data(r_x, r_y)
+        if display:
+            print("showing original")
+            plt.figure()
+            plt.plot(l_y,l_x)
+            plt.plot(r_y,r_x)
+            plt.show()
 
-    #print("showing original")
-    #plt.figure()
-    #plt.plot(l_y,l_x)
-    #plt.plot(r_y,r_x)
-    #plt.show()
+            print("showing poly")
+            plt.figure()
+            plt.plot(l_y,poly_l)
+            plt.plot(r_y,poly_r)
+            plt.show()
 
-
-    print("showing poly")
-    plt.figure()
-    poly = np.polyfit(l_y,l_x,8)
-    poly_alt = np.polyfit(r_y, r_x, 8)
-    poly_l = np.poly1d(poly)(l_y)
-    poly_r = np.poly1d(poly_alt)(r_y)
-    plt.plot(l_y,poly_l)
-    plt.plot(r_y,poly_r)
-    plt.show()
-
+        hcf_coefficients.append(poly + poly_alt)
+    return hcf_coefficients
 
 def plot_graph(data):
     G = process_data_to_graph(data, get_COO_matrix())
@@ -288,9 +305,7 @@ def render_velocity_series(joint_data, velocity_data, image_data, size):
 def render_velocities(joint_data, velocity_data, image_data, delay = True, metadata = 3):
     for i, coord in enumerate(joint_data):
         if i >= metadata:
-            #x = int((velocity_data[1] * 40) + coord[1])
-            #y = int((velocity_data[0] * 40) + coord[0])
-            #print("velocity data: ", velocity_data)
+            print("velocity data: ", velocity_data[i], len(velocity_data), len(velocity_data[i]), len(joint_data))
             image_direction = [int((velocity_data[i][1] * 40) + coord[1]),
                                  int((velocity_data[i][0] * 40) + coord[0])]
 
@@ -316,7 +331,6 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
     tmp_frame = copy.deepcopy(frame)
     tmp_joints = copy.deepcopy(joints)
     connections = joint_connections
-    print("length of joints: ", len(tmp_joints))
 
     #Top region
     if len(tmp_joints) == 14:
@@ -327,12 +341,15 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
     #Head region
     elif len(tmp_joints) == 8:
         connections = head_joint_connections
+    #limbs
     elif len(tmp_joints) == 6:
         connections = limb_connections
+    #Otherwise its the normal dataset with a mid-hip appended
+    elif len(tmp_joints) == 21:
+        connections = joint_connections_m_hip
 
     for joint_pair in connections:
             #Draw links between joints
-            print("joint pair: ", joint_pair, len(tmp_joints), len(connections))
             tmp_a = tmp_joints[joint_pair[1] + metadata]
             tmp_b = tmp_joints[joint_pair[0] + metadata]
             start = [int(float(tmp_a[1])), int(float(tmp_a[0]))]
@@ -354,7 +371,9 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
         if joint[1] >= 424:
             joint[1] = 423
         
-        if use_depth_as_colour == False:
+        if i == 14 or i == 16 or i == 18:
+            tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(255,255,255), thickness=4)
+        elif use_depth_as_colour == False:
             tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=colour, thickness=4)
         else:
             tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(150, 100, joint[2]), thickness=4)

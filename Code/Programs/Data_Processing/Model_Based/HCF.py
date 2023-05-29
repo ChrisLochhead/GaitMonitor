@@ -1,6 +1,8 @@
 import copy
 import math
 import numpy as np
+import matplotlib.pyplot as plt
+import Programs.Data_Processing.Model_Based.Render as Render
 
 #This will only work with relative data
 def get_gait_cycles(joint_data, images):
@@ -15,19 +17,41 @@ def get_gait_cycles(joint_data, images):
         else:
             #If this is the first of a new instance, add the old instance to the array,
             #clear it, add this current one and reset what current instance is.
-            instances.append(copy.deepcopy(instance))
+            
+            #Check if previous gait cycle too small (less than 5) and in that case just add it to one further back
+            if len(instance) < 5:
+                instances[-1] += instance
+            else:
+                instances.append(copy.deepcopy(instance))
+
             instance = []
             instance.append(joints)
             current_instance = joints[0]
+
+
 
     gait_cycles = []
     gait_cycle = []
 
     #For each instance
     for i, inst in enumerate(instances):
+
+        if i > 0:
+            if len(gait_cycle) > 0:
+                crossovers = 0
+                if len(gait_cycles) > 0:
+                    for g in gait_cycle:
+                        gait_cycles[-1].append(g)
+                else:
+                    gait_cycles.append(copy.deepcopy(gait_cycle))                    
+                gait_cycle = []
+
+
         found_initial_direction = False
         direction = -1
         crossovers = 0
+
+        row_18_previous = -1
 
         for j, row in enumerate(inst):
             #Only register initial direction if they aren't equal
@@ -39,6 +63,16 @@ def get_gait_cycles(joint_data, images):
                     direction = 1
                     found_initial_direction = True
 
+            #Check for legs mixing up in frame, only need to check one leg
+            #print("gap: ", abs(row_18_previous - row[18][1]), row_18_previous, row[18][1])
+            if abs(row_18_previous - row[18][1]) > 50 and found_initial_direction:
+                gait_cycle.append(row)
+                #print("detected leg switch", j)
+                row_18_previous = row[18][1]
+                #Render.render_joints(images[j], row, delay=True, use_depth=False)
+                continue
+
+            row_18_previous = row[18][1]
             #Check if the direction matches the current movement and append as appropriate
             if row[18][1] > row[19][1] and direction == 0:
                 gait_cycle.append(row)
@@ -46,24 +80,26 @@ def get_gait_cycles(joint_data, images):
                 gait_cycle.append(row)
             elif row[18][1] > row[19][1] and direction == 1:
                 crossovers += 1
-                #print("crossover detected")
+                #print("crossover detected a ", row[18][1], row[19][1], direction )
                 gait_cycle.append(row)
                 direction = 0
             elif row[18][1] < row[19][1] and direction == 0:
                 crossovers += 1
-                #print("crossover detected")
+                #print("crossover detected b ", row[18][1], row[19][1], direction)
                 gait_cycle.append(row)
                 direction = 1
             else:
                 #There is either no cross over or the rows are totally equal, in which case just add as usual
                 gait_cycle.append(row)
 
-            #render_joints(images[j], row, delay=True, use_depth=False)
+            #row 16 is right leg at crossover point
+            #print("crossover count: {} and current instance length: {}, direction: {}, row 18: {}, row 19: {} ".format(crossovers, len(gait_cycle), direction, row[18], row[19]))
+            #Render.render_joints(images[j], row, delay=True, use_depth=False)
 
             #Check the number of crossovers 
             #If there has been 2 this is one full gait cycle, append it to the gait cycles and reset the 
             #current gait cycle.
-            if crossovers > 1:
+            if crossovers > 1 and len(gait_cycle) > 5:
                 crossovers = 0
                 gait_cycles.append(copy.deepcopy(gait_cycle))
                 gait_cycle = []
@@ -92,11 +128,25 @@ def get_gait_cycles(joint_data, images):
         for i, row in enumerate(cycle):
             #Render every frame
             #print("frame ", i, " of ", len(cycle))
-            #render_joints(images[image_iter], row, delay=True, use_depth=False, colour=col)
+            #print("row: ", row)
+            #Render.render_joints(images[image_iter], row, delay=True, use_depth=False, colour=col)
             image_iter += 1
             
     return gait_cycles
 
+def get_knee_chart_polynomial(data):
+    trends = []
+    for i in range(len(data[0])):
+        print("charting knee polynomials", len(data), len(data[0]), len(data[1]), data[0][i], data[1][i])
+        trend = np.polyfit(data[0][i], data[1][i], 3)
+        plt.plot(data[0][i],data[1][i],'o')
+        trendpoly = np.poly1d(trend) 
+        plt.plot(data[0][i],trendpoly(data[0][i]))
+        plt.show()
+        trends.append(trend)
+
+    #This returns 4 polynomial co-efficients that approximate the knee angle curve.
+    return trends
 
 def get_stride_gap(gait_cycles, images):
     stride_gaps = []

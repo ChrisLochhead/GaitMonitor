@@ -215,6 +215,51 @@ def create_velocity_dataset(joint_data, image_data, joint_output):
     print("Velocity dataset completed.")
     return velocity_dataset
 
+def append_midhip(abs_data, images, joint_output):
+    abs_data, images = Utilities.process_data_input(abs_data, images)
+    midhip_dataset = []
+    for i, joints in enumerate(abs_data):
+        midhip_row = list(joints)
+        midhip_row.append(Utilities.midpoint(joints[14], joints[15]))
+        midhip_dataset.append(midhip_row)
+    
+        #Display results
+        #Render.render_joints(images[i], midhip_row, delay=True)
+    
+    Utilities.save_dataset(midhip_dataset, joint_output, colnames=Utilities.colnames_midhip)
+    return midhip_dataset
+
+def create_bone_dataset(abs_data, images, joint_output):
+    abs_data, images = Utilities.process_data_input(abs_data, images)
+
+    bone_dataset = []
+    for i, joints in enumerate(abs_data):
+        bone_row = list(joints[0:3])
+        for j, coords in enumerate(joints):
+            for bone_pair in Utilities.bone_connections:
+                if bone_pair[0] + 3 == j:
+                    #Check if bone is an extremity
+                    if bone_pair[1] != -1:
+                        #Get direction
+                        tmp_vector = [joints[bone_pair[1] + 3][0] - coords[0],
+                                    joints[bone_pair[1] + 3][1] - coords[1],
+                                    joints[bone_pair[1] + 3][2] - coords[2]]
+                        
+                        #Then normalize
+                        norm = math.sqrt(tmp_vector[0] ** 2 + tmp_vector[1] ** 2 + tmp_vector[2] ** 2)
+                        if norm == 0:
+                            norm = 1
+                        tmp_vector = [tmp_vector[0] / norm, tmp_vector[1] / norm, tmp_vector[2] / norm]
+                    else:
+                        tmp_vector = [0,0,0]
+                    bone_row.append(tmp_vector)
+        bone_dataset.append(bone_row)
+
+        #Check solution
+        #Render.render_velocities(abs_data[i], bone_row, images[i])
+
+    Utilities.save_dataset(bone_dataset, joint_output, colnames=Utilities.colnames_midhip)
+    return bone_dataset                  
 
 def create_joint_angle_dataset(abs_data, images, joint_output):
     print("Creating joint angle dataset (integrated)...")
@@ -282,8 +327,8 @@ def create_2_regions_dataset(abs_data, joint_output, images):
     for i, joints in enumerate(tqdm(abs_data)):
         top_row = list(joints[0:3])
         bottom_row = list(joints[0:3])
-        #Append the mid-hip to bottom row in place of the origin
-        bottom_row.append(Utilities.midpoint(joints[14], joints[15]))
+        #Append the mid-hip to bottom row in place of the origin ::::  This is now done earlier
+        #bottom_row.append(Utilities.midpoint(joints[14], joints[15]))
 
         for j, coords in enumerate(joints):
             if j >= 14:
@@ -394,6 +439,11 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
     #relative gait will return very marginally different gait cycles.)
     gait_cycles = transform_gait_cycle_data(pre_gait_cycles, abs_joint_data)
     rel_gait_cycles = transform_gait_cycle_data(pre_gait_cycles, rel_joint_data)
+
+    print("test polynomial")
+    #trend = hcf.get_knee_chart_polynomial(knee_data_cycles)
+    knee_data_cycles = Utilities.build_knee_joint_data(pre_gait_cycles, images)
+    Render.chart_knee_data(knee_data_cycles, True)
 
     #rel_gait_cycles = []
     #joint_counter = 0
