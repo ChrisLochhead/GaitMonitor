@@ -16,4 +16,4 @@ def assess_data(dataset):
     print(f'Graph has isolated nodes: {data.has_isolated_nodes()}')
     print(f'Graph has loops: {data.has_self_loops()}')
     #Plot graph data using networkX
-    Render.plot_graph(data)
+    #Render.plot_graph(data)

@@ -3,12 +3,14 @@ from Programs.Data_Processing.Model_Based.Demo import *
 #from Programs.Data_Processing.Model_Based.Utilities import load, load_images, save_dataset
 import Programs.Data_Processing.Model_Based.Dataset_Creator as Creator
 import Programs.Data_Processing.Model_Based.HCF as hcf
-import Programs.Machine_Learning.Model_Based.AutoEncoder as AE
+import Programs.Machine_Learning.Model_Based.AutoEncoder.GAE as GAE
 import Programs.Machine_Learning.Model_Based.GCN.Dataset_Obj as Dataset_Obj
 import Programs.Machine_Learning.Model_Based.GCN.Ground_Truths as GT
 import Programs.Machine_Learning.Model_Based.GCN.Utilities as Graph_Utils
 import torch
+import torch.nn as nn
 import torch_geometric
+import tqdm
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def main():
@@ -145,83 +147,29 @@ def process_autoencoder():
 
    
     #Create dataset
-    dataset = AE.JointDataset('./', 'MPI_pixels_omit_relative.csv').shuffle()
+    dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/', '3_Absolute_Data(trimmed instances).csv').shuffle()
     Graph_Utils.assess_data(dataset)
 
     train_loader, val_loader, test_loader = GT.create_dataloaders(dataset)
 
-    #Initialise VAE and pass this data through 
-    batch_size = 128
-    img_size = (32, 32) # (width, height)
-
-    input_dim = 3
-    hidden_dim = 128
-    n_embeddings= 768
-    output_dim = 3
-
-    lr = 2e-4
-    epochs = 5
-    print_step = 50
-    kwargs = {'num_workers': 1, 'pin_memory': True} 
-'''
-    #train_dataset = CIFAR10(dataset_path, transform=mnist_transform, train=True, download=True)
-    #test_dataset  = CIFAR10(dataset_path, transform=mnist_transform, train=False, download=True)
-
-    #train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, **kwargs)
-    #test_loader  = DataLoader(dataset=test_dataset,  batch_size=batch_size, shuffle=False,  **kwargs)
-
-    encoder = Encoder(input_dim=input_dim, hidden_dim=hidden_dim, output_dim=hidden_dim)
-    codebook = VQEmbeddingEMA(n_embeddings=n_embeddings, embedding_dim=hidden_dim)
-    decoder = Decoder(input_dim=hidden_dim, hidden_dim=hidden_dim, output_dim=output_dim)
-
-    model = Model(Encoder=encoder, Codebook=codebook, Decoder=decoder).to(DEVICE)
-
-    #Step 3. Define Loss function (reprod. loss) and optimizer
-    mse_loss = nn.MSELoss()
-    optimizer = Adam(model.parameters(), lr=lr)
-
-    #Step 4. Train Vector Quantized Variational AutoEncoder (VQ-VAE)
-
-    print("Start training VQ-VAE...")
-    model.train()
-
-    for epoch in range(epochs):
-        overall_loss = 0
-        for batch_idx, (x, _) in enumerate(train_loader):
-            x = x.to(DEVICE)
-
-            optimizer.zero_grad()
-
-            x_hat, commitment_loss, codebook_loss, perplexity = model(x)
-            recon_loss = mse_loss(x_hat, x)
-            
-            loss =  recon_loss + commitment_loss + codebook_loss
-                    
-            loss.backward()
-            optimizer.step()
-            
-            if batch_idx % print_step ==0: 
-                print("epoch:", epoch + 1, "  step:", batch_idx + 1, "  recon_loss:", recon_loss.item(), "  perplexity: ", perplexity.item(), 
-                "\n\t\tcommit_loss: ", commitment_loss.item(), "  codebook loss: ", codebook_loss.item(), "  total_loss: ", loss.item())
-        
-    print("Finish!!")
-
-    model.eval()
-
-    with torch.no_grad():
-
-        for batch_idx, (x, _) in enumerate(tqdm(test_loader)):
-
-            x = x.to(DEVICE)
-            x_hat, commitment_loss, codebook_loss, perplexity = model(x)
     
-            print("perplexity: ", perplexity.item(),"commit_loss: ", commitment_loss.item(), "  codebook loss: ", codebook_loss.item())
-            break
+    in_channels, out_channels = dataset.num_features, 16
 
 
-'''
+    model = GAE.VGAE(GAE.VariationalGCNEncoder(in_channels, out_channels))
+
+    epochs = 10
+    model = model.to(DEVICE)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+
+    for epoch in range(1, epochs + 1):
+        loss = GAE.GAEtrain(model, optimizer, train_loader)
+        auc, ap = GAE.GAEtest(test_loader,model)
+    print(f'Epoch: {epoch:03d}, AUC: {auc:.4f}, AP: {ap:.4f}')
+    
+
 
 if __name__ == '__main__':
     #Main menu
-    #process_autoencoder()
-    main()
+    process_autoencoder()
+    #main()

@@ -12,6 +12,7 @@ from torchvision.datasets import CIFAR10
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 
+
 # Model Hyperparameters
 
 dataset_path = '~/datasets'
@@ -29,7 +30,7 @@ class Encoder(nn.Module):
         
         self.strided_conv_1 = nn.Conv2d(input_dim, hidden_dim, kernel_1, stride, padding=1)
         self.strided_conv_2 = nn.Conv2d(hidden_dim, hidden_dim, kernel_2, stride, padding=1)
-        
+
         self.residual_conv_1 = nn.Conv2d(hidden_dim, hidden_dim, kernel_3, padding=1)
         self.residual_conv_2 = nn.Conv2d(hidden_dim, output_dim, kernel_4, padding=0)
         
