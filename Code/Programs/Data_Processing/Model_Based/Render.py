@@ -81,8 +81,6 @@ def chart_knee_data(gait_cycles, display = False):
     #ax = fig.add_subplot(111)
     hcf_coefficients = []
     for i in range(len(gait_cycles[0])):
-        if i == 0:
-            tits = 4/0
 
         l_x = gait_cycles[0][i]
         l_y = [i for i in range(len(l_x))]
@@ -90,8 +88,6 @@ def chart_knee_data(gait_cycles, display = False):
         r_x = gait_cycles[1][i]
         r_y = [i for i in range(len(r_x))]
 
-        print("length x: ", len(l_x), len(r_x))
-        print("x values: ", l_x)
         #Potentially add interpolation code here to give more examples for a smoother chart
         l_x, l_y = Utilities.interpolate_knee_data(l_x, l_y)
         r_x, r_y = Utilities.interpolate_knee_data(r_x, r_y)
@@ -114,7 +110,8 @@ def chart_knee_data(gait_cycles, display = False):
             plt.plot(r_y,poly_r)
             plt.show()
 
-        hcf_coefficients.append(poly + poly_alt)
+        #print("lens: ", len(poly), len(poly_alt), len(np.concatenate((poly, poly_alt))))
+        hcf_coefficients.append(np.concatenate((poly, poly_alt)))
     return hcf_coefficients
 
 def plot_graph(data):

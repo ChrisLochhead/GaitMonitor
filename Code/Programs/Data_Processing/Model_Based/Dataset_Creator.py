@@ -4,6 +4,7 @@ import Programs.Data_Processing.Model_Based.Render as Render
 import Programs.Data_Processing.Model_Based.HCF as hcf
 from tqdm import tqdm
 import math
+import numpy as np
 import copy 
 
 def combine_datasets(rel_data, vel_data, angle_data, images, joints_output):
@@ -28,6 +29,20 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joints_output):
     print("Completing combined dataset.")
     Utilities.save_dataset(combined_dataset, joints_output)
     return combined_dataset
+
+def combined_ground_truth_dataset(hcf, ground_truths, joints_output):
+    hcf, _ = Utilities.process_data_input(hcf, None)
+    ground_truths, _ = Utilities.process_data_input(ground_truths, None)
+    combined_data = []
+
+    print("enumerating hcf: ", len(hcf))
+    for i, row in enumerate(hcf):
+        print("first type {}, row type: {}".format(type(ground_truths[i]), type(row)))
+        concat = row + ground_truths[i]
+        print("lens: ", len(concat), len(row), len(ground_truths[i]))
+        combined_data.append(row + ground_truths[i])
+
+    Utilities.save_dataset(combined_data, joints_output, colnames=Utilities.combined_colnames)
 
 
 def create_ground_truth_dataset(pre_abs_data, abs_data, rel_data, vel_data, hcf_data, images, joints_output):
@@ -443,7 +458,7 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
     print("test polynomial")
     #trend = hcf.get_knee_chart_polynomial(knee_data_cycles)
     knee_data_cycles = Utilities.build_knee_joint_data(pre_gait_cycles, images)
-    Render.chart_knee_data(knee_data_cycles, True)
+    knee_data_coeffs = Render.chart_knee_data(knee_data_cycles, False)
 
     #rel_gait_cycles = []
     #joint_counter = 0
@@ -500,13 +515,17 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
         #hcf_cycle.append(stride_lengths[i][0])
         hcf_cycle.append(stride_lengths[i][1])
         hcf_cycle.append(max_gaps[i])
+        for c in knee_data_coeffs[0]:
+            hcf_cycle.append(c)
         #hcf_cycle.append(stride_ratios[i])
+        print("here's the row: ", len(hcf_cycle))
         gait_cycles_dataset.append(copy.deepcopy(hcf_cycle))
 
-    col_names = ["Instance", "No_In_Sequence", "Class", "Feet_Height_0", "Feet_Height_1",
-                 "Time_LOG_0", "Time_LOG_1", "Time_No_Movement", "Speed", "Stride_Gap", "Stride_Length", "Max_Gap"]
+   # hcf_names = ["Instance", "No_In_Sequence", "Class", "Feet_Height_0", "Feet_Height_1",
+   #              "Time_LOG_0", "Time_LOG_1", "Time_No_Movement", "Speed", "Stride_Gap", "Stride_Length", "Max_Gap", 'l_co 1',
+   #              'l_co 2', 'l_co 3', 'l_co 4', 'l_co 5', 'l_co 6', 'l_co 7', 'r_co 1', 'r_co 2', 'r_co 3', 'r_co 4', 'r_co 5', 'r_co 6', 'r_co 7']
     if joints_output != None:
-        Utilities.save_dataset(gait_cycles_dataset, joints_output, col_names)
+        Utilities.save_dataset(gait_cycles_dataset, joints_output, Utilities.hcf_colnames)
     print("HCF dataset completed.")
     return gait_cycles_dataset
 

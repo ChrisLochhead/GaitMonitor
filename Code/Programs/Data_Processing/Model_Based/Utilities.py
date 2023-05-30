@@ -46,8 +46,9 @@ colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','
 colnames_midhip = ['Instance', 'No_In_Sequence', 'Class', 'Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
     'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', "M_hip"] 
 
-hcf_colnames = ['Instance', 'No_In_Sequence', 'Class', 'Feet_height_0', 'Feet_height_1', "Time_LOG_0", "Time_LOG_1",
-                "Time_not_moving", 'Speed','Stride_gap_avg', 'Stride_gap_max', 'Stride_length_ratio']
+hcf_colnames = ["Instance", "No_In_Sequence", "Class", "Feet_Height_0", "Feet_Height_1",
+                 "Time_LOG_0", "Time_LOG_1", "Time_No_Movement", "Speed", "Stride_Gap", "Stride_Length", "Max_Gap", 'l_co 1',
+                 'l_co 2', 'l_co 3', 'l_co 4', 'l_co 5', 'l_co 6', 'l_co 7', 'r_co 1', 'r_co 2', 'r_co 3', 'r_co 4', 'r_co 5', 'r_co 6', 'r_co 7']
 
                 #Head goes to hip, all other head joints go to nothing because they will be dropped
 bone_connections =[[0, 17], [1, -1], [2, -1], [3, -1], [4, -1],
@@ -87,6 +88,9 @@ def ang(point_1, point_2, point_3):
     #print("p12, p13, p23: ", p12, p13, p23)
     top = ((p12 ** 2) + (p13 ** 2) - (p23 ** 2))
     denominator = (2 * p12 * p13)
+    if denominator == 0:
+        denominator = 0.01
+
     result = top/denominator
     #print(" top: {},  \ndenominator: {} \nand result: {}".format(top, denominator, result))
     #Calculate the angle given the 3 points
@@ -146,7 +150,6 @@ def interpolate_knee_data(x, y, scale = 5000):
                     inter_data.append(instance - ((angle_change / scale) * j))
                     #print("added value: ", instance - ((angle_change/scale) * j))
     
-    print("final lens: ", len(inter_data), len(inter_indices))
     return inter_data, inter_indices
 
 def split_by_class_and_instance(data):
