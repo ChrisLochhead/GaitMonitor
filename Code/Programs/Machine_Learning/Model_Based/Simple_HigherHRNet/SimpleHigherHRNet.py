@@ -31,7 +31,7 @@ class SimpleHigherHRNet:
                  filter_redundant_poses=True,
                  max_nof_people=30,
                  max_batch_size=32,
-                 device=torch.device("cpu"),
+                 device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
                  enable_tensorrt=False):
         """
         Initializes a new SimpleHigherHRNet object.
@@ -79,6 +79,7 @@ class SimpleHigherHRNet:
         self.max_nof_people = max_nof_people
         self.max_batch_size = max_batch_size
         self.device = device
+        print("Device: ", self.device)
         self.enable_tensorrt = enable_tensorrt
 
         # assert nof_joints in (14, 15, 17)

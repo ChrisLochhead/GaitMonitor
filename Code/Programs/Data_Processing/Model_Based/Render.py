@@ -216,7 +216,7 @@ def filter_coords(joints, index, metadata = 3):
     
     return coords
 
-def plot3D_joints(joints, pixel = True, metadata = 3, x_rot = 90, y_rot = 180, angles = None):
+def plot3D_joints(joints, pixel = True, metadata = 3, x_rot = 90, y_rot = 180):
     # generate data
     x = filter_coords(joints, 0)
     y = filter_coords(joints, 1)
@@ -262,9 +262,6 @@ def plot3D_joints(joints, pixel = True, metadata = 3, x_rot = 90, y_rot = 180, a
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
 
-    for a in angles:
-        ax.add_patch(a)
-
     # legend
     #-90, 180, 0 angle, azimuth and roll
     plt.legend(*sc.legend_elements(), bbox_to_anchor=(1.05, 1), loc=2)
@@ -278,7 +275,6 @@ def plot3D_joints(joints, pixel = True, metadata = 3, x_rot = 90, y_rot = 180, a
 def render_joints_series(image_source, joints, size, delay = True, use_depth = True, plot_3D = False, x_rot = 90, y_rot= 180):
     
     joints, images = Utilities.process_data_input(joints, image_source)
-        
     for i in range(size):
         if plot_3D:
             plot3D_joints(joints[i], x_rot=x_rot, y_rot=y_rot)
@@ -302,12 +298,12 @@ def render_velocity_series(joint_data, velocity_data, image_data, size):
 def render_velocities(joint_data, velocity_data, image_data, delay = True, metadata = 3):
     for i, coord in enumerate(joint_data):
         if i >= metadata:
-            print("velocity data: ", velocity_data[i], len(velocity_data), len(velocity_data[i]), len(joint_data))
+            #print("velocity data: ", velocity_data[i], len(velocity_data), len(velocity_data[i]), len(joint_data))
             image_direction = [int((velocity_data[i][1] * 40) + coord[1]),
                                  int((velocity_data[i][0] * 40) + coord[0])]
 
             image = cv2.arrowedLine(image_data, [int(coord[1]), int(coord[0])] , image_direction,
-                                            (0,255,0), 4) 
+                                            (0,255,0), 1) 
 
     cv2.imshow('Joint Utilities Image',image)
     cv2.setMouseCallback('Joint Utilities Image', click_event, image)

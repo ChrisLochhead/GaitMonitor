@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 from torch_geometric.utils import to_networkx
 
-from Dataset_Obj import get_COO_matrix
+from Programs.Machine_Learning.Model_Based.GCN.Dataset_Obj import get_COO_matrix
 
 joint_connections = [[15, 13], [13, 11], # left foot to hip 
                      [16, 14], [14, 12], # right foot to hip

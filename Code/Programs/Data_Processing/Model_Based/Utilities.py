@@ -272,14 +272,14 @@ def split_by_class(data):
     return regular, limp, stagger
            
 
-def process_data_input(joint_source, image_source):
+def process_data_input(joint_source, image_source, ignore_depth = True):
     if isinstance(joint_source, str):
         joints = load(joint_source)
     else:
         joints = joint_source
     
     if isinstance(image_source, str):
-        images = load_images(image_source)
+        images = load_images(image_source, ignore_depth=ignore_depth)
     else:
         images = image_source
 

@@ -15,19 +15,16 @@ def get_gait_cycles(joint_data, images):
         if joints[0] == current_instance:
             instance.append(joints)
         else:
-            #If this is the first of a new instance, add the old instance to the array,
-            #clear it, add this current one and reset what current instance is.
-            
             #Check if previous gait cycle too small (less than 5) and in that case just add it to one further back
-            if len(instance) < 5:
-                instances[-1] += instance
-            else:
-                instances.append(copy.deepcopy(instance))
-
+            #print("instance lens: ", len(instance))
+            #if len(instance) < 5:
+            #    if len(instances) > 0:
+            #        instances[-1] += instance
+            #else:
+            instances.append(copy.deepcopy(instance))
             instance = []
             instance.append(joints)
             current_instance = joints[0]
-
 
 
     gait_cycles = []

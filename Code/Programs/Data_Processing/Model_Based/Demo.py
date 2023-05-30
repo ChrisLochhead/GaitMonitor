@@ -200,7 +200,6 @@ def run_images(folder_name, out_folder, exclude_2D = False, write_mode = "w+", s
 
     for directory_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
         dirs.sort(key=Utilities.numericalSort)
-
         #Skip any instances already recorded
         if directory_iter < start_point:
             subdir_iter += 1
