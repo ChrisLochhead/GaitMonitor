@@ -71,6 +71,7 @@ def assess_data(dataset):
 
 def create_dataloaders(dataset, train = 0.8, val = 0.9, test = 0.9):
         # Create training, validation, and test sets
+        print("created dataloader lengths: {} : {} : {}".format(len(dataset),int(len(dataset)*train), int(len(dataset)*val) - int(len(dataset)*train) ))
         train_dataset = dataset[:int(len(dataset)*train)]
         val_dataset   = dataset[int(len(dataset)*train):int(len(dataset)*val)]
         test_dataset  = dataset[int(len(dataset)*test):]
@@ -80,11 +81,12 @@ def create_dataloaders(dataset, train = 0.8, val = 0.9, test = 0.9):
         print(f'Test set       = {len(test_dataset)} graphs')
 
         # Create mini-batches
-        train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+        train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True )
+        #print("train loader: ", len(train_loader))
         val_loader = DataLoader(val_dataset, batch_size=64, shuffle=True)
         test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
-        return train_loader, val_loader, test_loader
+        return train_loader, val_loader, test_loader, test_dataset
 
 def numericalSort(value):
     numbers = re.compile(r'(\d+)')

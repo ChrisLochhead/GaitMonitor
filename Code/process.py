@@ -11,8 +11,8 @@ import torch
 import torch.nn as nn
 import torch_geometric
 import tqdm
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+import torch_geometric.transforms as T
+from Programs.Machine_Learning.Model_Based.GCN.Graph_Nets import GCN, GIN, GAT, train, accuracy
 def main():
 
     #Experimental creating hand crafted features
@@ -148,25 +148,44 @@ def process_autoencoder():
    
     #Create dataset
     dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/', '3_Absolute_Data(trimmed instances).csv').shuffle()
-    Graph_Utils.assess_data(dataset)
+    #GT.assess_data(dataset)
 
-    train_loader, val_loader, test_loader = GT.create_dataloaders(dataset)
+    train_loader, val_loader, test_loader, _ = GT.create_dataloaders(dataset)
 
-    
-    in_channels, out_channels = dataset.num_features, 16
+    #Define model
+    print("Creating model: ")
+    gcn_model = GCN(dim_in = dataset.num_node_features, dim_h=16, dim_out=3)
+    gcn_model = gcn_model.to("cuda")
 
+    gat_model = GAT(dim_in = dataset.num_node_features, dim_h=16, dim_out=3)
+    gat_model = gat_model.to("cuda")
+    gin_model = GIN(dim_h=16, dataset=dataset)
+    #Train model
+    #embeddings, losses, accuracies, outputs, hs = model.train(model, criterion, optimizer, data)
+    print("GCN MODEL")
+    #model, embeddings, losses, accuracies, outputs, hs = train(gcn_model, train_loader, val_loader, test_loader)
+    print("GAT MODEL") 
+    model, embeddings, losses, accuracies, outputs, hs = train(gat_model, train_loader, val_loader, test_loader)
+    print("GIN MODEL")
+    model, embeddings, losses, accuracies, outputs, hs = train(gin_model, train_loader, val_loader, test_loader)
 
-    model = GAE.VGAE(GAE.VariationalGCNEncoder(in_channels, out_channels))
+    # Train TSNE
+    '''
+    tsne = TSNE(n_components=2, learning_rate='auto',
+            init='pca').fit_transform(embeddings[7].detach())
 
-    epochs = 10
-    model = model.to(DEVICE)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    # Plot TSNE
+    plt.figure(figsize=(10, 10))
+    plt.axis('off')
+    plt.scatter(tsne[:, 0], tsne[:, 1], s=50, c=dataset[7].y)
+    plt.show()
+    '''
 
-    for epoch in range(1, epochs + 1):
-        loss = GAE.GAEtrain(model, optimizer, train_loader)
-        auc, ap = GAE.GAEtest(test_loader,model)
-    print(f'Epoch: {epoch:03d}, AUC: {auc:.4f}, AP: {ap:.4f}')
-    
+    #Animate results
+    print("training complete, animating")
+    fig = plt.figure(figsize=(12, 12))
+    ax = fig.add_subplot(projection='3d')
+    run_3d_animation(fig, (embeddings, dataset, losses, accuracies, ax, train_loader))
 
 
 if __name__ == '__main__':

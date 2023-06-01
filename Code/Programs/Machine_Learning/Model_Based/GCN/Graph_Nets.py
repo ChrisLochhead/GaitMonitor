@@ -3,7 +3,7 @@ from torch.nn import Linear
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, global_add_pool, GINConv, GATv2Conv
 from torch.nn import Linear, Sequential, BatchNorm1d, ReLU
-from Dataset_Obj import *
+from Programs.Machine_Learning.Model_Based.GCN.Dataset_Obj import *
 
 joint_connections = [[15, 13], [13, 11], # left foot to hip 
                      [16, 14], [14, 12], # right foot to hip
@@ -17,20 +17,59 @@ joint_connections = [[15, 13], [13, 11], # left foot to hip
 
 class GAT(torch.nn.Module):
     """Graph Attention Network"""
-    def __init__(self, dim_in, dim_h, dim_out, heads=8):
+    def __init__(self, dim_in, dim_h, dim_out, heads=8, n_layers = 3):
         super().__init__()
         self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
-        self.gat2 = GATv2Conv(dim_h*heads, dim_out, heads=1)
+        self.gat2 = GATv2Conv(dim_h*heads, dim_h, heads=1)
+        self.gat3 = GATv2Conv(dim_h, dim_h, heads=1)
         self.optimizer = torch.optim.Adam(self.parameters(),
                                           lr=0.005,
                                           weight_decay=5e-4)
+        
 
-    def forward(self, x, edge_index):
-        h = F.dropout(x, p=0.6, training=self.training)
-        h = self.gat1(h, edge_index)
-        h = F.elu(h)
-        h = F.dropout(h, p=0.6, training=self.training)
-        h = self.gat2(h, edge_index)
+        result = ((n_layers -1) * dim_h) + (dim_h * heads)
+        print("RESULTAT: ", result)
+
+
+
+
+        self.lin1 = Linear(result, result)
+        self.lin2 = Linear(result, dim_out)
+
+    def forward(self, x, edge_index, batch):
+        x = x.to("cuda")
+        edge_index = edge_index.to("cuda")
+        batch = batch.to("cuda")
+        print("original : ", x.shape)
+        h1 = F.dropout(x, p=0.6, training=self.training)
+        print("pos a : ", h1.shape)
+        h1 = self.gat1(h1, edge_index)
+        h1 = F.elu(h1)
+        print("pos b : ", h1.shape)
+
+        h2 = F.dropout(h1, p=0.6, training=self.training)
+        h2 = self.gat2(h2, edge_index)
+        print("pos c: ", h2.shape)
+
+        h3 = F.dropout(h2, p=0.6, training=self.training)
+        h3 = self.gat3(h3, edge_index)
+        print("pos d: ", h3.shape)
+
+        # Graph-level readout
+        h1 = global_add_pool(h1, batch)
+        h2 = global_add_pool(h2, batch)
+        h3 = global_add_pool(h3, batch)
+
+        # Concatenate graph embeddings
+        print("sizes: ", h1.shape, h2.shape, h3.shape)
+        h = torch.cat((h1, h2, h3), dim=1)
+
+        # Classifier
+        h = self.lin1(h)
+        h = h.relu()
+        h = F.dropout(h, p=0.5, training=self.training)
+        h = self.lin2(h)
+
         return h, F.log_softmax(h, dim=1)
     
 class GIN(torch.nn.Module):
@@ -78,16 +117,40 @@ class GCN(torch.nn.Module):
     def __init__(self, dim_in, dim_h, dim_out):
       super().__init__()
       self.gcn1 = GCNConv(dim_in, dim_h)
-      self.gcn2 = GCNConv(dim_h, dim_out)
+      self.gcn2 = GCNConv(dim_h, dim_h)
+      self.lin1 = Linear(dim_h * 2, dim_h * 2)
+      self.lin2 = Linear(dim_h * 2, dim_out)
       self.optimizer = torch.optim.Adam(self.parameters(),
                                         lr=0.01,
                                         weight_decay=5e-4)
 
-    def forward(self, x, edge_index):
-        h = F.dropout(x, p=0.5, training=self.training)
-        h = self.gcn1(h, edge_index).relu()
+    def forward(self, x, edge_index, batch):
+        # Node embeddings
+        x = x.to("cuda")
+        edge_index = edge_index.to("cuda")
+        batch = batch.to("cuda")
+        print("X SHAPE; ", x.shape)
+        h1 = F.dropout(x, p=0.6, training=self.training)
+        h1 = self.gcn1(h1, edge_index)
+        print("h1 shape here, ", h1.shape)
+        h2 = F.dropout(h1, p=0.6, training=self.training)
+        h2 = self.gcn2(h2, edge_index)
+
+        print("h1 and 2: ", h1.shape, h2.shape)
+        # Graph-level readout
+        h1 = global_add_pool(h1, batch)
+        h2 = global_add_pool(h2, batch)
+        # Concatenate graph embeddings
+        h = torch.cat((h1, h2), dim=1)
+
+        # Classifier
+        print("H dimensions: ", h.shape)
+        tits = 5/0
+        h = self.lin1(h)
+        h = h.relu()
         h = F.dropout(h, p=0.5, training=self.training)
-        h = self.gcn2(h, edge_index)
+        h = self.lin2(h)
+
         return h, F.log_softmax(h, dim=1)
     
 # Calculate accuracy
@@ -100,8 +163,7 @@ def train(model, loader, val_loader, test_loader):
     optimizer = torch.optim.Adam(model.parameters(),
                                 lr=0.01,
                                 weight_decay=0.01)
-    epochs = 1000
-
+    epochs = 50
     model.train()
 
     # Data for animations
@@ -118,9 +180,13 @@ def train(model, loader, val_loader, test_loader):
         val_acc = 0
 
         # Train on batches
+        print("data loader info: ")
         for data in loader:
             optimizer.zero_grad()
+            #print("data : ", data, type(data))
+            data = data.to("cuda")
             h, out = model(data.x, data.edge_index, data.batch)
+
             loss = criterion(out, data.y)
             total_loss += loss / len(loader)
             acc += accuracy(out.argmax(dim=1), data.y) / len(loader)
@@ -138,7 +204,7 @@ def train(model, loader, val_loader, test_loader):
             val_loss, val_acc = test(model, val_loader)
 
         # Print metrics every 10 epochs
-        if (epoch % 100 == 0):
+        if (epoch % 1 == 0):
             print(f'Epoch {epoch:>3} | Train Loss: {total_loss:.2f} '
                 f'| Train Acc: {acc * 100:>5.2f}% '
                 f'| Val Loss: {val_loss:.2f} '
@@ -159,6 +225,7 @@ def test(model, loader):
     acc = 0
 
     for data in loader:
+        data = data.to("cuda")
         _, out = model(data.x, data.edge_index, data.batch)
         loss += criterion(out, data.y) / len(loader)
         acc += accuracy(out.argmax(dim=1), data.y) / len(loader)
