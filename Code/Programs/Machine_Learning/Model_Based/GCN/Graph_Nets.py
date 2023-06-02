@@ -169,7 +169,7 @@ def train(model, loader, val_loader, test_loader):
     optimizer = torch.optim.Adam(model.parameters(),
                                 lr=0.01,
                                 weight_decay=0.01)
-    epochs = 50
+    epochs = 100
     model.train()
 
     # Data for animations

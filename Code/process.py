@@ -154,10 +154,10 @@ def process_autoencoder():
 
    
     #Create dataset
-    dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/', '3_Absolute_Data(normed).csv').shuffle()
+    dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/', '15.5_Combined_Data(normed).csv').shuffle()
     #GT.assess_data(dataset)
 
-    train_loader, val_loader, test_loader, _ = GT.create_dataloaders(dataset)
+    train_loader, val_loader, test_loader, whole = GT.create_dataloaders(dataset)
     
     
     torch.manual_seed(0)
@@ -168,33 +168,34 @@ def process_autoencoder():
     print(f'Selected device: {device}')
     vae.to(device)
     vae.eval()
-    num_epochs = 1
+    num_epochs = 10
 
 
     for epoch in range(num_epochs):
         train_loss = GAE.train_epoch(vae,device,train_loader,optim)
-        val_loss = GAE.test_epoch(vae,device,val_loader)
+        #Get embedding of entire dataset and save it
+        val_loss = GAE.test_epoch(vae,device,whole, './Code/Datasets/Joint_Data/Office_Dataset/raw/encoded_data.csv')
         print('\n EPOCH {}/{} \t train loss {:.3f} \t val loss {:.3f}'.format(epoch + 1, num_epochs,train_loss,val_loss))
 
-
-    train_loader, val_loader, test_loader, _ = GT.create_dataloaders(dataset, batch_size=64)
+    encoded_dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/', 'encoded_data.csv').shuffle()
+    train_loader, val_loader, test_loader, _ = GT.create_dataloaders(encoded_dataset, batch_size=64)
 
     #Define model GCNs
     print("Creating model: ")
-    gcn_model = GCN(dim_in = dataset.num_node_features, dim_h=16, dim_out=3)
-    gcn_model = gcn_model.to("cuda")
+    #gcn_model = GCN(dim_in = dataset.num_node_features, dim_h=16, dim_out=3)
+    #gcn_model = gcn_model.to("cuda")
 
-    gat_model = GAT(dim_in = dataset.num_node_features, dim_h=16, dim_out=3)
+    gat_model = GAT(dim_in = encoded_dataset.num_node_features, dim_h=16, dim_out=3)
     gat_model = gat_model.to("cuda")
-    gin_model = GIN(dim_h=16, dataset=dataset)
+    #gin_model = GIN(dim_h=16, dataset=dataset)
     #Train model
     #embeddings, losses, accuracies, outputs, hs = model.train(model, criterion, optimizer, data)
-    print("GCN MODEL")
+    #print("GCN MODEL")
     #model, embeddings, losses, accuracies, outputs, hs = train(gcn_model, train_loader, val_loader, test_loader)
     print("GAT MODEL") 
     model, embeddings, losses, accuracies, outputs, hs = train(gat_model, train_loader, val_loader, test_loader)
-    print("GIN MODEL")
-    model, embeddings, losses, accuracies, outputs, hs = train(gin_model, train_loader, val_loader, test_loader)
+    #print("GIN MODEL")
+    #model, embeddings, losses, accuracies, outputs, hs = train(gin_model, train_loader, val_loader, test_loader)
 
     # Train TSNE
     '''

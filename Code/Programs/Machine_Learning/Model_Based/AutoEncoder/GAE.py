@@ -15,6 +15,7 @@ from torch_geometric.nn import GCNConv, global_add_pool, GINConv, GATv2Conv
 from sklearn.manifold import TSNE
 import plotly.express as px
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+import Programs.Data_Processing.Model_Based.Utilities as Utilities
 
 class VariationalEncoder(nn.Module):
     def __init__(self, dim_in, dim_h, latent_dims, heads=[8,1]):  
@@ -127,6 +128,25 @@ class VariationalAutoencoder(nn.Module):
     
 
 
+def tensor_to_csv(data, labels):
+    final_data = []
+    for i, batch in enumerate(data):
+        batch_array = batch.tolist()
+        #Add 2 0s for instance and no-in-sequence, they are discarded before NN use 
+        #anyway 
+        final_row = [0,0, labels[i].item()]
+
+        #Append each node individually to the row
+        for j, arr in enumerate(batch_array):
+            final_row.append(arr)
+
+        #print("final row: ", final_row)
+        final_data.append(final_row)
+        
+    return final_data
+        
+
+
 ### Training function
 def train_epoch(vae, device, dataloader, optimizer):
     # Set train mode for both the encoder and the decoder
@@ -154,21 +174,28 @@ def train_epoch(vae, device, dataloader, optimizer):
 
 
 ### Testing function
-def test_epoch(vae, device, dataloader):
+def test_epoch(vae, device, dataloader, joint_output):
     # Set evaluation mode for encoder and decoder
     vae.eval()
     val_loss = 0.0
+    encoded_dataset = []
+    labels = []
     with torch.no_grad(): # No need to track the gradients
         for x in dataloader:
             # Move tensor to the proper device
             x = x.to(device)
             # Encode data
+            print("data : ", x)
             encoded_data = vae.encoder(x.x, x.edge_index, x.batch)
+            encoded_dataset.append(encoded_data)
+            labels.append(x.y)
             # Decode data
             x_hat = vae(x.x, x.edge_index, x.batch)
             loss = ((x.x - x_hat)**2).sum()# + vae.encoder.kl
             val_loss += loss.item()
 
+    #Save lower dimensional embedding as it's own dataset
+    Utilities.save_dataset(tensor_to_csv(encoded_dataset, labels), joint_output)
     return val_loss / len(dataloader.dataset)
 
 

@@ -85,8 +85,8 @@ def create_dataloaders(dataset, train = 0.8, val = 0.9, test = 0.9, batch_size =
         #print("train loader: ", len(train_loader))
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-        return train_loader, val_loader, test_loader, test_dataset
+        whole_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+        return train_loader, val_loader, test_loader, whole_loader
 
 def numericalSort(value):
     numbers = re.compile(r'(\d+)')
