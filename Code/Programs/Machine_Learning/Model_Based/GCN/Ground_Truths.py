@@ -69,7 +69,7 @@ def assess_data(dataset):
     plot_graph(data)
 
 
-def create_dataloaders(dataset, train = 0.8, val = 0.9, test = 0.9):
+def create_dataloaders(dataset, train = 0.8, val = 0.9, test = 0.9, batch_size = 1):
         # Create training, validation, and test sets
         print("created dataloader lengths: {} : {} : {}".format(len(dataset),int(len(dataset)*train), int(len(dataset)*val) - int(len(dataset)*train) ))
         train_dataset = dataset[:int(len(dataset)*train)]
@@ -81,10 +81,10 @@ def create_dataloaders(dataset, train = 0.8, val = 0.9, test = 0.9):
         print(f'Test set       = {len(test_dataset)} graphs')
 
         # Create mini-batches
-        train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True )
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True )
         #print("train loader: ", len(train_loader))
-        val_loader = DataLoader(val_dataset, batch_size=64, shuffle=True)
-        test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
         return train_loader, val_loader, test_loader, test_dataset
 

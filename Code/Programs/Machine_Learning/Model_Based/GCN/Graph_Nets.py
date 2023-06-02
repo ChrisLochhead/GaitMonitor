@@ -17,52 +17,58 @@ joint_connections = [[15, 13], [13, 11], # left foot to hip
 
 class GAT(torch.nn.Module):
     """Graph Attention Network"""
-    def __init__(self, dim_in, dim_h, dim_out, heads=8, n_layers = 3):
+    def __init__(self, dim_in, dim_h, dim_out, heads=[8,1,1,1], n_layers = 4):
         super().__init__()
-        self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads)
-        self.gat2 = GATv2Conv(dim_h*heads, dim_h, heads=1)
-        self.gat3 = GATv2Conv(dim_h, dim_h, heads=1)
+        self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads[0])
+        self.gat2 = GATv2Conv(dim_h*heads[0], dim_h, heads=heads[1])
+        self.gat3 = GATv2Conv(dim_h*heads[1], dim_h, heads=heads[2])
+        self.gat4 = GATv2Conv(dim_h*heads[2], dim_h, heads=heads[3])
         self.optimizer = torch.optim.Adam(self.parameters(),
                                           lr=0.005,
                                           weight_decay=5e-4)
         
 
-        result = ((n_layers -1) * dim_h) + (dim_h * heads)
-        print("RESULTAT: ", result)
+        out = ((n_layers -1) * dim_h) + (dim_h * heads[0])
 
 
+        #for layer in range(n_layers-1)
 
 
-        self.lin1 = Linear(result, result)
-        self.lin2 = Linear(result, dim_out)
+        self.lin1 = Linear(out, out)
+        self.lin2 = Linear(out, dim_out)
 
     def forward(self, x, edge_index, batch):
         x = x.to("cuda")
         edge_index = edge_index.to("cuda")
         batch = batch.to("cuda")
-        print("original : ", x.shape)
+        #print("original : ", x.shape)
         h1 = F.dropout(x, p=0.6, training=self.training)
-        print("pos a : ", h1.shape)
+        #print("pos a : ", h1.shape, type(self.gat1))
         h1 = self.gat1(h1, edge_index)
         h1 = F.elu(h1)
-        print("pos b : ", h1.shape)
+        #print("pos b : ", h1.shape)
 
         h2 = F.dropout(h1, p=0.6, training=self.training)
         h2 = self.gat2(h2, edge_index)
-        print("pos c: ", h2.shape)
+        #print("pos c: ", h2.shape)
 
         h3 = F.dropout(h2, p=0.6, training=self.training)
         h3 = self.gat3(h3, edge_index)
-        print("pos d: ", h3.shape)
+        #print("pos d: ", h3.shape)
+
+        h4 = F.dropout(h3, p=0.6, training=self.training)
+        h4 = self.gat3(h4, edge_index)
+        #print("pos e: ", h4.shape)
 
         # Graph-level readout
         h1 = global_add_pool(h1, batch)
         h2 = global_add_pool(h2, batch)
         h3 = global_add_pool(h3, batch)
+        h4 = global_add_pool(h4, batch)
 
         # Concatenate graph embeddings
-        print("sizes: ", h1.shape, h2.shape, h3.shape)
-        h = torch.cat((h1, h2, h3), dim=1)
+        #print("sizes: ", h1.shape, h2.shape, h3.shape, h4.shape)
+        h = torch.cat((h1, h2, h3, h4), dim=1)
 
         # Classifier
         h = self.lin1(h)
@@ -183,7 +189,6 @@ def train(model, loader, val_loader, test_loader):
         print("data loader info: ")
         for data in loader:
             optimizer.zero_grad()
-            #print("data : ", data, type(data))
             data = data.to("cuda")
             h, out = model(data.x, data.edge_index, data.batch)
 

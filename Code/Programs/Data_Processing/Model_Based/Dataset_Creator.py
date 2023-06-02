@@ -7,6 +7,52 @@ import math
 import numpy as np
 import copy 
 
+from sklearn.preprocessing import normalize
+
+def normalize_values(data, joint_output):
+    data, _ = Utilities.process_data_input(data, None)
+    meta_data = []
+    joint_data = []
+
+    for i, column in enumerate(zip(*data)): 
+        if i < 3: 
+            meta_data.append(column)
+        else:
+            print("column before: ", len(column), len(column[0]))
+            normed_matrix = normalize(column, axis=1, norm='l2')  
+            print("column after: ", len(normed_matrix), len(normed_matrix[0]))
+            joint_data.append(normed_matrix)
+            #print("lens: ", len(normed_matrix), len(column), len(column[0]))
+
+    transposed_joints = []
+    for index, j in enumerate(zip(*joint_data)):
+        transposed_joints.append(j)
+
+    joint_data = transposed_joints
+    print("joint data info: ", len(joint_data), len(joint_data[0]), len(joint_data[0][0]))
+    meta_data = np.transpose(meta_data)
+
+    final = []
+    print("meta data shape: ", len(meta_data), len(meta_data[1]))
+    for j, col in enumerate(meta_data):
+        final_row = list(col)
+        for coords in joint_data[j]:
+            #Fix the formatting before saving it 
+            refactored_coords = []
+            for c in coords:
+                refactored_coords.append(c)
+            final_row.append(refactored_coords)
+
+        final.append(final_row)
+   
+
+    print("joints: ", len(final))
+    print("joints dimensions: ", len(final[0]))
+    print(len(final[0][4]))
+
+    Utilities.save_dataset(final, joint_output) 
+    return final
+
 def combine_datasets(rel_data, vel_data, angle_data, images, joints_output):
     print("Combining datasets...")
     rel_data, images = Utilities.process_data_input(rel_data, images)
@@ -20,7 +66,9 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joints_output):
         for j, joint in enumerate(row):
             if j > 2:
                 #print("row before: ", combined_row[0:5])
-                combined_row.append([joint, vel_data[i][j], [0,0,angle_data[i][j]]])
+                combined_row.append([joint[0], joint[1], joint[2],
+                                     vel_data[i][j][0], vel_data[i][j][1], vel_data[i][j][2], 
+                                     angle_data[i][j][0], angle_data[i][j][1], angle_data[i][j][2] ])
                 #print("row after: ", combined_row[0:5])
         
         #print("final combined row: ", combined_row[0:5])
@@ -98,6 +146,7 @@ def assign_class_labels(num_switches, num_classes, joint_file, joint_output):
 def process_empty_frames(joint_file, image_file, joint_output, image_output):
     print("\nProcessing Empty frames...")
     joint_data, image_data = Utilities.process_data_input(joint_file, image_file)
+    print("LENS: ", len(joint_data), len(image_data))
     joint_data, image_data = Data_Correction.remove_empty_frames(joint_data, image_data)
     Utilities.save_dataset(joint_data, joint_output)
     Utilities.save_images(joint_data, image_data, image_output)

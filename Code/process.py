@@ -13,6 +13,8 @@ import torch_geometric
 import tqdm
 import torch_geometric.transforms as T
 from Programs.Machine_Learning.Model_Based.GCN.Graph_Nets import GCN, GIN, GAT, train, accuracy
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 def main():
 
     #Experimental creating hand crafted features
@@ -26,9 +28,9 @@ def main():
 
     
     #Sort class labels (for 0ffice Images_chris this is 20-0, 20-1, 20-2)
-    abs_joint_data = Creator.assign_class_labels(num_switches=20, num_classes=2, 
-                                    joint_file="./Code/Datasets/Joint_Data/Office_Dataset/Absolute_Data.csv",
-                                    joint_output="./Code/Datasets/Joint_Data/Office_Dataset/1_Absolute_Data(classes applied).csv")
+    #abs_joint_data = Creator.assign_class_labels(num_switches=20, num_classes=2, 
+    #                                joint_file="./Code/Datasets/Joint_Data/Office_Dataset/Absolute_Data.csv",
+    #                                joint_output="./Code/Datasets/Joint_Data/Office_Dataset/1_Absolute_Data(classes applied).csv")
     
     #Display first 2 instances of results 
     #print("\nStage 1: ")
@@ -51,6 +53,8 @@ def main():
                                                         joint_output="./Code/Datasets/Joint_Data/Office_Dataset/3_Absolute_Data(trimmed instances).csv",
                                                         image_output="./Code/Datasets/Office_Dataset/3_Trimmed Instances/", trim = 5)
 
+    abs_norm_data = Creator.normalize_values(abs_joint_data, 
+                                             joint_output="./Code/Datasets/Joint_Data/Office_Dataset/3_Absolute_Data(normed).csv")
     print("\nStage 3: ")
     #render_joints_series(image_data, abs_joint_data, size=10)
 
@@ -129,6 +133,9 @@ def main():
     #Combine datasets (relative, velocity, joint angles, regions)
     combined_data = Creator.combine_datasets(relative_joint_data, velocity_data, joint_bones_data, image_data,
                                              joints_output="./Code/Datasets/Joint_Data/Office_Dataset/15_Combined_Data.csv")
+    
+    combined_norm_data = Creator.normalize_values(combined_data, 
+                                             joint_output="./Code/Datasets/Joint_Data/Office_Dataset/15.5_Combined_Data(normed).csv")
 
     print("\nStage 14:")
     #Create regions data of combined data
@@ -147,12 +154,32 @@ def process_autoencoder():
 
    
     #Create dataset
-    dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/', '3_Absolute_Data(trimmed instances).csv').shuffle()
+    dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/', '3_Absolute_Data(normed).csv').shuffle()
     #GT.assess_data(dataset)
 
     train_loader, val_loader, test_loader, _ = GT.create_dataloaders(dataset)
+    
+    
+    torch.manual_seed(0)
+    d = 3
+    vae = GAE.VariationalAutoencoder(dim_in=dataset.num_node_features, dim_h=64, latent_dims=d)
+    lr = 1e-3 #originally 3
+    optim = torch.optim.Adam(vae.parameters(), lr=lr, weight_decay=1e-7) # originally 5
+    print(f'Selected device: {device}')
+    vae.to(device)
+    vae.eval()
+    num_epochs = 1
 
-    #Define model
+
+    for epoch in range(num_epochs):
+        train_loss = GAE.train_epoch(vae,device,train_loader,optim)
+        val_loss = GAE.test_epoch(vae,device,val_loader)
+        print('\n EPOCH {}/{} \t train loss {:.3f} \t val loss {:.3f}'.format(epoch + 1, num_epochs,train_loss,val_loss))
+
+
+    train_loader, val_loader, test_loader, _ = GT.create_dataloaders(dataset, batch_size=64)
+
+    #Define model GCNs
     print("Creating model: ")
     gcn_model = GCN(dim_in = dataset.num_node_features, dim_h=16, dim_out=3)
     gcn_model = gcn_model.to("cuda")

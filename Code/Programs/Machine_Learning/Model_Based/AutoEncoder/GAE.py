@@ -17,117 +17,113 @@ import plotly.express as px
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 class VariationalEncoder(nn.Module):
-    def __init__(self, dim_in, dim_h, latent_dims, heads=8):  
+    def __init__(self, dim_in, dim_h, latent_dims, heads=[8,1]):  
         super(VariationalEncoder, self).__init__()
-        self.conv1 = GATv2Conv(dim_in, dim_h, heads=heads)
-        self.conv2 = GATv2Conv(dim_in, dim_h, heads=heads)
-        #self.conv1 = nn.Conv2d(1, 8, 3, stride=2, padding=1)
-        #self.conv2 = nn.Conv2d(8, 16, 3, stride=2, padding=1)
-        self.batch2 = nn.BatchNorm2d(16)
+        #self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads[0])
+        #self.gat2 = GATv2Conv(dim_h*heads[0], dim_h, heads=heads[1])
+        self.gcn1 = GCNConv(dim_in, dim_h)
+        #self.gcn2 = GCNConv(dim_h, dim_h)
 
-        self.conv3 = GATv2Conv(dim_in, dim_h, heads=heads)
-        #self.conv3 = nn.Conv2d(16, 32, 3, stride=2, padding=0) 
-        #  
-        self.linear1 = nn.Linear(3*3*32, 128)
-        self.linear2 = nn.Linear(128, latent_dims)
-        self.linear3 = nn.Linear(128, latent_dims)
+        self.linear1 = nn.Linear(dim_h, latent_dims)# int(dim_h/2))
+        #self.linear2 = nn.Linear(int(dim_h/2), latent_dims)
+        self.linear3 = nn.Linear(latent_dims, latent_dims)
+        self.linear4 = nn.Linear(latent_dims, latent_dims)
 
+        # hack to get sampling on the GPU
         self.N = torch.distributions.Normal(0, 1)
-        self.N.loc = self.N.loc.cuda() # hack to get sampling on the GPU
+        self.N.loc = self.N.loc.cuda()
         self.N.scale = self.N.scale.cuda()
         self.kl = 0
+        #########################################################
 
-    def forward(self, x, edge_index):
-        #THIS IS THE STANDARD GCN FORWARD FUNCTION
-        # Node embeddings
+    def forward(self, x, edge_index, batch):
         x = x.to("cuda")
         edge_index = edge_index.to("cuda")
         batch = batch.to("cuda")
 
-        h1 = self.gcn1(x, edge_index)
-        h2 = self.gcn2(h1, edge_index)
+        #print("x: ", x.shape)
+        #g1 = F.dropout(x, p=0.6, training=self.training)
+        g1 = self.gcn1(x, edge_index)
 
-        # Graph-level readout
-        h1 = global_add_pool(h1, batch)
-        h2 = global_add_pool(h2, batch)
-        # Concatenate graph embeddings
-        h = torch.cat((h1, h2), dim=1)
 
-        x = torch.flatten(h, start_dim=1)
-        x = F.relu(self.linear1(x))
-        mu =  self.linear2(x)
-        sigma = torch.exp(self.linear3(x))
+        #print("h1: ", g1.shape)
+
+        #g2 = F.dropout(g1, p=0.6, training=self.training)
+        #g2 = self.gcn2(g2, edge_index)
+
+        #print("h2: ", g2.shape)
+
+
+        l1 = self.linear1(g1)
+        #print("l1: ", l1.shape)
+
+        #l2 = self.linear2(l1)
+        #print("l2", l2.shape)
+
+        l3 = self.linear3(l1)
+        #print("l3", l3.shape)
+    
+        mu =  self.linear4(l3)
+        sigma = torch.exp(self.linear4(l3))
         z = mu + sigma*self.N.sample(mu.shape)
         self.kl = (sigma**2 + mu**2 - torch.log(sigma) - 1/2).sum()
-        return z      
-        # Classifier
-        #print("H dimensions: ", h.shape)
-        h = self.lin1(h)
-        h = h.relu()
-        h = F.dropout(h, p=0.5, training=self.training)
-        h = self.lin2(h)
-
-        return h, F.log_softmax(h, dim=1)
-        #This is the original GAE FORWARD
-        '''
-        x = x.to(device)
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.batch2(self.conv2(x)))
-        x = F.relu(self.conv3(x))
-        x = torch.flatten(x, start_dim=1)
-        x = F.relu(self.linear1(x))
-        mu =  self.linear2(x)
-        sigma = torch.exp(self.linear3(x))
-        z = mu + sigma*self.N.sample(mu.shape)
-        self.kl = (sigma**2 + mu**2 - torch.log(sigma) - 1/2).sum()
-        return z      
-'''
+        return l3 #z      
 
 
 
 class Decoder(nn.Module):
     
-    def __init__(self, latent_dims):
+    def __init__(self, latent_dims, out, dim_in, dim_h, heads=[8,1]):
         super().__init__()
 
-        self.decoder_lin = nn.Sequential(
-            nn.Linear(latent_dims, 128),
-            nn.ReLU(True),
-            nn.Linear(128, 3 * 3 * 32),
-            nn.ReLU(True)
-        )
+        self.linear1 = nn.Linear(latent_dims, latent_dims)
+        #self.linear2 = nn.Linear(latent_dims, int(dim_h/2))
+        self.linear3 = nn.Linear(latent_dims, dim_h)#int(dim_h/2), dim_h)
 
-        self.unflatten = nn.Unflatten(dim=1, unflattened_size=(32, 3, 3))
+        #If I transpose these the thing will work
+        #self.gat1 = GATv2Conv(dim_h, dim_h*heads[0], heads=heads[1])
+        #self.gat2 = GATv2Conv(dim_h, dim_in, heads=heads[0])
+        #self.gcn1 = GCNConv(dim_h, dim_h)
+        self.gcn2 = GCNConv(dim_h, dim_in)
 
-        self.decoder_conv = nn.Sequential(
-            nn.ConvTranspose2d(32, 16, 3, stride=2, output_padding=0),
-            nn.BatchNorm2d(16),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(16, 8, 3, stride=2, padding=1, output_padding=1),
-            nn.BatchNorm2d(8),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(8, 1, 3, stride=2, padding=1, output_padding=1)
-        )
         
-    def forward(self, x):
-        x = self.decoder_lin(x)
-        x = self.unflatten(x)
-        x = self.decoder_conv(x)
-        x = torch.sigmoid(x)
-        return x
+    def forward(self, x, edge_index, batch):
+        x = x.to("cuda")
+        edge_index = edge_index.to("cuda")
+        batch = batch.to("cuda")
+
+        #print("output ", x.shape)
+        #This is 64,9
+        l1 = self.linear1(x)
+        #print("after l3: ", l1.shape)
+        #l2 = self.linear2(l1)
+        #This should be 1088, 16?
+        #print("after l2", l2.shape)
+        l3 = self.linear3(l1)
+        #print("after l1", l3.shape)
+
+        #g1 = self.gcn1(l3, edge_index)
+        #print("after g2", l3.shape)
+
+        g2 = self.gcn2(l3, edge_index)
+        #print("after g1, this should be [18,9]: ", g2.shape)
+
+        return g2#torch.sigmoid(h2)      #This is sigmoided for some reason?
+
     
 
 
 class VariationalAutoencoder(nn.Module):
     def __init__(self, dim_in, dim_h, latent_dims):
         super(VariationalAutoencoder, self).__init__()
+        #Default heads
         self.encoder = VariationalEncoder(dim_in, dim_h, latent_dims)
-        self.decoder = Decoder(latent_dims)
+        self.decoder = Decoder(latent_dims, latent_dims, dim_in, dim_h)
 
-    def forward(self, x, edge_index):
+    def forward(self, x, edge_index, batch):
         x = x.to(device)
-        z = self.encoder(x, edge_index)
-        return self.decoder(z)
+        z = self.encoder(x, edge_index, batch)
+        return self.decoder(z, edge_index, batch)
     
 
 
@@ -137,19 +133,20 @@ def train_epoch(vae, device, dataloader, optimizer):
     vae.train()
     train_loss = 0.0
     # Iterate the dataloader (we do not need the label values, this is unsupervised learning)
-    for x in dataloader: 
+    for i, x in enumerate(dataloader): 
         # Move tensor to the proper device
         x = x.to(device)
-        x_hat = vae(x.x, x.edge_index)
+        x_hat = vae(x.x, x.edge_index, x.batch)
         # Evaluate loss
-        loss = ((x - x_hat)**2).sum() + vae.encoder.kl
+        loss = ((x.x - x_hat)**2).sum()# + vae.encoder.kl
 
         # Backward pass
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         # Print batch loss
-        print('\t partial train loss (single batch): %f' % (loss.item()))
+        #if i % 100 == 0:
+        #    print('\t partial train loss (single batch): %f' % (loss.item()))
         train_loss+=loss.item()
 
     return train_loss / len(dataloader.dataset)
@@ -162,14 +159,14 @@ def test_epoch(vae, device, dataloader):
     vae.eval()
     val_loss = 0.0
     with torch.no_grad(): # No need to track the gradients
-        for x, _ in dataloader:
+        for x in dataloader:
             # Move tensor to the proper device
             x = x.to(device)
             # Encode data
-            encoded_data = vae.encoder(x)
+            encoded_data = vae.encoder(x.x, x.edge_index, x.batch)
             # Decode data
-            x_hat = vae(x)
-            loss = ((x - x_hat)**2).sum() + vae.encoder.kl
+            x_hat = vae(x.x, x.edge_index, x.batch)
+            loss = ((x.x - x_hat)**2).sum()# + vae.encoder.kl
             val_loss += loss.item()
 
     return val_loss / len(dataloader.dataset)
@@ -208,29 +205,7 @@ def show_image(img):
 
 def run_VAE(train_loader, val_loader, test_dataset):
 
-    data_dir = 'dataset'
-
-    #train_dataset = torchvision.datasets.MNIST(data_dir, train=True, download=True)
-    #test_dataset  = torchvision.datasets.MNIST(data_dir, train=False, download=True)
-
-    transform = transforms.Compose([
-    transforms.ToTensor(),
-    ])
-
-    #dataset.transform = transform
-    #test_dataset.transform = test_transform
-
-    #m=len(dataset)
-
-    #train_data, val_data = random_split(train_dataset, [int(m-m*0.2), int(m*0.2)])
-    #batch_size=10#256
-
-    #train_loader = torch.utils.data.DataLoader(train_data, batch_size=batch_size)
-    #valid_loader = torch.utils.data.DataLoader(val_data, batch_size=batch_size)
-    #test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size,shuffle=True)
-
     ### Set the random seed for reproducible results
-    torch.manual_seed(0)
     d = 9
     vae = VariationalAutoencoder(dim_in=3, dim_h=16, latent_dims=d)
     lr = 1e-3 
@@ -244,7 +219,6 @@ def run_VAE(train_loader, val_loader, test_dataset):
         train_loss = train_epoch(vae,device,train_loader,optim)
         val_loss = test_epoch(vae,device,val_loader)
         print('\n EPOCH {}/{} \t train loss {:.3f} \t val loss {:.3f}'.format(epoch + 1, num_epochs,train_loss,val_loss))
-        plot_ae_outputs(vae.encoder,vae.decoder,n=10, test_dataset=test_dataset)
 
     with torch.no_grad():
 
