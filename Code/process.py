@@ -7,6 +7,7 @@ import Programs.Machine_Learning.Model_Based.AutoEncoder.GAE as GAE
 import Programs.Machine_Learning.Model_Based.GCN.Dataset_Obj as Dataset_Obj
 import Programs.Machine_Learning.Model_Based.GCN.Ground_Truths as GT
 import Programs.Machine_Learning.Model_Based.GCN.Utilities as Graph_Utils
+import Programs.Data_Processing.Model_Based.Render as Render
 import torch
 import torch.nn as nn
 import torch_geometric
@@ -152,71 +153,101 @@ def process_autoencoder():
     print(f"Cuda available: {torch.cuda.is_available()}")
     print(f"Torch geometric version: {torch_geometric.__version__}")
 
-   
-    #Create dataset
-    dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/', '15.5_Combined_Data(normed).csv').shuffle()
-    #GT.assess_data(dataset)
+    #Upper and lower region dataset
+    lower_dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_bottom/', '16_Combined_Data_2Region_bottom.csv',
+                                              joint_connections=Render.bottom_joint_connection).shuffle()
+    dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/15.5_Combined_Data(normed)/', '15.5_Combined_Data(normed).csv',
+                                       joint_connections=Render.joint_connections_m_hip).shuffle()
+    upper_dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_top/', '16_Combined_Data_2Region_top.csv',
+                                             joint_connections=Render.top_joint_connections).shuffle()
 
-    train_loader, val_loader, test_loader, whole = GT.create_dataloaders(dataset)
+    print(dataset[0])
+    print(upper_dataset[0])
+    print(lower_dataset[0])
+
+    #train_loader, val_loader, test_loader, whole = GT.create_dataloaders(dataset)
+
+    encoded_datasets = {'normal' : [dataset, "15.5_Combined_Data(normed)" ], 
+                        'upper' : [upper_dataset, "16_Combined_Data_2Region_top"],
+                        'lower' : [lower_dataset, "16_Combined_Data_2Region_bottom"]}
     
+    skeleton_sizes = [17, 10, 6]
+
+    #torch.manual_seed(0)
+    num_epochs = 100
+    #Upper Region Dataset
     
-    torch.manual_seed(0)
-    d = 3
-    vae = GAE.VariationalAutoencoder(dim_in=dataset.num_node_features, dim_h=64, latent_dims=d)
-    lr = 1e-3 #originally 3
-    optim = torch.optim.Adam(vae.parameters(), lr=lr, weight_decay=1e-7) # originally 5
-    print(f'Selected device: {device}')
-    vae.to(device)
-    vae.eval()
-    num_epochs = 10
+    for index, (key, value) in enumerate(encoded_datasets.items()):
+        if index > -1:
+            vae = GAE.VariationalAutoencoder(dim_in=value[0].num_node_features, dim_h=128, latent_dims=3)
+            print("dim in: ", value[0].num_node_features)
+            optim = torch.optim.Adam(vae.parameters(), lr=1e-3, weight_decay=1e-5) # originally 5
+            vae.to(device)
+            vae.eval()
+            for epoch in range(num_epochs):
+                train_loader, _, test_loader, whole = GT.create_dataloaders(value[0], batch_size=16)
+                train_loss = GAE.train_epoch(vae,device,train_loader,optim)
+                #Get embedding of entire dataset and save it
+                val_loss = GAE.test_epoch(vae,device,whole, './Code/Datasets/Joint_Data/Office_Dataset/' + str(value[1]) + '/encoded/raw/encoded.csv', 
+                                        skeleton_size = skeleton_sizes[index])
+                print('\n EPOCH {}/{} \t train loss {:.3f} \t val loss {:.3f}'.format(epoch + 1, num_epochs,train_loss,val_loss))
 
 
-    for epoch in range(num_epochs):
-        train_loss = GAE.train_epoch(vae,device,train_loader,optim)
-        #Get embedding of entire dataset and save it
-        val_loss = GAE.test_epoch(vae,device,whole, './Code/Datasets/Joint_Data/Office_Dataset/raw/encoded_data.csv')
-        print('\n EPOCH {}/{} \t train loss {:.3f} \t val loss {:.3f}'.format(epoch + 1, num_epochs,train_loss,val_loss))
+    print("Autoencoding completing: Merging top and bottom datasets...")
 
-    encoded_dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/', 'encoded_data.csv').shuffle()
-    train_loader, val_loader, test_loader, _ = GT.create_dataloaders(encoded_dataset, batch_size=64)
+    encoded_dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/15.5_Combined_Data(normed)/encoded/', 'encoded.csv',
+                                                joint_connections=Render.joint_connections_m_hip).shuffle()
+    encoded_upper = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_top/encoded/', 'encoded.csv',
+                                              joint_connections=Render.top_joint_connections).shuffle()
+    encoded_lower = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_bottom/encoded/', 'encoded.csv',
+                                              joint_connections=Render.bottom_joint_connection).shuffle()
+    
+    print("all encoded datasets loaded sucessfully. ")
+    
+    #Combine
+    #Read both in as csv, append together, resacve, load result and joint dataset
+    upper_array  = Utilities.load('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_top/encoded/raw/encoded.csv', metadata=True, 
+                                  colnames = Utilities.colnames_top)
+    lower_array = Utilities.load('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_bottom/encoded/raw/encoded.csv', metadata=True,
+                                 colnames = Utilities.colnames_bottom)
 
-    #Define model GCNs
+    concatenated_regions = []
+    for i, row in enumerate(upper_array):
+        print("row: ", type(row), len(row), len(lower_array[i]), type(lower_array[i]))
+        concat_row = list(row)
+        for j, low_arr in enumerate(lower_array[i]):
+            if j > 2:
+                concat_row.append(low_arr)
+        concatenated_regions.append(concat_row)
+        print("lens: ", len(row), len(lower_array[i]), len(concatenated_regions[i]))
+    
+    Utilities.save_dataset(concatenated_regions, './Code/Datasets/Joint_Data/Office_Dataset/18_encoded_concat_2region/raw/encoded_concat_2region.csv')
+    print("Concatenation sucessful...")
+
+
+
+def run_gat():
+
+    encoded_2region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
+                                              joint_connections=Render.bottom_joint_connection).shuffle()
+    
+    print("concatenated dataset loaded sucessfully...")
+    
     print("Creating model: ")
-    #gcn_model = GCN(dim_in = dataset.num_node_features, dim_h=16, dim_out=3)
-    #gcn_model = gcn_model.to("cuda")
-
-    gat_model = GAT(dim_in = encoded_dataset.num_node_features, dim_h=16, dim_out=3)
+    gat_model = GAT(dim_in = encoded_2region.num_node_features, dim_h=128, dim_out=3)
     gat_model = gat_model.to("cuda")
-    #gin_model = GIN(dim_h=16, dataset=dataset)
-    #Train model
-    #embeddings, losses, accuracies, outputs, hs = model.train(model, criterion, optimizer, data)
-    #print("GCN MODEL")
-    #model, embeddings, losses, accuracies, outputs, hs = train(gcn_model, train_loader, val_loader, test_loader)
+
     print("GAT MODEL") 
-    model, embeddings, losses, accuracies, outputs, hs = train(gat_model, train_loader, val_loader, test_loader)
-    #print("GIN MODEL")
-    #model, embeddings, losses, accuracies, outputs, hs = train(gin_model, train_loader, val_loader, test_loader)
+    train_val_dataset = encoded_2region[:int(len(encoded_2region)*0.9)]
+    test_dataset  = encoded_2region[int(len(encoded_2region)*0.9):]
+    train_score, val_scores, test_scores = GAE.cross_valid(gat_model, test_dataset, dataset=train_val_dataset, k_fold=5)
 
-    # Train TSNE
-    '''
-    tsne = TSNE(n_components=2, learning_rate='auto',
-            init='pca').fit_transform(embeddings[7].detach())
-
-    # Plot TSNE
-    plt.figure(figsize=(10, 10))
-    plt.axis('off')
-    plt.scatter(tsne[:, 0], tsne[:, 1], s=50, c=dataset[7].y)
-    plt.show()
-    '''
-
-    #Animate results
-    print("training complete, animating")
-    fig = plt.figure(figsize=(12, 12))
-    ax = fig.add_subplot(projection='3d')
-    run_3d_animation(fig, (embeddings, dataset, losses, accuracies, ax, train_loader))
-
+    print("final results: ")
+    for i, score in enumerate(train_score):
+        print("score {:.2f}: training: {:.2f}, validation: {:.2f}, test: {:.2f}".format(i, score, val_scores[i], test_scores[i]))
 
 if __name__ == '__main__':
     #Main menu
-    process_autoencoder()
+    #process_autoencoder()
+    run_gat()
     #main()

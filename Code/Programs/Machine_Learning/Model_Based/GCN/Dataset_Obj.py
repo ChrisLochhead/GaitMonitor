@@ -5,25 +5,19 @@ from torch_geometric.data import Data
 from torch_geometric.data import Dataset
 import os
 from tqdm import tqdm
-
-joint_connections = [[15, 13], [13, 11], # left foot to hip 
-                     [16, 14], [14, 12], # right foot to hip
-                     [11, 0], [12, 0], # hips to origin
-                     [9, 7], [7, 5], # left hand to shoulder
-                     [10, 8], [6, 8], #right hand to shoulder
-                     [5, 0], [6, 0], # Shoulders to origin
-                     [1, 3], [2, 4], # ears to eyes
-                     [3, 0], [4, 0],
-                     [5, 6], [11, 12]]# shoulders connected, hips connected
+from torchvision import transforms
+import Programs.Data_Processing.Model_Based.Render as Render
 
 class JointDataset(Dataset):
-    def __init__(self, root, filename, test=False, transform=None, pre_transform=None):
+    def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
         """
         self.test = test
         self.filename = filename
+        self.transform = transforms.Compose([transforms.ToTensor()])
+        self.joint_connections = joint_connections
         super(JointDataset, self).__init__(root, transform, pre_transform)
         
     @property
@@ -52,7 +46,7 @@ class JointDataset(Dataset):
     def process(self):
         self.data = pd.read_csv(self.raw_paths[0], header=None)#.reset_index()
         self.data = convert_to_literals(self.data)
-        coo_matrix = get_COO_matrix()
+        coo_matrix = get_COO_matrix(self.joint_connections)
 
         for index, row in tqdm(self.data.iterrows(), total=self.data.shape[0]):
             # Featurize molecule
@@ -84,9 +78,10 @@ class JointDataset(Dataset):
                                  f'data_{idx}.pt'))        
         return data
 
-def get_COO_matrix():
+def get_COO_matrix(connections):
   res = [[],[]]
-  for connection in joint_connections:
+  print("connections: ", len(connections))
+  for connection in connections:
     #Once for each of the 3 coords in each connection
     for i in range(0, 3):
         res[0] += [connection[0], connection[1]]

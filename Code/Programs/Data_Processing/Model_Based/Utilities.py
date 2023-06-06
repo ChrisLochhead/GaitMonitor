@@ -46,6 +46,12 @@ colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','
 colnames_midhip = ['Instance', 'No_In_Sequence', 'Class', 'Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
     'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', "M_hip"] 
 
+colnames_top = ['Instance', 'No_In_Sequence', 'Class', 'Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
+    'L_elbow','R_elbow','L_hand','R_hand'] 
+
+colnames_bottom = ['Instance', 'No_In_Sequence', 'Class', 'L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', "M_hip"] 
+
+
 hcf_colnames = ["Instance", "No_In_Sequence", "Class", "Feet_Height_0", "Feet_Height_1",
                  "Time_LOG_0", "Time_LOG_1", "Time_No_Movement", "Speed", "Stride_Gap", "Stride_Length", "Max_Gap", 'l_co 1',
                  'l_co 2', 'l_co 3', 'l_co 4', 'l_co 5', 'l_co 6', 'l_co 7', 'r_co 1', 'r_co 2', 'r_co 3', 'r_co 4', 'r_co 5', 'r_co 6', 'r_co 7']
@@ -272,9 +278,9 @@ def split_by_class(data):
     return regular, limp, stagger
            
 
-def process_data_input(joint_source, image_source, ignore_depth = True):
+def process_data_input(joint_source, image_source, ignore_depth = True, cols = colnames_midhip):
     if isinstance(joint_source, str):
-        joints = load(joint_source)
+        joints = load(joint_source, colnames=cols)
     else:
         joints = joint_source
     
@@ -309,9 +315,13 @@ def convert_to_sequences(abs_data):
 
 def save_dataset(data, name, colnames = colnames):
     print("Saving joints")
-    #Check if midhip has been added yet
+    #Check for dataset type
     if len(data[0]) == 21:
         colnames = colnames_midhip
+    elif len(data[0]) == 10:
+        colnames = colnames_bottom
+    elif len(data[0]) == 14:
+        colnames = colnames_top
 
     new_dataframe = pd.DataFrame(data, columns = colnames)
     #Convert to dataframe 
@@ -491,15 +501,13 @@ def save(joints, name):
                 row = [ round(elem, 4) for elem in list ]
                 writer.writerow(row)
 
-def load(file = "image_data.csv"):
+def load(file = "image_data.csv", metadata = True, colnames = colnames_midhip):
     joints = []
     #Load in as a pandas dataset
-    colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','Joint_4','Joint_5','Joint_6','Joint_7',
-          'Joint_8','Joint_9','Joint_10','Joint_11','Joint_12','Joint_13','Joint_14','Joint_15','Joint_16', 'Joint_17'] 
     dataset = pd.read_csv(file, names=colnames, header=None)
 
     #Convert all data to literals
-    dataset = convert_to_literals(dataset)
+    dataset = convert_to_literals(dataset, metadata)
 
     #Convert to 2D array 
     joints = dataset.to_numpy()
@@ -507,13 +515,13 @@ def load(file = "image_data.csv"):
     return joints
 
 
-def convert_to_literals(data):
+def convert_to_literals(data, metadata = True):
     for i,  (index, row) in enumerate(data.iterrows()):
         for col_index, col in enumerate(row):
-            if col_index >= 3:
+            if col_index >= 3 and metadata == True or metadata == False:
                 tmp = ast.literal_eval(row[col_index])
                 data.iat[i, col_index] = copy.deepcopy(tmp)
             else:
-                data.iat[i, col_index] = int(data.iat[i, col_index])
+                data.iat[i, col_index] = float(data.iat[i, col_index])
 
     return data

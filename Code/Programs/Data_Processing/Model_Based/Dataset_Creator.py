@@ -10,7 +10,7 @@ import copy
 from sklearn.preprocessing import normalize
 
 def normalize_values(data, joint_output):
-    data, _ = Utilities.process_data_input(data, None)
+    data, _ = Utilities.process_data_input(data, None, cols=Utilities.colnames)
     meta_data = []
     joint_data = []
 
@@ -145,7 +145,7 @@ def assign_class_labels(num_switches, num_classes, joint_file, joint_output):
 
 def process_empty_frames(joint_file, image_file, joint_output, image_output):
     print("\nProcessing Empty frames...")
-    joint_data, image_data = Utilities.process_data_input(joint_file, image_file)
+    joint_data, image_data = Utilities.process_data_input(joint_file, image_file, cols=Utilities.colnames)
     print("LENS: ", len(joint_data), len(image_data))
     joint_data, image_data = Data_Correction.remove_empty_frames(joint_data, image_data)
     Utilities.save_dataset(joint_data, joint_output)
@@ -197,7 +197,7 @@ def create_relative_dataset(abs_data, image_data, joint_output):
 
 def create_normalized_dataset(joint_data, image_data, joint_output):
     print("\nNormalizing joint data...")
-    joint_data, image_data = Utilities.process_data_input(joint_data, image_data)
+    joint_data, image_data = Utilities.process_data_input(joint_data, image_data, cols=Utilities.colnames)
     #Normalize depth extremities
     joint_data = Data_Correction.normalize_outlier_depths(joint_data, image_data)
     #Normalize outlier values
@@ -280,7 +280,7 @@ def create_velocity_dataset(joint_data, image_data, joint_output):
     return velocity_dataset
 
 def append_midhip(abs_data, images, joint_output):
-    abs_data, images = Utilities.process_data_input(abs_data, images)
+    abs_data, images = Utilities.process_data_input(abs_data, images, cols=Utilities.colnames)
     midhip_dataset = []
     for i, joints in enumerate(abs_data):
         midhip_row = list(joints)
