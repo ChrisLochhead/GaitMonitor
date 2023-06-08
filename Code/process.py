@@ -228,23 +228,39 @@ def process_autoencoder():
 
 def run_gat():
 
-    encoded_2region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
-                                              joint_connections=Render.bottom_joint_connection).shuffle()
+    encoded_2region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_bottom', '16_Combined_Data_2Region_bottom.csv',
+                                              joint_connections=Render.joint_connections_m_hip, cycles=True).shuffle()
     
+    #GT.assess_data(encoded_2region)
     print("concatenated dataset loaded sucessfully...")
     
     print("Creating model: ")
-    gat_model = GAT(dim_in = encoded_2region.num_node_features, dim_h=128, dim_out=3)
+    gat_model = GAT(dim_in = encoded_2region.num_node_features, dim_h=16, dim_out=3)
     gat_model = gat_model.to("cuda")
 
     print("GAT MODEL") 
     train_val_dataset = encoded_2region[:int(len(encoded_2region)*0.9)]
     test_dataset  = encoded_2region[int(len(encoded_2region)*0.9):]
-    train_score, val_scores, test_scores = GAE.cross_valid(gat_model, test_dataset, dataset=train_val_dataset, k_fold=5)
+    train_score, val_scores, test_scores = GAE.cross_valid(gat_model, test_dataset, dataset=train_val_dataset, k_fold=5, batch=16)
 
     print("final results: ")
+    for ind, t in enumerate(test_scores):
+        test_scores[ind] = test_scores[ind].cpu()
+        test_scores[ind] = float(test_scores[ind])
+
     for i, score in enumerate(train_score):
         print("score {:.2f}: training: {:.2f}, validation: {:.2f}, test: {:.2f}".format(i, score, val_scores[i], test_scores[i]))
+
+    mean, var = Utilities.mean_var(test_scores)
+    print("mean, std and variance: {:.2f}%, {:.2f}% {:.5f}".format(mean, math.sqrt(var), var))
+
+
+
+def run_hcf_gat():
+    pass
+
+def run_stgcn():
+    pass
 
 if __name__ == '__main__':
     #Main menu

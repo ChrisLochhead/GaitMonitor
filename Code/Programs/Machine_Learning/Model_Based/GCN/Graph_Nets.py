@@ -178,9 +178,9 @@ def train(model, loader, val_loader, test_loader):
     #print("types: ", type(model), type(loader), type(val_loader))
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(),
-                                lr=0.001,
+                                lr=0.0001,
                                 weight_decay=0.00005)
-    epochs = 250
+    epochs = 100
     model.train()
 
     # Data for animations
@@ -201,7 +201,9 @@ def train(model, loader, val_loader, test_loader):
         # Train on batches
         #
         # print("data loader info: ", type(loader))
+        loader_iter = 0
         for data in loader:
+
             optimizer.zero_grad()
             data = data.to("cuda")
             h, out = model(data.x, data.edge_index, data.batch, train=True)
@@ -217,6 +219,7 @@ def train(model, loader, val_loader, test_loader):
             accuracies.append(acc)
             outputs.append(out.argmax(dim=1))
             hs.append(h)
+            loader_iter += 1
 
 
         # Validation
@@ -224,7 +227,8 @@ def train(model, loader, val_loader, test_loader):
         val_accs.append(val_acc)
 
         # Print metrics every 10 epochs
-        if (epoch % 1 == 0):
+        if (epoch % 5 == 0):
+            print("num of examples in loader:", loader_iter)
             print(f'Epoch {epoch:>3} | Train Loss: {total_loss:.2f} '
                 f'| Train Acc: {acc * 100:>5.2f}% '
                 f'| Val Loss: {val_loss:.2f} '
@@ -249,6 +253,8 @@ def test(model, loader, train = False):
         data = data.to("cuda")
         _, out = model(data.x, data.edge_index, data.batch, train)
         loss += criterion(out, data.y) / len(loader)
+        #ADD CHECK HERE
+        #print("predictions: ", out.argmax(dim=1), data.y)
         acc += accuracy(out.argmax(dim=1), data.y) / len(loader)
 
     return loss, acc

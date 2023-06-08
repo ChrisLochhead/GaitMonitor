@@ -162,7 +162,7 @@ def train_epoch(vae, device, dataloader, optimizer):
 
 
 # define a cross validation function
-def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,dataset=None,k_fold=5):
+def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,dataset=None,k_fold=5, batch = 64):
     
     train_score = []
     val_score = []
@@ -190,7 +190,6 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,dataset=No
         train_indices = train_left_indices + train_right_indices
         val_indices = list(range(vall,valr))
 
-
         train_set = dataset[train_indices]
         val_set = dataset[val_indices]
         test_set = test_dataset
@@ -203,13 +202,13 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,dataset=No
         model = GN.GAT(dim_in = dataset.num_node_features, dim_h=128, dim_out=3)
         model = model.to("cuda")
             
-        train_loader = GeoLoader(train_set, batch_size=128,
+        train_loader = GeoLoader(train_set, batch_size=batch,
                                           shuffle=True)
-        val_loader = GeoLoader(val_set, batch_size=128,
+        val_loader = GeoLoader(val_set, batch_size=batch,
                                           shuffle=True)
-        test_loader = GeoLoader(test_set, batch_size=128,
+        test_loader = GeoLoader(test_set, batch_size=batch,
                                           shuffle=True)
-        
+    
         
         model, embeddings, losses, accuracies, outputs, vals, tests = GN.train(model, train_loader, val_loader, test_loader)
         train_score.append(accuracies[1])

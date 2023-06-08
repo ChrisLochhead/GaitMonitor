@@ -7,9 +7,10 @@ import os
 from tqdm import tqdm
 from torchvision import transforms
 import Programs.Data_Processing.Model_Based.Render as Render
+import Programs.Data_Processing.Model_Based.HCF as HCF
 
 class JointDataset(Dataset):
-    def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip):
+    def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip, cycles = False):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
@@ -18,6 +19,10 @@ class JointDataset(Dataset):
         self.filename = filename
         self.transform = transforms.Compose([transforms.ToTensor()])
         self.joint_connections = joint_connections
+        self.cycles = cycles
+        self.num_cycles = 0
+        self.cycle_indices = []
+
         super(JointDataset, self).__init__(root, transform, pre_transform)
         
     @property
@@ -33,7 +38,6 @@ class JointDataset(Dataset):
         self.data = pd.read_csv(self.raw_paths[0], header=None)
         
         print("data being read from: ", self.raw_paths[0], type(self.raw_paths[0]))
-        print(self.raw_paths[0])
         if self.test:
             return [f'data_test_{i}.pt' for i in list(self.data.index)]
         else:
@@ -44,50 +48,128 @@ class JointDataset(Dataset):
         pass
 
     def process(self):
-        self.data = pd.read_csv(self.raw_paths[0], header=None)#.reset_index()
+        self.data = pd.read_csv(self.raw_paths[0], header=None)
         self.data = convert_to_literals(self.data)
         coo_matrix = get_COO_matrix(self.joint_connections)
 
-        for index, row in tqdm(self.data.iterrows(), total=self.data.shape[0]):
-            # Featurize molecule
-            data = data_to_graph(row, coo_matrix)
+        if self.cycles:
+            self.data_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
+            self.data = pd.DataFrame(self.data_cycles)
+            self.num_cycles = len(self.data_cycles)
+            for index, row in enumerate(tqdm(self.data_cycles, total=len(self.data_cycles[0]))):
+                
+                self.cycle_indices.append(len(row))
 
-            if self.test:
-                torch.save(data, 
-                    os.path.join(self.processed_dir, 
-                                 f'data_test_{index}.pt'))
-            else:
-                torch.save(data, 
-                    os.path.join(self.processed_dir, 
-                                 f'data_{index}.pt'))
+                #Start from scratch with coo matrix every cycle as cycles will be different lengths
+                coo_matrix = get_COO_matrix(self.joint_connections)
+                mod_coo_matrix = self.modify_COO_matrix(len(row), self.joint_connections, coo_matrix)
+                # Featurize molecule
+                data = data_to_graph(row, mod_coo_matrix)
+                if self.test:
+                    torch.save(data, 
+                        os.path.join(self.processed_dir, 
+                                    f'data_test_{index}.pt'))
+                else:
+                    torch.save(data, 
+                        os.path.join(self.processed_dir, 
+                                    f'data_{index}.pt'))
+                
+                t_data = torch.load(os.path.join(self.processed_dir, 
+                        f'data_{index}.pt')) 
+            
+                 
+        else:
+
+            for index, row in tqdm(self.data_cycles.iterrows(), total=self.data_cycles.shape[0]):
+                # Featurize molecule
+                data = data_to_graph(row, coo_matrix)
+
+                if self.test:
+                    torch.save(data, 
+                        os.path.join(self.processed_dir, 
+                                    f'data_test_{index}.pt'))
+                else:
+                    torch.save(data, 
+                        os.path.join(self.processed_dir, 
+                                    f'data_{index}.pt'))
             
 
-    def _get_label(self, label):
-        label = np.asarray([label])
-        return torch.tensor(label, dtype=torch.int64)
+    #def _get_label(self, label):
+    #    label = np.asarray([label])
+    #    return torch.tensor(label, dtype=torch.int64)
 
     def len(self):
         return self.data.shape[0]
 
     def get(self, idx):
+
+        if self.cycles:
+            #print("calling inside self cycles", idx)
+            frame_count = 0
+            for i, c in enumerate(self.cycle_indices):
+                if idx <= frame_count:
+                    true_indice = i
+                    break
+                else:
+                    frame_count += c
+
+            #print("true indice: ", idx, true_indice)
+            #idx = true_indice
+
+    
         if self.test:
             data = torch.load(os.path.join(self.processed_dir, 
                                  f'data_test_{idx}.pt'))
         else:
             data = torch.load(os.path.join(self.processed_dir, 
-                                 f'data_{idx}.pt'))        
+                                 f'data_{idx}.pt'))    
+
+        #print("returned data", data, data.y, idx, true_indice)    
         return data
+    
+    def modify_COO_matrix(self, gait_cycle_length, connections, current_matrix):
+        #Get number of joints per graph:
+        #17 connections is mid-hip appended full graph
+        current_matrix = copy.deepcopy(current_matrix)
+        max_value = 0
+        #Quickly get number of nodes in graph as this can vary depending on joints
+        for c in connections:
+            if c[0] > max_value:
+                max_value = c[0]
+            if c[1] > max_value:
+                max_value = c[1]
+
+        graph_size = max_value
+
+        for i in range(gait_cycle_length):
+            #Don't append connections to the last frame as there's nothing after it
+            if i != gait_cycle_length - 1: # -1 to ignore the last one
+                for node_index in range(graph_size):
+                    #Add connections pointing to the next graph
+                    for j in range(0, 3):
+                        current_matrix[0] += [node_index + (((i + 1) * graph_size) + 1), node_index]
+                        current_matrix[1] += [node_index , node_index + (((i + 1) * graph_size) + 1)]
+
+
+            #After connections between graphs are added, add a new matrix onto the bottom of another graph
+            if i != 0: # Ignore the first one: the original coo matrix already has it's first self-connections
+                for connection in connections:
+                    for i in range(0, 3):
+                        current_matrix[0] += [connection[0] + (((i + 1) * graph_size) + 1), connection[1] + (((i + 1) * graph_size) + 1)]
+                        current_matrix[1] += [connection[1] + (((i + 1) * graph_size) + 1), connection[0] + (((i + 1) * graph_size) + 1)]
+
+                
+        return current_matrix
 
 def get_COO_matrix(connections):
   res = [[],[]]
-  print("connections: ", len(connections))
   for connection in connections:
     #Once for each of the 3 coords in each connection
     for i in range(0, 3):
         res[0] += [connection[0], connection[1]]
         res[1] += [connection[1], connection[0]]
   return res
-
+        
 import ast 
 import copy 
 
@@ -104,19 +186,48 @@ def convert_to_literals(data):
             
 #Input here would be each row
 def data_to_graph(row, coo_matrix):
-    refined_row = row.iloc[3:]
-    node_f= refined_row
+    #The single instance per row case (No gait cycles, row is a single frame)
+    if isinstance(row[0], np.ndarray) == False:
+        refined_row = row.iloc[3:]
+        node_f= refined_row
 
-    #This is standard Data that has edge shit
-    row_as_array = np.array(node_f.values.tolist())
+        #This is standard Data that has edge shit
+        row_as_array = np.array(node_f.values.tolist())
 
-    #Turn into one-hot vector
-    y = int(row.iloc[2])
+        #Turn into one-hot vector
+        y = int(row.iloc[2])
 
-    data = Data(x=torch.tensor(row_as_array, dtype=torch.float),
-                y=torch.tensor([y], dtype=torch.long),
-                edge_index=torch.tensor(coo_matrix, dtype=torch.long),
-                #This isn't needed
-                #edge_attr=torch.tensor(edge_attr,dtype=torch.float)
-                )
-    return data
+        data = Data(x=torch.tensor(row_as_array, dtype=torch.float),
+                    y=torch.tensor([y], dtype=torch.long),
+                    edge_index=torch.tensor(coo_matrix, dtype=torch.long),
+                    #This isn't needed
+                    #edge_attr=torch.tensor(edge_attr,dtype=torch.float)
+                    )
+        
+        return data
+    #The multi-instance case (with gait cycles, row is a full cycle of frames or varying length)
+    else:
+        gait_cycle = []
+        y_arr = []
+        for cycle_part in row:
+            refined_row = cycle_part[3:]    
+            row_as_array = np.array(refined_row)     
+            y = int(cycle_part[2])  
+
+            y_arr.append(y)
+            if len(gait_cycle) <= 0:
+                gait_cycle = row_as_array
+            else:   
+                gait_cycle = np.concatenate((gait_cycle, row_as_array), axis=0)
+
+        
+        #Verify gait cycle is calculated correctly:
+        #Pass entire cycle as single graph
+        data = Data(x=torch.tensor(list(gait_cycle), dtype=torch.float),
+            y=torch.tensor([y], dtype=torch.long),
+            edge_index=torch.tensor(coo_matrix, dtype=torch.long),
+            #This isn't needed
+            #edge_attr=torch.tensor(edge_attr,dtype=torch.float)
+            )
+        
+        return data

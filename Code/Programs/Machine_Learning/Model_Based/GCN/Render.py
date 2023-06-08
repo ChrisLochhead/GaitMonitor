@@ -22,8 +22,8 @@ from matplotlib import animation
 plt.rcParams["animation.bitrate"] = 3000
 plt.rcParams['animation.ffmpeg_path'] = "C:/Users/Chris/Desktop/ffmpeg-5.1.2-full_build/bin/ffmpeg.exe"
 
-def plot_graph(data):
-    G = process_data_to_graph(data, get_COO_matrix())
+def plot_graph(data, connections):
+    G = process_data_to_graph(data, get_COO_matrix(connections))
     print("nodes: ", G.nodes(G))
     plt.figure(figsize=(12, 12))
     plt.axis('off')

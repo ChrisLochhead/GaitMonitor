@@ -6,6 +6,7 @@ import Programs.Data_Processing.Model_Based.Render as Render
 
 #This will only work with relative data
 def get_gait_cycles(joint_data, images):
+    
     instances = []
     instance = []
     current_instance = 0

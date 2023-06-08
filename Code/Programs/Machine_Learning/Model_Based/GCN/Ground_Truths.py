@@ -66,7 +66,7 @@ def assess_data(dataset):
     print(f'Graph has isolated nodes: {data.has_isolated_nodes()}')
     print(f'Graph has loops: {data.has_self_loops()}')
     #Plot graph data using networkX
-    plot_graph(data)
+    plot_graph(data, dataset.joint_connections)
 
 
 def create_dataloaders(dataset, train = 0.8, val = 0.9, test = 0.9, batch_size = 16):

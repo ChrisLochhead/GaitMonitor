@@ -71,6 +71,20 @@ bone_connections =[[0, 17], [1, -1], [2, -1], [3, -1], [4, -1],
 #Occlusion co-ordinates for home recording dataset
 occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
 
+def mean_var(data_list):
+    for i, d in enumerate(data_list):
+        data_list[i] *= 100
+
+    mean = sum(data_list)/len(data_list)
+  
+    var_enum = 0
+    for d in data_list:
+        var_enum += (d - mean) ** 2
+
+    total_var = var_enum / len(data_list)
+
+    return mean, total_var
+
 def dot(vA, vB):
     return vA[0]*vB[0]+vA[1]*vB[1]
 
