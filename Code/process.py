@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch_geometric
 import tqdm
 import torch_geometric.transforms as T
-from Programs.Machine_Learning.Model_Based.GCN.Graph_Nets import GCN, GIN, GAT, train, accuracy
+from Programs.Machine_Learning.Model_Based.GCN.Graph_Nets import GCN, GIN, GAT, train, accuracy, MultiInputGAT
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def main():
@@ -225,23 +225,32 @@ def process_autoencoder():
     print("Concatenation sucessful...")
 
 
+def run_multi_input_gat():
 
-def run_gat():
-
-    encoded_2region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_bottom', '16_Combined_Data_2Region_bottom.csv',
-                                              joint_connections=Render.joint_connections_m_hip, cycles=True).shuffle()
+    datasets = []
+    bottom_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_bottom', '16_Combined_Data_2Region_bottom.csv',
+                                              joint_connections=Render.bottom_joint_connection, cycles=True).shuffle()
     
-    #GT.assess_data(encoded_2region)
-    print("concatenated dataset loaded sucessfully...")
+    top_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_top', '16_Combined_Data_2Region_top.csv',
+                                            joint_connections=Render.top_joint_connections, cycles=True).shuffle()
+    
+    datasets.append(top_region)
+    datasets.append(bottom_region)
     
     print("Creating model: ")
-    gat_model = GAT(dim_in = encoded_2region.num_node_features, dim_h=16, dim_out=3)
+    gat_model = MultiInputGAT(dim_in=top_region.num_node_featuresm, dim_h=16, dim_out=3)
     gat_model = gat_model.to("cuda")
 
     print("GAT MODEL") 
-    train_val_dataset = encoded_2region[:int(len(encoded_2region)*0.9)]
-    test_dataset  = encoded_2region[int(len(encoded_2region)*0.9):]
-    train_score, val_scores, test_scores = GAE.cross_valid(gat_model, test_dataset, dataset=train_val_dataset, k_fold=5, batch=16)
+    #These regions will be the same for both datasets
+    multi_input_train_val = []
+    multi_input_test = []
+    for dataset in datasets:
+        multi_input_train_val.append(dataset[:int(len(dataset)*0.9)])
+        multi_input_test.append(dataset[int(len(dataset)*0.9):])
+
+
+    train_score, val_scores, test_scores = GAE.cross_valid(gat_model, multi_input_test, dataset=multi_input_train_val, k_fold=5, batch=16)
 
     print("final results: ")
     for ind, t in enumerate(test_scores):
@@ -255,15 +264,42 @@ def run_gat():
     print("mean, std and variance: {:.2f}%, {:.2f}% {:.5f}".format(mean, math.sqrt(var), var))
 
 
+ 
+def run_gat():
 
-def run_hcf_gat():
-    pass
+    dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_bottom', '16_Combined_Data_2Region_bottom.csv',
+                                              joint_connections=Render.bottom_joint_connection, cycles=True).shuffle()
+    
+    #GT.assess_data(encoded_2region)
+    print("concatenated dataset loaded sucessfully...")
+    
+    print("Creating model: ")
+    gat_model = GAT(dim_in = dataset.num_node_features, dim_h=16, dim_out=3)
+    gat_model = gat_model.to("cuda")
 
-def run_stgcn():
-    pass
+    print("GAT MODEL") 
+    #These regions will be the same for both datasets
+    train_val_dataset = dataset[:int(len(dataset)*0.9)]
+    test_dataset  = dataset[int(len(dataset)*0.9):]
+
+
+    train_score, val_scores, test_scores = GAE.cross_valid(gat_model, [test_dataset], dataset=[train_val_dataset], k_fold=5, batch=16)
+
+    print("final results: ")
+    for ind, t in enumerate(test_scores):
+        test_scores[ind] = test_scores[ind].cpu()
+        test_scores[ind] = float(test_scores[ind])
+
+    for i, score in enumerate(train_score):
+        print("score {:.2f}: training: {:.2f}, validation: {:.2f}, test: {:.2f}".format(i, score, val_scores[i], test_scores[i]))
+
+    mean, var = Utilities.mean_var(test_scores)
+    print("mean, std and variance: {:.2f}%, {:.2f}% {:.5f}".format(mean, math.sqrt(var), var))
+
 
 if __name__ == '__main__':
     #Main menu
     #process_autoencoder()
-    run_gat()
+    run_multi_input_gat()
+    #run_gat()
     #main()

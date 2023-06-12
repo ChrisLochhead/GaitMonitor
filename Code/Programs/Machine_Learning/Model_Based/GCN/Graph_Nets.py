@@ -42,10 +42,11 @@ class GAT(torch.nn.Module):
         self.m5 = BatchNorm1d(128)
         self.lin2 = Linear(128, dim_out)
 
-    def forward(self, x, edge_index, batch, train):
-        x = x.to("cuda")
-        edge_index = edge_index.to("cuda")
-        batch = batch.to("cuda")
+    def forward(self, xs, edge_indices, batches, train):
+        #This will be passed as a 1D array if a normal GAT with only a single input stream
+        x = xs[0].to("cuda")
+        edge_index = edge_indices[0].to("cuda")
+        batch = batches[0].to("cuda")
         #print("original : ", x.shape)
         #x = self.norm(x)
 
@@ -86,6 +87,97 @@ class GAT(torch.nn.Module):
         h = self.m5(h)
         h = F.dropout(h, p=0.1, training=train)
         h = self.lin2(h)
+
+        return F.sigmoid(h), F.log_softmax(h, dim=1)
+
+
+
+class MultiInputGAT(torch.nn.Module):
+    """Graph Attention Network"""
+    def __init__(self, dim_in, dim_h, dim_out, heads=[1,1,1,1], n_inputs = 2):
+        super().__init__()
+        dim_half = int(dim_h/2)
+        dim_4th = int(dim_half/2)
+        dim_8th = int(dim_4th/2)
+        self.num_inputs = n_inputs
+        self.streams = []
+
+        for i in range(self.num_inputs):
+            i_stream = []
+            i_stream.append(GATv2Conv(dim_in, dim_h, heads=heads[0]))
+            i_stream.append(BatchNorm1d(dim_h))
+            i_stream.append(GATv2Conv(dim_h*heads[1], dim_half, heads=heads[2]))
+            i_stream.append(BatchNorm1d(dim_half))
+            i_stream.append(GATv2Conv(dim_half*heads[2], dim_4th, heads=heads[3]))
+            i_stream.append(BatchNorm1d(dim_4th))
+            i_stream.append(GATv2Conv(dim_4th*heads[3], dim_8th, heads=heads[3]))
+            i_stream.append(BatchNorm1d(dim_8th))
+            self.streams.append(i_stream)
+        
+        print("number of streams built: ", len(self.streams))
+
+        self.m = AvgPool1d(3, stride=3, padding=1)
+        self.norm = BatchNorm1d(3)
+        self.optimizer = torch.optim.Adam(self.parameters(),
+                                          lr=0.005,
+                                          weight_decay=5e-4)
+
+        #Extra linear layer to compensate for more data
+        self.lin1 = Linear(256 * n_inputs, 128 * n_inputs)
+        self.m1 = BatchNorm1d(128* n_inputs)
+        self.lin2 = Linear(128* n_inputs, 64 * n_inputs)
+        self.m2 = BatchNorm1d(64* n_inputs)
+        self.lin3 = Linear(64* n_inputs, dim_out)
+
+    def forward(self, data, edge_indices, batches, train):
+        for i, x in enumerate(data):
+            data[i] = data.to("cuda")
+            edge_indices[i] = edge_indices[i].to("cuda")
+            batches[i] = batches[i].to("cuda")
+        #print("original : ", x.shape)
+        #x = self.norm(x)
+        hidden_layers = []
+        stream_outputs = []
+        h = x
+        for stream_no, stream in enumerate(self.streams):
+            h = data[stream_no]
+            for i, layer in enumerate(stream):
+                #Only stop at each GATConv Layer
+                if i / 2 == 0:
+                    #This is the usual convolution block
+                    h = F.relu(layer(h, edge_indices[stream_no]))
+                    #Batch norm always the next one
+                    h = stream[i + 1](h)
+                    h = F.dropout(h, p=0.1, training=train)
+                    #Record each  hidden layer value
+                    hidden_layers.append(h)
+            
+            #After the stream is done, concatenate each streams layers
+            h1 = global_add_pool(hidden_layers[0], batches[0])
+            h2 = global_add_pool(hidden_layers[1], batches[1])
+            h3 = global_add_pool(hidden_layers[2], batches[2])
+            h4 = global_add_pool(hidden_layers[3], batches[3])
+
+            # Concatenate graph embeddings
+            #print("sizes: ", h1.shape, h2.shape, h3.shape)#, h4.shape)
+            stream_outputs.append(torch.cat((h1, h2, h3, h4), dim=1))
+
+        #Concatenate all stream outputs
+        h_out = stream_outputs[0]
+        for i, output in enumerate(stream_outputs):
+            if i != 0:
+                h_out = torch.cat((h_out, output), dim=1)
+
+        print("shape of concatenated output: ", h_out.shape)
+
+        # Classifier
+        h = F.relu(self.lin1(h))
+        h = self.m1(h)
+        h = F.dropout(h, p=0.1, training=train)
+        h = F.relu(self.lin2(h))
+        h = self.m2(h)
+        h = F.dropout(h, p=0.1, training=train)
+        h = self.lin3(h)
 
         return F.sigmoid(h), F.log_softmax(h, dim=1)
     
@@ -198,15 +290,24 @@ def train(model, loader, val_loader, test_loader):
         val_loss = 0
         val_acc = 0
 
-        # Train on batches
-        #
-        # print("data loader info: ", type(loader))
         loader_iter = 0
-        for data in loader:
+
+        for index, data in enumerate(loader[0]):
 
             optimizer.zero_grad()
-            data = data.to("cuda")
-            h, out = model(data.x, data.edge_index, data.batch, train=True)
+            #data = data.to("cuda")
+            #This would be two for top and bottom region
+            data_xs = []
+            data_indices = []
+            data_batches = []
+            for j in len(loader):
+                data_xs.append(loader[index].x)
+                data_indices.append(loader[index].edge_index)               
+                data_batches.append(loader[index].batch)    
+
+
+            #h, out = model(data.x, data.edge_index, data.batch, train=True)
+            h, out = model(data_xs, data_indices, data_batches, train=True)
 
             loss = criterion(out, data.y)
             total_loss += loss / len(loader)

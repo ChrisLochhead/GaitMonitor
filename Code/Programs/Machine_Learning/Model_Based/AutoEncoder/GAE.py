@@ -162,13 +162,13 @@ def train_epoch(vae, device, dataloader, optimizer):
 
 
 # define a cross validation function
-def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,dataset=None,k_fold=5, batch = 64):
+def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=None,k_fold=5, batch = 64, inputs_size = 1):
     
     train_score = []
     val_score = []
     test_score = []
 
-    total_size = len(dataset)
+    total_size = len(datasets[0])
     fraction = 1/k_fold
     seg = int(total_size * fraction)
     # tr:train,val:valid; r:right,l:left;  eg: trrr: right index of right side train subset 
@@ -190,27 +190,30 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,dataset=No
         train_indices = train_left_indices + train_right_indices
         val_indices = list(range(vall,valr))
 
-        train_set = dataset[train_indices]
-        val_set = dataset[val_indices]
-        test_set = test_dataset
-        #train_set = torch.utils.data.dataset.Subset(dataset,train_indices)
-        #val_set = torch.utils.data.dataset.Subset(dataset,val_indices)
-        #print("types here: ", type(train_set), type(val_set))
-        
-#         print(len(train_set),len(val_set))
-#         print()
-        model = GN.GAT(dim_in = dataset.num_node_features, dim_h=128, dim_out=3)
+        train_loaders = []
+        val_loaders = []
+        test_loaders = []
+
+        for dataset in datasets:
+            train_set = dataset[train_indices]
+            val_set = dataset[val_indices]
+            test_set = test_dataset
+
+
+            train_loaders.append(GeoLoader(train_set, batch_size=batch,
+                                            shuffle=True))
+            val_loaders.append(GeoLoader(val_set, batch_size=batch,
+                                            shuffle=True))
+            test_loaders.append(GeoLoader(test_set, batch_size=batch,
+                                            shuffle=True))
+
+        model = GN.GAT(dim_in = datasets[0].num_node_features, dim_h=128, dim_out=3)
         model = model.to("cuda")
             
-        train_loader = GeoLoader(train_set, batch_size=batch,
-                                          shuffle=True)
-        val_loader = GeoLoader(val_set, batch_size=batch,
-                                          shuffle=True)
-        test_loader = GeoLoader(test_set, batch_size=batch,
-                                          shuffle=True)
+
     
         
-        model, embeddings, losses, accuracies, outputs, vals, tests = GN.train(model, train_loader, val_loader, test_loader)
+        model, embeddings, losses, accuracies, outputs, vals, tests = GN.train(model, train_loaders, val_loaders, test_loaders)
         train_score.append(accuracies[1])
         #val_acc = valid(res_model,criterion,optimizer,val_loader)
         val_score.append(vals[-1])
