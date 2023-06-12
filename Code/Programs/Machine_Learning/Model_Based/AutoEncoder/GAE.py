@@ -5,13 +5,14 @@ import random
 import torch
 import torchvision
 from torchvision import transforms
-from torch.utils.data import DataLoader,random_split
+from torch.utils.data import random_split
 from torch_geometric.loader import DataLoader as GeoLoader
 from torch import nn
 import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
 from torch_geometric.nn import GCNConv, global_add_pool, GINConv, GATv2Conv
+from torch.utils.data import RandomSampler
 
 from sklearn.manifold import TSNE
 import plotly.express as px
@@ -194,25 +195,37 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         val_loaders = []
         test_loaders = []
 
+        #Set up so identical seed is used
+        torch.manual_seed(1)
+        seed = int(torch.empty((), dtype=torch.int64).random_().item())  # use the same seed as Scenario 1
+        G = torch.Generator()
+        G.manual_seed(1)
+
+        #There will always be at least one dataset, use samplers made for that first dataset for all of them
+        train_sample = RandomSampler(datasets[0][train_indices], generator=G)
+        val_sample = RandomSampler(datasets[0][val_indices], generator=G)
+        test_sample = RandomSampler(test_dataset, generator=G)
+
+        init = G.get_state()
         for dataset in datasets:
             train_set = dataset[train_indices]
             val_set = dataset[val_indices]
             test_set = test_dataset
 
+            train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler = RandomSampler(train_sample, generator=G)))
+            val_loaders.append(GeoLoader(val_set, batch_size=batch, sampler = RandomSampler(val_sample, generator=G)))
+            test_loaders.append(GeoLoader(test_set, batch_size=batch, sampler = RandomSampler(test_sample, generator=G)))
 
-            train_loaders.append(GeoLoader(train_set, batch_size=batch,
-                                            shuffle=True))
-            val_loaders.append(GeoLoader(val_set, batch_size=batch,
-                                            shuffle=True))
-            test_loaders.append(GeoLoader(test_set, batch_size=batch,
-                                            shuffle=True))
+            #Reset the generator so every dataset gets the same sampling 
+            G.set_state(init)
+
 
         model = GN.GAT(dim_in = datasets[0].num_node_features, dim_h=128, dim_out=3)
         model = model.to("cuda")
             
 
     
-        
+        print("loader going in: ", train_loaders)
         model, embeddings, losses, accuracies, outputs, vals, tests = GN.train(model, train_loaders, val_loaders, test_loaders)
         train_score.append(accuracies[1])
         #val_acc = valid(res_model,criterion,optimizer,val_loader)

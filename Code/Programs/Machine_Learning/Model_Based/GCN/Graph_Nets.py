@@ -292,23 +292,45 @@ def train(model, loader, val_loader, test_loader):
 
         loader_iter = 0
 
+        #First pass, append all the data together into arrays
+        xs_batch = []
+        indice_batch = []
+        batch_batch = []
+        for load in loader: 
+            data_xs = []
+            data_indices = []
+            data_batches = []
+            for data in load:
+                data_xs.append(data.x)
+                data_indices.append(data.edge_index)               
+                data_batches.append(data.batch)
+
+            xs_batch.append(data_xs)
+            indice_batch.append(data_indices)
+            batch_batch.append(data_batches)       
+
+        #Second pass: process the data 
         for index, data in enumerate(loader[0]):
 
             optimizer.zero_grad()
             #data = data.to("cuda")
             #This would be two for top and bottom region
-            data_xs = []
-            data_indices = []
-            data_batches = []
-            for j in len(loader):
-                data_xs.append(loader[index].x)
-                data_indices.append(loader[index].edge_index)               
-                data_batches.append(loader[index].batch)    
+            data_x = xs_batch[index][0]
+            data_indice = indice_batch[index][0]
+            data_batch = batch_batch[index][0]
 
-
+            for i in range(len(xs_batch[0])):
+                if i > 0:
+                    print("before: ", data_x, xs_batch[index][i])
+                    data_x += xs_batch[index][i]
+                    print("after: ", data_x)
+                    data_indice += indice_batch[index][i]
+                    data_batch += batch_batch[index][i]
+                    
             #h, out = model(data.x, data.edge_index, data.batch, train=True)
             h, out = model(data_xs, data_indices, data_batches, train=True)
 
+            #First data batch with Y has to have the right outputs
             loss = criterion(out, data.y)
             total_loss += loss / len(loader)
             acc += accuracy(out.argmax(dim=1), data.y) / len(loader)

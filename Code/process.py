@@ -238,7 +238,7 @@ def run_multi_input_gat():
     datasets.append(bottom_region)
     
     print("Creating model: ")
-    gat_model = MultiInputGAT(dim_in=top_region.num_node_featuresm, dim_h=16, dim_out=3)
+    gat_model = MultiInputGAT(dim_in=top_region.num_node_features, dim_h=16, dim_out=3)
     gat_model = gat_model.to("cuda")
 
     print("GAT MODEL") 
@@ -250,7 +250,7 @@ def run_multi_input_gat():
         multi_input_test.append(dataset[int(len(dataset)*0.9):])
 
 
-    train_score, val_scores, test_scores = GAE.cross_valid(gat_model, multi_input_test, dataset=multi_input_train_val, k_fold=5, batch=16)
+    train_score, val_scores, test_scores = GAE.cross_valid(gat_model, multi_input_test, datasets=multi_input_train_val, k_fold=5, batch=16)
 
     print("final results: ")
     for ind, t in enumerate(test_scores):
@@ -268,7 +268,7 @@ def run_multi_input_gat():
 def run_gat():
 
     dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_bottom', '16_Combined_Data_2Region_bottom.csv',
-                                              joint_connections=Render.bottom_joint_connection, cycles=True).shuffle()
+                                              joint_connections=Render.bottom_joint_connection, cycles=True)#.shuffle()
     
     #GT.assess_data(encoded_2region)
     print("concatenated dataset loaded sucessfully...")
@@ -283,7 +283,7 @@ def run_gat():
     test_dataset  = dataset[int(len(dataset)*0.9):]
 
 
-    train_score, val_scores, test_scores = GAE.cross_valid(gat_model, [test_dataset], dataset=[train_val_dataset], k_fold=5, batch=16)
+    train_score, val_scores, test_scores = GAE.cross_valid(gat_model, [test_dataset], datasets=[train_val_dataset], k_fold=5, batch=16)
 
     print("final results: ")
     for ind, t in enumerate(test_scores):
