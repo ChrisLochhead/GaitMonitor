@@ -212,19 +212,16 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
             val_set = dataset[val_indices]
             test_set = test_dataset
 
-            train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler = RandomSampler(train_sample, generator=G)))
-            val_loaders.append(GeoLoader(val_set, batch_size=batch, sampler = RandomSampler(val_sample, generator=G)))
-            test_loaders.append(GeoLoader(test_set, batch_size=batch, sampler = RandomSampler(test_sample, generator=G)))
-
+            train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler = RandomSampler(train_sample, generator=G), drop_last = True))
+            val_loaders.append(GeoLoader(val_set, batch_size=batch, sampler = RandomSampler(val_sample, generator=G), drop_last = True))
+            test_loaders.append(GeoLoader(test_set, batch_size=batch, sampler = RandomSampler(test_sample, generator=G), drop_last = True))
+            print("train: ", train_set, batch)
             #Reset the generator so every dataset gets the same sampling 
             G.set_state(init)
-
 
         model = GN.GAT(dim_in = datasets[0].num_node_features, dim_h=128, dim_out=3)
         model = model.to("cuda")
             
-
-    
         print("loader going in: ", train_loaders)
         model, embeddings, losses, accuracies, outputs, vals, tests = GN.train(model, train_loaders, val_loaders, test_loaders)
         train_score.append(accuracies[1])

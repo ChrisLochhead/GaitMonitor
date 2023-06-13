@@ -294,43 +294,58 @@ def train(model, loader, val_loader, test_loader):
 
         #First pass, append all the data together into arrays
         xs_batch = []
+        ys_batch = []
         indice_batch = []
         batch_batch = []
         for load in loader: 
             data_xs = []
             data_indices = []
             data_batches = []
+            data_ys = []
+            print("new loader")
             for data in load:
+                print("data: ", data.x.size())
+                data = data.to("cuda")
                 data_xs.append(data.x)
                 data_indices.append(data.edge_index)               
                 data_batches.append(data.batch)
+                data_ys.append(data.y)
 
             xs_batch.append(data_xs)
             indice_batch.append(data_indices)
-            batch_batch.append(data_batches)       
+            batch_batch.append(data_batches)   
+            ys_batch.append(data_ys)    
 
         #Second pass: process the data 
         for index, data in enumerate(loader[0]):
 
             optimizer.zero_grad()
-            #data = data.to("cuda")
+            data = data.to("cuda")
+            
             #This would be two for top and bottom region
-            data_x = xs_batch[index][0]
-            data_indice = indice_batch[index][0]
-            data_batch = batch_batch[index][0]
+            print("lengths: ", len(loader[0]), len(xs_batch), len(xs_batch[0]))
 
-            for i in range(len(xs_batch[0])):
+            data_x = [xs_batch[0][index]]
+            data_indice = [indice_batch[0][index]]
+            data_batch = [batch_batch[0][index]]
+
+
+            for i in range(len(xs_batch)):
                 if i > 0:
-                    print("before: ", data_x, xs_batch[index][i])
-                    data_x += xs_batch[index][i]
-                    print("after: ", data_x)
-                    data_indice += indice_batch[index][i]
-                    data_batch += batch_batch[index][i]
-                    
+                    #print("here: ", xs_batch[i][index].size(), len(xs_batch[i][index]))
+                    data_x.append(xs_batch[i][index])
+                    data_indice.append(indice_batch[i][index])
+                    data_batch.append(batch_batch[i][index])
+
+            print("data going in: ", data_x[0].size(), data_x[1].size(), len(data_indices), data_batch[0].size(), data_batch[1].size(), index, len(loader[0]))
             #h, out = model(data.x, data.edge_index, data.batch, train=True)
             h, out = model(data_xs, data_indices, data_batches, train=True)
 
             #First data batch with Y has to have the right outputs
+            print("data y: ", len(data.y), len(out))
+            print("my data.y: ", len(data_ys[index]), len(data_ys))
+            print("out: ", out.size())
+            print("h: ", h.size())
             loss = criterion(out, data.y)
             total_loss += loss / len(loader)
             acc += accuracy(out.argmax(dim=1), data.y) / len(loader)
