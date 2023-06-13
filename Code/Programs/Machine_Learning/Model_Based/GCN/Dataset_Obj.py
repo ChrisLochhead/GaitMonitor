@@ -10,7 +10,7 @@ import Programs.Data_Processing.Model_Based.Render as Render
 import Programs.Data_Processing.Model_Based.HCF as HCF
 
 class JointDataset(Dataset):
-    def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip, cycles = False):
+    def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip, cycles = False, cycle_preset = None):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
@@ -22,6 +22,7 @@ class JointDataset(Dataset):
         self.cycles = cycles
         self.num_cycles = 0
         self.cycle_indices = []
+        self.cycle_preset = cycle_preset
 
         super(JointDataset, self).__init__(root, transform, pre_transform)
         
@@ -53,7 +54,11 @@ class JointDataset(Dataset):
         coo_matrix = get_COO_matrix(self.joint_connections)
 
         if self.cycles:
-            self.data_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
+            if self.cycle_preset != None:
+                self.data_cycles = self.cycle_preset
+            else:
+                self.data_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
+            
             self.data = pd.DataFrame(self.data_cycles)
             self.num_cycles = len(self.data_cycles)
             for index, row in enumerate(tqdm(self.data_cycles, total=len(self.data_cycles[0]))):
@@ -127,6 +132,31 @@ class JointDataset(Dataset):
         #print("returned data", data, data.y, idx, true_indice)    
         return data
     
+    def split_cycles(self, split_type = 2):
+        if split_type == 2:
+            top_cycles = []
+            bottom_cycles = []
+            for cycle in (self.data_cycles):
+                top_cycle = []
+                bottom_cycle = []
+                for row in cycle:
+                    top_cycle_row = [row[0], row[1], row[2]]
+                    bottom_cycle_row = [row[0], row[1], row[2]]
+                    for i, coord in enumerate(row):
+                        if i > 2 and i < 14:
+                            top_cycle_row.append(coord)
+                        elif i >= 14:
+                            bottom_cycle_row.append(coord)
+                    
+                    top_cycle.append(top_cycle_row)
+                    bottom_cycle.append(bottom_cycle_row)
+                
+                top_cycles.append(top_cycle)
+                bottom_cycles.append(bottom_cycle)
+
+            return top_cycles, bottom_cycles
+                
+
     def modify_COO_matrix(self, gait_cycle_length, connections, current_matrix):
         #Get number of joints per graph:
         #17 connections is mid-hip appended full graph
@@ -187,7 +217,7 @@ def convert_to_literals(data):
 #Input here would be each row
 def data_to_graph(row, coo_matrix):
     #The single instance per row case (No gait cycles, row is a single frame)
-    if isinstance(row[0], np.ndarray) == False:
+    if isinstance(row[0], np.ndarray) == False and isinstance(row[0], list) == False:
         refined_row = row.iloc[3:]
         node_f= refined_row
 

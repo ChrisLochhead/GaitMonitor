@@ -140,7 +140,7 @@ def main():
 
     print("\nStage 14:")
     #Create regions data of combined data
-    top_region_dataset, bottom_region_dataset = Creator.create_2_regions_dataset(combined_data, #CHANGE BACK TO ABS_JOINT_DATA
+    top_region_dataset, bottom_region_dataset = Creator.create_2_regions_dataset(combined_norm_data, #CHANGE BACK TO ABS_JOINT_DATA
                                                                                  joint_output="./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region",
                                                                                  images = image_data)
     regions_data = Creator.create_5_regions_dataset(combined_data,
@@ -228,11 +228,17 @@ def process_autoencoder():
 def run_multi_input_gat():
 
     datasets = []
+
+    full_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/15.5_Combined_Data(normed)', '15.5_Combined_Data(normed).csv',
+                                              joint_connections=Render.bottom_joint_connection, cycles=True)#.shuffle()
+    
+    top_cycles, bottom_cycles = full_region.split_cycles()
+    
     bottom_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_bottom', '16_Combined_Data_2Region_bottom.csv',
-                                              joint_connections=Render.bottom_joint_connection, cycles=True).shuffle()
+                                              joint_connections=Render.bottom_joint_connection, cycles=True, cycle_preset=bottom_cycles)#.shuffle()
     
     top_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_top', '16_Combined_Data_2Region_top.csv',
-                                            joint_connections=Render.top_joint_connections, cycles=True).shuffle()
+                                            joint_connections=Render.top_joint_connections, cycles=True, cycle_preset=top_cycles)#.shuffle()
     
     datasets.append(top_region)
     datasets.append(bottom_region)
@@ -248,7 +254,6 @@ def run_multi_input_gat():
     for dataset in datasets:
         multi_input_train_val.append(dataset[:int(len(dataset)*0.9)])
         multi_input_test.append(dataset[int(len(dataset)*0.9):])
-
 
     train_score, val_scores, test_scores = GAE.cross_valid(gat_model, multi_input_test, datasets=multi_input_train_val, k_fold=5, batch=16)
 
@@ -267,7 +272,7 @@ def run_multi_input_gat():
  
 def run_gat():
 
-    dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_bottom', '16_Combined_Data_2Region_bottom.csv',
+    dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/15.5_Combined_Data(normed)', '15.5_Combined_Data(normed).csv',
                                               joint_connections=Render.bottom_joint_connection, cycles=True)#.shuffle()
     
     #GT.assess_data(encoded_2region)

@@ -12,7 +12,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
 from torch_geometric.nn import GCNConv, global_add_pool, GINConv, GATv2Conv
-from torch.utils.data import RandomSampler
+from torch.utils.data import RandomSampler, DistributedSampler
+
 
 from sklearn.manifold import TSNE
 import plotly.express as px
@@ -199,7 +200,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         torch.manual_seed(1)
         seed = int(torch.empty((), dtype=torch.int64).random_().item())  # use the same seed as Scenario 1
         G = torch.Generator()
-        G.manual_seed(1)
+        #G.manual_seed(1)
 
         #There will always be at least one dataset, use samplers made for that first dataset for all of them
         train_sample = RandomSampler(datasets[0][train_indices], generator=G)
@@ -212,18 +213,19 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
             val_set = dataset[val_indices]
             test_set = test_dataset
 
-            train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler = RandomSampler(train_sample, generator=G), drop_last = True))
-            val_loaders.append(GeoLoader(val_set, batch_size=batch, sampler = RandomSampler(val_sample, generator=G), drop_last = True))
-            test_loaders.append(GeoLoader(test_set, batch_size=batch, sampler = RandomSampler(test_sample, generator=G), drop_last = True))
-            print("train: ", train_set, batch)
+            train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler = train_sample, drop_last = True))
+            val_loaders.append(GeoLoader(val_set, batch_size=batch, sampler = val_sample, drop_last = True))
+            test_loaders.append(GeoLoader(test_set, batch_size=batch, sampler = test_sample, drop_last = True))
+
             #Reset the generator so every dataset gets the same sampling 
             G.set_state(init)
+
+        G.set_state(init)
 
         model = GN.GAT(dim_in = datasets[0].num_node_features, dim_h=128, dim_out=3)
         model = model.to("cuda")
             
-        print("loader going in: ", train_loaders)
-        model, embeddings, losses, accuracies, outputs, vals, tests = GN.train(model, train_loaders, val_loaders, test_loaders)
+        model, embeddings, losses, accuracies, outputs, vals, tests = GN.train(model, train_loaders, val_loaders, test_loaders, G)
         train_score.append(accuracies[1])
         #val_acc = valid(res_model,criterion,optimizer,val_loader)
         val_score.append(vals[-1])
@@ -288,61 +290,3 @@ def plot_ae_outputs(encoder,decoder,n=10, test_dataset=None):
 def show_image(img):
     npimg = img.numpy()
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
-
-'''def run_VAE(train_loader, val_loader, test_dataset):
-
-    ### Set the random seed for reproducible results
-    d = 9
-    vae = VariationalAutoencoder(dim_in=3, dim_h=16, latent_dims=d)
-    lr = 1e-3 
-    optim = torch.optim.Adam(vae.parameters(), lr=lr, weight_decay=1e-5)
-    print(f'Selected device: {device}')
-    vae.to(device)
-    vae.eval()
-    num_epochs = 50
-
-    for epoch in range(num_epochs):
-        train_loss = train_epoch(vae,device,train_loader,optim)
-        val_loss = test_epoch(vae,device,val_loader)
-        print('\n EPOCH {}/{} \t train loss {:.3f} \t val loss {:.3f}'.format(epoch + 1, num_epochs,train_loss,val_loss))
-
-    with torch.no_grad():
-
-        # sample latent vectors from the normal distribution
-        latent = torch.randn(128, d, device=device)
-
-        # reconstruct images from the latent vectors
-        img_recon = vae.decoder(latent)
-        img_recon = img_recon.cpu()
-
-        fig, ax = plt.subplots(figsize=(20, 8.5))
-        show_image(torchvision.utils.make_grid(img_recon.data[:100],10,5))
-        plt.show()
-
-
-    encoded_samples = []
-    for sample in tqdm(test_dataset):
-        img = sample[0].unsqueeze(0).to(device)
-        label = sample[1]
-        # Encode image
-        vae.eval()
-        with torch.no_grad():
-            encoded_img  = vae.encoder(img)
-        # Append to list
-        encoded_img = encoded_img.flatten().cpu().numpy()
-        encoded_sample = {f"Enc. Variable {i}": enc for i, enc in enumerate(encoded_img)}
-        encoded_sample['label'] = label
-        encoded_samples.append(encoded_sample)
-        
-    encoded_samples = pd.DataFrame(encoded_samples)
-    encoded_samples
-
-
-    px.scatter(encoded_samples, x='Enc. Variable 0', y='Enc. Variable 1', color=encoded_samples.label.astype(str), opacity=0.7)
-
-    tsne = TSNE(n_components=2)
-    tsne_results = tsne.fit_transform(encoded_samples.drop(['label'],axis=1))
-
-    fig = px.scatter(tsne_results, x=0, y=1, color=encoded_samples.label.astype(str),labels={'0': 'tsne-2d-one', '1': 'tsne-2d-two'})
-    fig.show()
-'''
