@@ -10,7 +10,9 @@ import Programs.Machine_Learning.Model_Based.GCN.Utilities as Graph_Utils
 import Programs.Data_Processing.Model_Based.Render as Render
 import torch
 import torch.nn as nn
+from torch.utils.data import Subset
 import torch_geometric
+import random
 import tqdm
 import torch_geometric.transforms as T
 from Programs.Machine_Learning.Model_Based.GCN.Graph_Nets import GCN, GIN, GAT, train, accuracy, MultiInputGAT
@@ -232,28 +234,62 @@ def run_multi_input_gat():
     full_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/15.5_Combined_Data(normed)', '15.5_Combined_Data(normed).csv',
                                               joint_connections=Render.bottom_joint_connection, cycles=True)#.shuffle()
     
-    top_cycles, bottom_cycles = full_region.split_cycles()
+    #TOP AND BOTTON REGIONS #############################################################################################################
+
+    '''top_cycles, bottom_cycles = full_region.split_cycles()
     
-    bottom_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_bottom', '16_Combined_Data_2Region_bottom.csv',
-                                              joint_connections=Render.bottom_joint_connection, cycles=True, cycle_preset=bottom_cycles)#.shuffle()
+    bottom_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_bottom',
+                                              '16_Combined_Data_2Region_bottom.csv',
+                                              joint_connections=Render.bottom_joint_connection, cycles=True, cycle_preset=bottom_cycles)
     
-    top_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_top', '16_Combined_Data_2Region_top.csv',
-                                            joint_connections=Render.top_joint_connections, cycles=True, cycle_preset=top_cycles)#.shuffle()
+    top_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_top',
+                                           '16_Combined_Data_2Region_top.csv',
+                                            joint_connections=Render.top_joint_connections, cycles=True, cycle_preset=top_cycles)
+    
+    datasets.append(top_region)
+    datasets.append(bottom_region)'''
+    #####################################################################################################################################
+
+    #Exodia Regions #############################################################################################################
+    l_leg, r_leg, l_arm, r_arm, head = full_region.split_cycles(split_type=5)
+    left_leg = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionl_leg',
+                                              '17_Combined_Data_5Regionl_leg.csv',
+                                              joint_connections=Render.limb_connections, cycles=True, cycle_preset=bottom_cycles)
+    
+    right_leg = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionr_leg',
+                                           '17_Combined_Data_5Regionr_leg.csv',
+                                            joint_connections=Render.limb_connections, cycles=True, cycle_preset=top_cycles)
+    left_arm = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionl_arm',
+                                              '17_Combined_Data_5Regionl_leg.csv',
+                                              joint_connections=Render.limb_connections, cycles=True, cycle_preset=bottom_cycles)
+    
+    right_arm = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionr_arm',
+                                           '17_Combined_Data_5Regionr_arm.csv',
+                                            joint_connections=Render.limb_connections, cycles=True, cycle_preset=top_cycles)   
+    head = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionhead',
+                                              '17_Combined_Data_5Regionhead.csv',
+                                              joint_connections=Render.head_joint_connections, cycles=True, cycle_preset=bottom_cycles)
     
     datasets.append(top_region)
     datasets.append(bottom_region)
-    
+    #####################################################################################################################################
+
     print("Creating model: ")
     gat_model = MultiInputGAT(dim_in=top_region.num_node_features, dim_h=16, dim_out=3)
     gat_model = gat_model.to("cuda")
+
+    train_val_indices = random.sample(range(len(full_region)), int(0.9 * len(full_region)))
+    test_indices = random.sample(set(range(len(full_region))) - set(train_val_indices), int(0.1 * len(full_region)))
 
     print("GAT MODEL") 
     #These regions will be the same for both datasets
     multi_input_train_val = []
     multi_input_test = []
     for dataset in datasets:
-        multi_input_train_val.append(dataset[:int(len(dataset)*0.9)])
-        multi_input_test.append(dataset[int(len(dataset)*0.9):])
+        multi_input_train_val.append(dataset[train_val_indices])
+        multi_input_test.append(dataset[test_indices])
+        #multi_input_train_val.append(dataset[:int(len(dataset)*0.9)])
+        #multi_input_test.append(dataset[int(len(dataset)*0.9):])
 
     train_score, val_scores, test_scores = GAE.cross_valid(gat_model, multi_input_test, datasets=multi_input_train_val, k_fold=5, batch=16)
 
@@ -273,7 +309,7 @@ def run_multi_input_gat():
 def run_gat():
 
     dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/15.5_Combined_Data(normed)', '15.5_Combined_Data(normed).csv',
-                                              joint_connections=Render.bottom_joint_connection, cycles=True)#.shuffle()
+                                              joint_connections=Render.bottom_joint_connection, cycles=True).shuffle()
     
     #GT.assess_data(encoded_2region)
     print("concatenated dataset loaded sucessfully...")
@@ -283,12 +319,12 @@ def run_gat():
     gat_model = gat_model.to("cuda")
 
     print("GAT MODEL") 
-    #These regions will be the same for both datasets
+
     train_val_dataset = dataset[:int(len(dataset)*0.9)]
     test_dataset  = dataset[int(len(dataset)*0.9):]
 
 
-    train_score, val_scores, test_scores = GAE.cross_valid(gat_model, [test_dataset], datasets=[train_val_dataset], k_fold=5, batch=16)
+    train_score, val_scores, test_scores = GAE.cross_valid(gat_model, [test_dataset], datasets=[train_val_dataset], k_fold=5, batch=4)
 
     print("final results: ")
     for ind, t in enumerate(test_scores):
@@ -305,6 +341,6 @@ def run_gat():
 if __name__ == '__main__':
     #Main menu
     #process_autoencoder()
-    run_multi_input_gat()
-    #run_gat()
+    #run_multi_input_gat()
+    run_gat()
     #main()
