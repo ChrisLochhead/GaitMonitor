@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, global_add_pool, GINConv, GATv2Conv
 from torch.nn import Linear, Sequential, BatchNorm1d, ReLU, AvgPool2d, AvgPool1d
 from Programs.Machine_Learning.Model_Based.GCN.Dataset_Obj import *
+from torch_geometric.nn import ChebConv
 
 joint_connections = [[15, 13], [13, 11], # left foot to hip 
                      [16, 14], [14, 12], # right foot to hip
@@ -91,7 +92,38 @@ class GAT(torch.nn.Module):
         return F.sigmoid(h), F.log_softmax(h, dim=1)
 
 
+class STGCNBlock(torch.nn.Module):
+    def __init__(self, in_channels, dim_h, temporal_kernel_size):
+        super(STGCNBlock, self).__init__()
+        self.temporal_conv1 = torch.nn.Conv2d(in_channels, dim_h, kernel_size=(temporal_kernel_size, 1))
+        self.spatial_conv = GATv2Conv(dim_h, dim_h, heads=1)
+        #self.spatial_conv = ChebConv(dim_h, dim_h, K=3)
+        self.temporal_conv2 = torch.nn.Conv2d(dim_h, in_channels, kernel_size=(temporal_kernel_size, 1))
+        self.relu = ReLU()
+        self.pooling = torch.nn.MaxPool2d(kernel_size=(1, 0.5))
 
+    def forward(self, x, edge_index):
+        x = self.relu(self.temporal_conv1(x))
+        x = self.relu(self.spatial_conv(x, edge_index))
+        x = self.relu(self.temporal_conv2(x))
+        return x
+
+class STGCN(torch.nn.Module):
+    def __init__(self, num_nodes, num_features, num_classes):
+        super(STGCN, self).__init__()
+        #Change these blocks, fully connected then implement
+        self.block1 = STGCNBlock(num_features, 64, 9)
+        self.block2 = STGCNBlock(64, 64, 9)
+        self.fc = Linear(64 * num_nodes, num_classes)
+
+    def forward(self, x, edge_index):
+        x1 = self.block1(x, edge_index)
+        x2 = self.block2(x1, edge_index)
+        x2 = x2.view(x2.size(0), -1)  # Flatten the tensor
+        x = x1 + x2  # Skip connection
+        x = self.fc(x)
+        return x
+    
 class MultiInputGAT(torch.nn.Module):
     """Graph Attention Network"""
     def __init__(self, dim_in, dim_h, dim_out, heads=[1,1,1,1], n_inputs = 2, hcf = False):
