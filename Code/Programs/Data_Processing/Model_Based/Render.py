@@ -104,7 +104,7 @@ def chart_knee_data(gait_cycles, display = False):
             plt.plot(r_y,r_x)
             plt.show()
 
-            print("showing poly")
+            print("showing poly", poly)
             plt.figure()
             plt.plot(l_y,poly_l)
             plt.plot(r_y,poly_r)

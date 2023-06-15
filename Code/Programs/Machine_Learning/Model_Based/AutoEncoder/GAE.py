@@ -182,10 +182,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         valr = i * seg + seg
         trrl = valr
         trrr = total_size
-        # msg
-#         print("train indices: [%d,%d),[%d,%d), test indices: [%d,%d)" 
-#               % (trll,trlr,trrl,trrr,vall,valr))
-        
+
         train_left_indices = list(range(trll,trlr))
         train_right_indices = list(range(trrl,trrr))
         
@@ -200,18 +197,17 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         torch.manual_seed(1)
         seed = int(torch.empty((), dtype=torch.int64).random_().item())  # use the same seed as Scenario 1
         G = torch.Generator()
-        #G.manual_seed(1)
 
         #There will always be at least one dataset, use samplers made for that first dataset for all of them
         train_sample = RandomSampler(datasets[0][train_indices], generator=G)
         val_sample = RandomSampler(datasets[0][val_indices], generator=G)
-        test_sample = RandomSampler(test_dataset, generator=G)
+        test_sample = RandomSampler(test_dataset[0], generator=G)
 
         init = G.get_state()
         for dataset in datasets:
             train_set = dataset[train_indices]
             val_set = dataset[val_indices]
-            test_set = test_dataset
+            test_set = test_dataset[0]
 
             train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler = train_sample, drop_last = True))
             val_loaders.append(GeoLoader(val_set, batch_size=batch, sampler = val_sample, drop_last = True))

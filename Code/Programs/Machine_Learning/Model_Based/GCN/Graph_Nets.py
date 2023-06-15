@@ -273,7 +273,7 @@ def train(model, loader, val_loader, test_loader, generator):
     optimizer = torch.optim.Adam(model.parameters(),
                                 lr=0.0001,
                                 weight_decay=0.00005)
-    epochs = 50
+    epochs = 250
     model.train()
 
     # Data for animations
@@ -392,8 +392,8 @@ def test(model, loaders, generator, train = False):
 
         #_, out = model(data.x, data.edge_index, data.batch, train)
         _, out = model(data_x, data_i, data_b, train)
-        loss += criterion(out, data.y) / len(loaders)
-        #print("acc: ", acc, out, data.y)
-        acc += accuracy(out.argmax(dim=1), data.y) / len(loaders)
+        loss += criterion(out, data.y) / len(loaders[0])
+        #print("acc: ", acc, data.y)
+        acc += accuracy(out.argmax(dim=1), data.y) / len(loaders[0])
 
     return loss, acc

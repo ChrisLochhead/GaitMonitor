@@ -71,6 +71,17 @@ bone_connections =[[0, 17], [1, -1], [2, -1], [3, -1], [4, -1],
 #Occlusion co-ordinates for home recording dataset
 occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
 
+# explicit function to normalize array
+def normalize_1D(arr, t_min = 0, t_max = 1):
+    norm_arr = []
+    diff = t_max - t_min
+    diff_arr = max(arr) - min(arr)
+    for i in arr:
+        temp = (((i - min(arr))*diff)/diff_arr) + t_min
+        norm_arr.append(temp)
+    return norm_arr
+
+
 def mean_var(data_list):
     for i, d in enumerate(data_list):
         data_list[i] *= 100
@@ -336,8 +347,16 @@ def save_dataset(data, name, colnames = colnames):
         colnames = colnames_bottom
     elif len(data[0]) == 14:
         colnames = colnames_top
+    elif len(data[0]) == 26:
+        print("its this one: ")
+        colnames = hcf_colnames
+
 
     new_dataframe = pd.DataFrame(data, columns = colnames)
+
+    if len(data[0]) == 26:
+        print("size: ", new_dataframe.shape)
+        print(new_dataframe.head())
     #Convert to dataframe 
     new_dataframe.to_csv(name,index=False, header=False)     
 

@@ -125,7 +125,10 @@ def main():
     #Create HCF dataset
     hcf_data = Creator.create_hcf_dataset(pre_scale, abs_joint_data, relative_joint_data, velocity_data, image_data, 
                                joints_output="./Code/Datasets/Joint_Data/Office_Dataset/13_HCF_Data.csv")
-
+    
+    hcf_data_normed = Creator.normalize_values(hcf_data, 
+                                             joint_output="./Code/Datasets/Joint_Data/Office_Dataset/13.5_HCF_Data(normed).csv", hcf=True)
+    
     print("\nStage 12:")
     #Create ground truth comparison set
     print("data going into gait cycle extractor: ", pre_scale[0])
@@ -251,35 +254,45 @@ def run_multi_input_gat():
     #####################################################################################################################################
 
     #Exodia Regions #############################################################################################################
-    l_leg, r_leg, l_arm, r_arm, head = full_region.split_cycles(split_type=5)
+    '''l_leg, r_leg, l_arm, r_arm, head = full_region.split_cycles(split_type=5)
     left_leg = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionl_leg',
                                               '17_Combined_Data_5Regionl_leg.csv',
-                                              joint_connections=Render.limb_connections, cycles=True, cycle_preset=bottom_cycles)
+                                              joint_connections=Render.limb_connections, cycles=True, cycle_preset=l_leg)
     
     right_leg = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionr_leg',
                                            '17_Combined_Data_5Regionr_leg.csv',
-                                            joint_connections=Render.limb_connections, cycles=True, cycle_preset=top_cycles)
+                                            joint_connections=Render.limb_connections, cycles=True, cycle_preset=r_leg)
     left_arm = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionl_arm',
-                                              '17_Combined_Data_5Regionl_leg.csv',
-                                              joint_connections=Render.limb_connections, cycles=True, cycle_preset=bottom_cycles)
+                                              '17_Combined_Data_5Regionl_arm.csv',
+                                              joint_connections=Render.limb_connections, cycles=True, cycle_preset=l_arm)
     
     right_arm = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionr_arm',
                                            '17_Combined_Data_5Regionr_arm.csv',
-                                            joint_connections=Render.limb_connections, cycles=True, cycle_preset=top_cycles)   
+                                            joint_connections=Render.limb_connections, cycles=True, cycle_preset=r_arm)   
     head = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionhead',
                                               '17_Combined_Data_5Regionhead.csv',
-                                              joint_connections=Render.head_joint_connections, cycles=True, cycle_preset=bottom_cycles)
+                                              joint_connections=Render.head_joint_connections, cycles=True, cycle_preset=head)
     
-    datasets.append(top_region)
-    datasets.append(bottom_region)
+    datasets.append(left_leg)
+    datasets.append(right_leg)
+    datasets.append(left_arm)
+    datasets.append(right_arm)
+    #datasets.append(head)
+    '''
+    #####################################################################################################################################
+    hcf_data = Dataset_Obj.HCFDataset('./Code/Datasets/Joint_Data/Office_Dataset/13.5_HCF_Data(normed)',
+                                              '13.5_HCF_Data(normed).csv', cycles=True, cycle_preset=full_region.data_cycles)
+    
+    datasets.append(full_region)
+    datasets.append(hcf_data)
     #####################################################################################################################################
 
     print("Creating model: ")
-    gat_model = MultiInputGAT(dim_in=top_region.num_node_features, dim_h=16, dim_out=3)
+    gat_model = MultiInputGAT(dim_in=full_region.num_node_features, dim_h=16, dim_out=3)
     gat_model = gat_model.to("cuda")
 
-    train_val_indices = random.sample(range(len(full_region)), int(0.9 * len(full_region)))
-    test_indices = random.sample(set(range(len(full_region))) - set(train_val_indices), int(0.1 * len(full_region)))
+    train_val_indices = random.sample(range(len(full_region)), int(0.8 * len(full_region)))
+    test_indices = random.sample(set(range(len(full_region))) - set(train_val_indices), int(0.2 * len(full_region)))
 
     print("GAT MODEL") 
     #These regions will be the same for both datasets
@@ -288,8 +301,6 @@ def run_multi_input_gat():
     for dataset in datasets:
         multi_input_train_val.append(dataset[train_val_indices])
         multi_input_test.append(dataset[test_indices])
-        #multi_input_train_val.append(dataset[:int(len(dataset)*0.9)])
-        #multi_input_test.append(dataset[int(len(dataset)*0.9):])
 
     train_score, val_scores, test_scores = GAE.cross_valid(gat_model, multi_input_test, datasets=multi_input_train_val, k_fold=5, batch=16)
 
@@ -342,5 +353,5 @@ if __name__ == '__main__':
     #Main menu
     #process_autoencoder()
     #run_multi_input_gat()
-    run_gat()
-    #main()
+    #run_gat()
+    main()

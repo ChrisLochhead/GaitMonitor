@@ -9,8 +9,12 @@ import copy
 
 from sklearn.preprocessing import normalize
 
-def normalize_values(data, joint_output):
-    data, _ = Utilities.process_data_input(data, None, cols=Utilities.colnames)
+def normalize_values(data, joint_output, hcf = False):
+    if hcf:
+        data, _ = Utilities.process_data_input(data, None, cols=Utilities.hcf_colnames)
+    else:
+        data, _ = Utilities.process_data_input(data, None, cols=Utilities.colnames)
+    print("data length: ", len(data[0]))
     meta_data = []
     joint_data = []
 
@@ -18,39 +22,50 @@ def normalize_values(data, joint_output):
         if i < 3: 
             meta_data.append(column)
         else:
-            print("column before: ", len(column), len(column[0]))
-            normed_matrix = normalize(column, axis=1, norm='l2')  
-            print("column after: ", len(normed_matrix), len(normed_matrix[0]))
+            #print("column before: ", len(column), column)
+            if hcf:
+                normed_matrix = Utilities.normalize_1D(column)
+                #normed_matrix = normalize(column, axis=0, norm='l2')  
+            else:
+                normed_matrix = normalize(column, axis=1, norm='l2')  
+            #print("column after: ", len(normed_matrix), len(normed_matrix[0]))
             joint_data.append(normed_matrix)
             #print("lens: ", len(normed_matrix), len(column), len(column[0]))
 
+    print("joint data: ", len(joint_data[0]))
     transposed_joints = []
     for index, j in enumerate(zip(*joint_data)):
         transposed_joints.append(j)
 
     joint_data = transposed_joints
-    print("joint data info: ", len(joint_data), len(joint_data[0]), len(joint_data[0][0]))
+    #print("joint data info: ", len(joint_data), len(joint_data[0]), len(joint_data[0][0]))
     meta_data = np.transpose(meta_data)
-
+    print("meta data: ", len(meta_data[0]))
     final = []
-    print("meta data shape: ", len(meta_data), len(meta_data[1]))
+    #print("meta data shape: ", len(meta_data), len(meta_data[1]))
     for j, col in enumerate(meta_data):
         final_row = list(col)
         for coords in joint_data[j]:
             #Fix the formatting before saving it 
-            refactored_coords = []
-            for c in coords:
-                refactored_coords.append(c)
-            final_row.append(refactored_coords)
+            if hcf == False:
+                refactored_coords = []
+                for c in coords:
+                    refactored_coords.append(c)
+                final_row.append(refactored_coords)
+            else:
+                final_row.append(coords)
 
         final.append(final_row)
    
 
-    print("joints: ", len(final))
-    print("joints dimensions: ", len(final[0]))
-    print(len(final[0][4]))
-
-    Utilities.save_dataset(final, joint_output) 
+    print("joints: ", len(final[0]))
+    #print("joints dimensions: ", len(final[0]))
+    #print(len(final[0][4]))
+    if hcf:
+        print("saving as this: ", len(final), len(final[0]))
+        Utilities.save_dataset(final, joint_output, colnames=Utilities.hcf_colnames) 
+    else:
+        Utilities.save_dataset(final, joint_output)
     return final
 
 def combine_datasets(rel_data, vel_data, angle_data, images, joints_output):
@@ -564,7 +579,7 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
         #hcf_cycle.append(stride_lengths[i][0])
         hcf_cycle.append(stride_lengths[i][1])
         hcf_cycle.append(max_gaps[i])
-        for c in knee_data_coeffs[0]:
+        for c in knee_data_coeffs[i]:
             hcf_cycle.append(c)
         #hcf_cycle.append(stride_ratios[i])
         print("here's the row: ", len(hcf_cycle))

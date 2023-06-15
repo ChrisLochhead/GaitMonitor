@@ -155,7 +155,41 @@ class JointDataset(Dataset):
                 bottom_cycles.append(bottom_cycle)
 
             return top_cycles, bottom_cycles
-                
+
+        #Order should be returned: l_leg, r_leg, l_arm, r_arm, head
+        elif split_type == 5:
+            limb_cycles = [[],[],[],[],[]]
+            for cycle in (self.data_cycles):
+                single_cycle = [[],[],[],[],[]]
+                for row in cycle:
+                    row_cycle = [[],[],[],[],[]]
+                    for i, c in enumerate(single_cycle):
+                        row_cycle[i]  = [row[0], row[1], row[2]]
+                    
+                    for i, coord in enumerate(row):
+                        #Head coords 
+                        if i > 2 and i < 8:
+                            row_cycle[4].append(coord)
+                        #Left hand
+                        elif i == 8 or i == 10 or i == 12:
+                            row_cycle[2].append(coord)
+                        #Right hand
+                        elif i == 9 or i == 11 or i == 13:
+                            row_cycle[3].append(coord)
+                        #Left foot
+                        elif i == 14 or i == 16 or i == 18:
+                            row_cycle[0].append(coord)
+                        #Right foot
+                        elif i == 15 or i == 17 or i == 19:
+                            row_cycle[1].append(coord)
+                    
+                    for i, c in enumerate(row_cycle):
+                        single_cycle[i].append(c)
+
+                for i, c in enumerate(single_cycle):
+                    limb_cycles[i].append(c)
+
+            return [c for c in limb_cycles]
 
     def modify_COO_matrix(self, gait_cycle_length, connections, current_matrix):
         #Get number of joints per graph:
@@ -259,5 +293,287 @@ def data_to_graph(row, coo_matrix):
             #This isn't needed
             #edge_attr=torch.tensor(edge_attr,dtype=torch.float)
             )
+        
+        return data
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class HCFDataset(Dataset):
+    def __init__(self, root, filename, test=False, transform=None, pre_transform=None, cycles = False, cycle_preset = None):
+        """
+        root = Where the dataset should be stored. This folder is split
+        into raw_dir (downloaded dataset) and processed_dir (processed data). 
+        """
+        self.test = test
+        self.filename = filename
+        self.transform = transforms.Compose([transforms.ToTensor()])
+        self.cycles = cycles
+        self.num_cycles = 0
+        self.cycle_indices = []
+        self.cycle_preset = cycle_preset
+
+        super(HCFDataset, self).__init__(root, transform, pre_transform)
+        
+    @property
+    def raw_file_names(self):
+        """ If this file exists in raw_dir, the download is not triggered.
+            (The download func. is not implemented here)  
+        """
+        return self.filename
+
+    @property
+    def processed_file_names(self):
+        """ If these files are found in raw_dir, processing is skipped"""
+        self.data = pd.read_csv(self.raw_paths[0], header=None)
+        
+        print("data being read from: ", self.raw_paths[0], type(self.raw_paths[0]))
+        if self.test:
+            return [f'data_test_{i}.pt' for i in list(self.data.index)]
+        else:
+            return [f'data_{i}.pt' for i in list(self.data.index)]
+        
+
+    def download(self):
+        pass
+
+    def process(self):
+        self.data = pd.read_csv(self.raw_paths[0], header=None)
+        self.data = convert_to_literals(self.data)
+
+        if self.cycles:
+            if self.cycle_preset != None:
+                self.data_cycles = self.cycle_preset
+            else:
+                self.data_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
+            
+            self.data = pd.DataFrame(self.data_cycles)
+            self.num_cycles = len(self.data_cycles)
+            for index, row in enumerate(tqdm(self.data_cycles, total=len(self.data_cycles[0]))):
+                
+                self.cycle_indices.append(len(row))
+
+                # Featurize molecule
+                data = data_to_tensor(row)
+                if self.test:
+                    torch.save(data, 
+                        os.path.join(self.processed_dir, 
+                                    f'data_test_{index}.pt'))
+                else:
+                    torch.save(data, 
+                        os.path.join(self.processed_dir, 
+                                    f'data_{index}.pt'))
+                
+                t_data = torch.load(os.path.join(self.processed_dir, 
+                        f'data_{index}.pt'))             
+        else:
+
+            for index, row in tqdm(self.data_cycles.iterrows(), total=self.data_cycles.shape[0]):
+                # Featurize molecule
+                data = data_to_tensor(row)
+
+                if self.test:
+                    torch.save(data, 
+                        os.path.join(self.processed_dir, 
+                                    f'data_test_{index}.pt'))
+                else:
+                    torch.save(data, 
+                        os.path.join(self.processed_dir, 
+                                    f'data_{index}.pt'))
+
+    def len(self):
+        return self.data.shape[0]
+
+    def get(self, idx):
+
+        if self.cycles:
+            #print("calling inside self cycles", idx)
+            frame_count = 0
+            for i, c in enumerate(self.cycle_indices):
+                if idx <= frame_count:
+                    true_indice = i
+                    break
+                else:
+                    frame_count += c
+
+            #print("true indice: ", idx, true_indice)
+            #idx = true_indice
+
+    
+        if self.test:
+            data = torch.load(os.path.join(self.processed_dir, 
+                                 f'data_test_{idx}.pt'))
+        else:
+            data = torch.load(os.path.join(self.processed_dir, 
+                                 f'data_{idx}.pt'))    
+
+        #print("returned data", data, data.y, idx, true_indice)    
+        return data
+    
+    def split_cycles(self, split_type = 2):
+        if split_type == 2:
+            top_cycles = []
+            bottom_cycles = []
+            for cycle in (self.data_cycles):
+                top_cycle = []
+                bottom_cycle = []
+                for row in cycle:
+                    top_cycle_row = [row[0], row[1], row[2]]
+                    bottom_cycle_row = [row[0], row[1], row[2]]
+                    for i, coord in enumerate(row):
+                        if i > 2 and i < 14:
+                            top_cycle_row.append(coord)
+                        elif i >= 14:
+                            bottom_cycle_row.append(coord)
+                    
+                    top_cycle.append(top_cycle_row)
+                    bottom_cycle.append(bottom_cycle_row)
+                
+                top_cycles.append(top_cycle)
+                bottom_cycles.append(bottom_cycle)
+
+            return top_cycles, bottom_cycles
+
+        #Order should be returned: l_leg, r_leg, l_arm, r_arm, head
+        elif split_type == 5:
+            limb_cycles = [[],[],[],[],[]]
+            for cycle in (self.data_cycles):
+                single_cycle = [[],[],[],[],[]]
+                for row in cycle:
+                    row_cycle = [[],[],[],[],[]]
+                    for i, c in enumerate(single_cycle):
+                        row_cycle[i]  = [row[0], row[1], row[2]]
+                    
+                    for i, coord in enumerate(row):
+                        #Head coords 
+                        if i > 2 and i < 8:
+                            row_cycle[4].append(coord)
+                        #Left hand
+                        elif i == 8 or i == 10 or i == 12:
+                            row_cycle[2].append(coord)
+                        #Right hand
+                        elif i == 9 or i == 11 or i == 13:
+                            row_cycle[3].append(coord)
+                        #Left foot
+                        elif i == 14 or i == 16 or i == 18:
+                            row_cycle[0].append(coord)
+                        #Right foot
+                        elif i == 15 or i == 17 or i == 19:
+                            row_cycle[1].append(coord)
+                    
+                    for i, c in enumerate(row_cycle):
+                        single_cycle[i].append(c)
+
+                for i, c in enumerate(single_cycle):
+                    limb_cycles[i].append(c)
+
+            return [c for c in limb_cycles]
+
+    def modify_COO_matrix(self, gait_cycle_length, connections, current_matrix):
+        #Get number of joints per graph:
+        #17 connections is mid-hip appended full graph
+        current_matrix = copy.deepcopy(current_matrix)
+        max_value = 0
+        #Quickly get number of nodes in graph as this can vary depending on joints
+        for c in connections:
+            if c[0] > max_value:
+                max_value = c[0]
+            if c[1] > max_value:
+                max_value = c[1]
+
+        graph_size = max_value
+
+        for i in range(gait_cycle_length):
+            #Don't append connections to the last frame as there's nothing after it
+            if i != gait_cycle_length - 1: # -1 to ignore the last one
+                for node_index in range(graph_size):
+                    #Add connections pointing to the next graph
+                    for j in range(0, 3):
+                        current_matrix[0] += [node_index + (((i + 1) * graph_size) + 1), node_index]
+                        current_matrix[1] += [node_index , node_index + (((i + 1) * graph_size) + 1)]
+
+
+            #After connections between graphs are added, add a new matrix onto the bottom of another graph
+            if i != 0: # Ignore the first one: the original coo matrix already has it's first self-connections
+                for connection in connections:
+                    for i in range(0, 3):
+                        current_matrix[0] += [connection[0] + (((i + 1) * graph_size) + 1), connection[1] + (((i + 1) * graph_size) + 1)]
+                        current_matrix[1] += [connection[1] + (((i + 1) * graph_size) + 1), connection[0] + (((i + 1) * graph_size) + 1)]
+
+                
+        return current_matrix
+    
+#Input here would be each row
+def data_to_tensor(row):
+    #The single instance per row case (No gait cycles, row is a single frame)
+    if isinstance(row[0], np.ndarray) == False and isinstance(row[0], list) == False:
+        refined_row = row.iloc[3:]
+        node_f= refined_row
+
+        #This is standard Data that has edge shit
+        row_as_array = np.array(node_f.values.tolist())
+
+        #Turn into one-hot vector
+        y = int(row.iloc[2])
+
+        data = Data(x=torch.tensor(row_as_array, dtype=torch.float),
+                    y=torch.tensor([y], dtype=torch.long))
+        
+        return data
+    #The multi-instance case (with gait cycles, row is a full cycle of frames or varying length)
+    else:
+        gait_cycle = []
+        y_arr = []
+        for cycle_part in row:
+            refined_row = cycle_part[3:]    
+            row_as_array = np.array(refined_row)     
+            y = int(cycle_part[2])  
+
+            y_arr.append(y)
+            if len(gait_cycle) <= 0:
+                gait_cycle = row_as_array
+            else:   
+                gait_cycle = np.concatenate((gait_cycle, row_as_array), axis=0)
+
+        
+        #Verify gait cycle is calculated correctly:
+        #Pass entire cycle as single graph
+        data = Data(x=torch.tensor(list(gait_cycle), dtype=torch.float),
+            y=torch.tensor([y], dtype=torch.long))
         
         return data
