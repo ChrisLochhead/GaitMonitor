@@ -94,24 +94,36 @@ class GAT(torch.nn.Module):
 
 class MultiInputGAT(torch.nn.Module):
     """Graph Attention Network"""
-    def __init__(self, dim_in, dim_h, dim_out, heads=[1,1,1,1], n_inputs = 2):
+    def __init__(self, dim_in, dim_h, dim_out, heads=[1,1,1,1], n_inputs = 2, hcf = False):
         super().__init__()
         dim_half = int(dim_h/2)
         dim_4th = int(dim_half/2)
         dim_8th = int(dim_4th/2)
         self.num_inputs = n_inputs
         self.streams = []
+        self.hcf = hcf
 
         for i in range(self.num_inputs):
             i_stream = []
-            i_stream.append(GATv2Conv(dim_in, dim_h, heads=heads[0]))
-            i_stream.append(BatchNorm1d(dim_h))
-            i_stream.append(GATv2Conv(dim_h*heads[1], dim_half, heads=heads[2]))
-            i_stream.append(BatchNorm1d(dim_half))
-            i_stream.append(GATv2Conv(dim_half*heads[2], dim_4th, heads=heads[3]))
-            i_stream.append(BatchNorm1d(dim_4th))
-            i_stream.append(GATv2Conv(dim_4th*heads[3], dim_8th, heads=heads[3]))
-            i_stream.append(BatchNorm1d(dim_8th))
+            if i == len(range(self.num_inputs)) - 1 and hcf == True :
+                print("Here?") # This is a normal linear net for HCF data without graphical structure
+                i_stream.append(Linear(dim_in, dim_h))
+                i_stream.append(BatchNorm1d(dim_h))
+                i_stream.append(Linear(dim_h, dim_half))
+                i_stream.append(BatchNorm1d(dim_half))
+                i_stream.append(Linear(dim_half, dim_4th))
+                i_stream.append(BatchNorm1d(dim_4th))
+                i_stream.append(Linear(dim_4th, dim_8th))
+                i_stream.append(BatchNorm1d(dim_8th))
+            else:
+                i_stream.append(GATv2Conv(dim_in, dim_h, heads=heads[0]))
+                i_stream.append(BatchNorm1d(dim_h))
+                i_stream.append(GATv2Conv(dim_h*heads[1], dim_half, heads=heads[2]))
+                i_stream.append(BatchNorm1d(dim_half))
+                i_stream.append(GATv2Conv(dim_half*heads[2], dim_4th, heads=heads[3]))
+                i_stream.append(BatchNorm1d(dim_4th))
+                i_stream.append(GATv2Conv(dim_4th*heads[3], dim_8th, heads=heads[3]))
+                i_stream.append(BatchNorm1d(dim_8th))
             self.streams.append(i_stream)
         
         print("number of streams built: ", len(self.streams))
@@ -142,10 +154,16 @@ class MultiInputGAT(torch.nn.Module):
         for stream_no, stream in enumerate(self.streams):
             h = data[stream_no]
             for i, layer in enumerate(stream):
+
                 #Only stop at each GATConv Layer
                 if i / 2 == 0:
-                    #This is the usual convolution block
-                    h = F.relu(layer(h, edge_indices[stream_no]))
+                    #This is the usual convolution block #if hcf, this is just a linear layer
+                    if i == len(stream) - 1 and self.hcf:
+                        print("going in here?")
+                        h = F.relu(layer(h))
+                    else:
+                        print("only in here")
+                        h = F.relu(layer(h, edge_indices[stream_no]))
                     #Batch norm always the next one
                     h = stream[i + 1](h)
                     h = F.dropout(h, p=0.1, training=train)
@@ -273,7 +291,7 @@ def train(model, loader, val_loader, test_loader, generator):
     optimizer = torch.optim.Adam(model.parameters(),
                                 lr=0.0001,
                                 weight_decay=0.00005)
-    epochs = 250
+    epochs = 150
     model.train()
 
     # Data for animations

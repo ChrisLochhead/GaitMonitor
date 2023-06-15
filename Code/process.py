@@ -233,13 +233,16 @@ def process_autoencoder():
 def run_multi_input_gat():
 
     datasets = []
-
+    #This has the most processed but still absolute datapoints for calculating accurate gait cycles
+    gait_cycles_data = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/4.5_Absolute_Data(midhip)', '4.5_Absolute_Data(midhip).csv',
+                                              joint_connections=Render.bottom_joint_connection, cycles=True)
+    
     full_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/15.5_Combined_Data(normed)', '15.5_Combined_Data(normed).csv',
-                                              joint_connections=Render.bottom_joint_connection, cycles=True)#.shuffle()
+                                              joint_connections=Render.bottom_joint_connection, cycles=True, cycle_preset=gait_cycles_data.data_cycles)
     
     #TOP AND BOTTON REGIONS #############################################################################################################
 
-    '''top_cycles, bottom_cycles = full_region.split_cycles()
+    '''top_cycles, bottom_cycles = gait_cycles_data.split_cycles()
     
     bottom_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_bottom',
                                               '16_Combined_Data_2Region_bottom.csv',
@@ -254,7 +257,7 @@ def run_multi_input_gat():
     #####################################################################################################################################
 
     #Exodia Regions #############################################################################################################
-    '''l_leg, r_leg, l_arm, r_arm, head = full_region.split_cycles(split_type=5)
+    '''l_leg, r_leg, l_arm, r_arm, head = gait_cycles_data.split_cycles(split_type=5)
     left_leg = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionl_leg',
                                               '17_Combined_Data_5Regionl_leg.csv',
                                               joint_connections=Render.limb_connections, cycles=True, cycle_preset=l_leg)
@@ -281,28 +284,31 @@ def run_multi_input_gat():
     '''
     #####################################################################################################################################
     hcf_data = Dataset_Obj.HCFDataset('./Code/Datasets/Joint_Data/Office_Dataset/13.5_HCF_Data(normed)',
-                                              '13.5_HCF_Data(normed).csv', cycles=True, cycle_preset=full_region.data_cycles)
+                                              '13.5_HCF_Data(normed).csv', cycles=True, cycle_preset=gait_cycles_data.data_cycles)
     
     datasets.append(full_region)
     datasets.append(hcf_data)
     #####################################################################################################################################
 
     print("Creating model: ")
-    gat_model = MultiInputGAT(dim_in=full_region.num_node_features, dim_h=16, dim_out=3)
+    gat_model = MultiInputGAT(dim_in=full_region.num_node_features, dim_h=16, dim_out=3, hcf=True)
     gat_model = gat_model.to("cuda")
 
     train_val_indices = random.sample(range(len(full_region)), int(0.8 * len(full_region)))
     test_indices = random.sample(set(range(len(full_region))) - set(train_val_indices), int(0.2 * len(full_region)))
+
+    print("two different lengths?", hcf_data, full_region)
 
     print("GAT MODEL") 
     #These regions will be the same for both datasets
     multi_input_train_val = []
     multi_input_test = []
     for dataset in datasets:
+        print("dataset iteration")
         multi_input_train_val.append(dataset[train_val_indices])
         multi_input_test.append(dataset[test_indices])
 
-    train_score, val_scores, test_scores = GAE.cross_valid(gat_model, multi_input_test, datasets=multi_input_train_val, k_fold=5, batch=16)
+    train_score, val_scores, test_scores = GAE.cross_valid(gat_model, multi_input_test, datasets=multi_input_train_val, k_fold=5, batch=32)
 
     print("final results: ")
     for ind, t in enumerate(test_scores):
@@ -352,6 +358,6 @@ def run_gat():
 if __name__ == '__main__':
     #Main menu
     #process_autoencoder()
-    #run_multi_input_gat()
+    run_multi_input_gat()
     #run_gat()
-    main()
+    #main()

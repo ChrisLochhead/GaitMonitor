@@ -240,7 +240,7 @@ import copy
 def convert_to_literals(data):
     for i,  (index, row) in enumerate(data.iterrows()):
         for col_index, col in enumerate(row):
-            if col_index >= 3:
+            if col_index >= 3 and type(row[col_index]) != np.float64:
                 tmp = ast.literal_eval(row[col_index])
                 data.iat[i, col_index] = copy.deepcopy(tmp)
             else:
@@ -420,7 +420,6 @@ class HCFDataset(Dataset):
         return self.data.shape[0]
 
     def get(self, idx):
-
         if self.cycles:
             #print("calling inside self cycles", idx)
             frame_count = 0
