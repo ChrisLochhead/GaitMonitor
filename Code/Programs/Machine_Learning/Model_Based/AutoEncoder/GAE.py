@@ -164,7 +164,7 @@ def train_epoch(vae, device, dataloader, optimizer):
 
 
 # define a cross validation function
-def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=None,k_fold=5, batch = 64, inputs_size = 1):
+def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=None,k_fold=5, batch = 64, inputs_size = 1, epochs = 100):
     
     train_score = []
     val_score = []
@@ -221,7 +221,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         model = GN.GAT(dim_in = datasets[0].num_node_features, dim_h=128, dim_out=3)
         model = model.to("cuda")
             
-        model, embeddings, losses, accuracies, outputs, vals, tests = GN.train(model, train_loaders, val_loaders, test_loaders, G)
+        model, embeddings, losses, accuracies, outputs, vals, tests = GN.train(model, train_loaders, val_loaders, test_loaders, G, epochs)
         train_score.append(accuracies[1])
         #val_acc = valid(res_model,criterion,optimizer,val_loader)
         val_score.append(vals[-1])
