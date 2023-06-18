@@ -1,25 +1,12 @@
 import matplotlib.pyplot as plt # plotting library
 import numpy as np # this module is useful to work with numerical arrays
-import pandas as pd 
-import random 
 import torch
-import torchvision
-from torchvision import transforms
 from torch.utils.data import random_split
-from torch_geometric.loader import DataLoader as GeoLoader
 from torch import nn
 import torch.nn.functional as F
-import torch.optim as optim
-import tqdm
-from torch_geometric.nn import GCNConv, global_add_pool, GINConv, GATv2Conv
-from torch.utils.data import RandomSampler, DistributedSampler
-
-
-from sklearn.manifold import TSNE
-import plotly.express as px
+from torch_geometric.nn import GCNConv
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 import Programs.Data_Processing.Model_Based.Utilities as Utilities
-import Programs.Machine_Learning.Model_Based.GCN.Graph_Nets as GN
 
 class VariationalEncoder(nn.Module):
     def __init__(self, dim_in, dim_h, latent_dims, heads=[8,1]):  
@@ -161,73 +148,6 @@ def train_epoch(vae, device, dataloader, optimizer):
         train_loss+=loss.item()
 
     return train_loss / len(dataloader.dataset)
-
-
-# define a cross validation function
-def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=None,k_fold=5, batch = 64, inputs_size = 1, epochs = 100):
-    
-    train_score = []
-    val_score = []
-    test_score = []
-
-    total_size = len(datasets[0])
-    fraction = 1/k_fold
-    seg = int(total_size * fraction)
-    # tr:train,val:valid; r:right,l:left;  eg: trrr: right index of right side train subset 
-    # index: [trll,trlr],[vall,valr],[trrl,trrr]
-    for i in range(k_fold):
-        trll = 0
-        trlr = i * seg
-        vall = trlr
-        valr = i * seg + seg
-        trrl = valr
-        trrr = total_size
-
-        train_left_indices = list(range(trll,trlr))
-        train_right_indices = list(range(trrl,trrr))
-        
-        train_indices = train_left_indices + train_right_indices
-        val_indices = list(range(vall,valr))
-
-        train_loaders = []
-        val_loaders = []
-        test_loaders = []
-
-        #Set up so identical seed is used
-        torch.manual_seed(1)
-        seed = int(torch.empty((), dtype=torch.int64).random_().item())  # use the same seed as Scenario 1
-        G = torch.Generator()
-
-        #There will always be at least one dataset, use samplers made for that first dataset for all of them
-        train_sample = RandomSampler(datasets[0][train_indices], generator=G)
-        val_sample = RandomSampler(datasets[0][val_indices], generator=G)
-        test_sample = RandomSampler(test_dataset[0], generator=G)
-
-        init = G.get_state()
-        for dataset in datasets:
-            train_set = dataset[train_indices]
-            val_set = dataset[val_indices]
-            test_set = test_dataset[0]
-
-            train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler = train_sample, drop_last = True))
-            val_loaders.append(GeoLoader(val_set, batch_size=batch, sampler = val_sample, drop_last = True))
-            test_loaders.append(GeoLoader(test_set, batch_size=batch, sampler = test_sample, drop_last = True))
-
-            #Reset the generator so every dataset gets the same sampling 
-            G.set_state(init)
-
-        G.set_state(init)
-
-        model = GN.GAT(dim_in = datasets[0].num_node_features, dim_h=128, dim_out=3)
-        model = model.to("cuda")
-            
-        model, embeddings, losses, accuracies, outputs, vals, tests = GN.train(model, train_loaders, val_loaders, test_loaders, G, epochs)
-        train_score.append(accuracies[1])
-        #val_acc = valid(res_model,criterion,optimizer,val_loader)
-        val_score.append(vals[-1])
-        test_score.append(tests[-1])
-    
-    return train_score,val_score, test_score
         
 ### Testing function
 def test_epoch(vae, device, dataloader, joint_output, skeleton_size):
@@ -255,8 +175,6 @@ def test_epoch(vae, device, dataloader, joint_output, skeleton_size):
     Utilities.save_dataset(tensor_to_csv(encoded_dataset, labels, skeleton_size=skeleton_size), joint_output)
     return val_loss / len(dataloader.dataset)
 
-
-
 def plot_ae_outputs(encoder,decoder,n=10, test_dataset=None):
     plt.figure(figsize=(16,4.5))
     targets = test_dataset.targets.numpy()
@@ -280,9 +198,3 @@ def plot_ae_outputs(encoder,decoder,n=10, test_dataset=None):
       if i == n//2:
          ax.set_title('Reconstructed images')
     plt.show()  
-
-
-
-def show_image(img):
-    npimg = img.numpy()
-    plt.imshow(np.transpose(npimg, (1, 2, 0)))

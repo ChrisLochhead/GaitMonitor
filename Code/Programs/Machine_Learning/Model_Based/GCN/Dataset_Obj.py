@@ -10,7 +10,7 @@ import Programs.Data_Processing.Model_Based.Render as Render
 import Programs.Data_Processing.Model_Based.HCF as HCF
 
 class JointDataset(Dataset):
-    def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip, cycles = False, cycle_preset = None):
+    def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip, cycles = False, cycle_preset = []):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
@@ -21,8 +21,7 @@ class JointDataset(Dataset):
         self.joint_connections = joint_connections
         self.cycles = cycles
         self.num_cycles = 0
-        self.cycle_indices = []
-        self.cycle_preset = cycle_preset
+        self.cycle_indices = cycle_preset
 
         super(JointDataset, self).__init__(root, transform, pre_transform)
         
@@ -48,16 +47,45 @@ class JointDataset(Dataset):
     def download(self):
         pass
 
+    def process_data_from_preset(self, data):
+        gait_cycles = []
+        indice_count = 0
+        print("total: ", sum(self.cycle_indices))
+        #done = 5/0
+        for i, cycle in enumerate(self.cycle_indices):
+            gait_cycle = []
+            for j in range(cycle):
+                gait_cycle.append(data[indice_count])
+                indice_count += 1
+
+            gait_cycles.append(gait_cycle)
+        
+        #print("gait cycle count: {}, gait indice count: {}".format(len(gait_cycles), indice_count))
+        return gait_cycles
+                  
+
     def process(self):
         self.data = pd.read_csv(self.raw_paths[0], header=None)
+        print("size: ", self.data.shape)
         self.data = convert_to_literals(self.data)
         coo_matrix = get_COO_matrix(self.joint_connections)
 
         if self.cycles:
-            if self.cycle_preset != None:
-                self.data_cycles = self.cycle_preset
+            if len(self.cycle_indices) != 0:
+                self.data_cycles = self.process_data_from_preset(self.data.to_numpy())
+            #t = 0
+            #for c in self.data_cycles:
+            #    t += len(c)
+            #print("total len: ", t)
+            #d=  5/0
+                
             else:
                 self.data_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
+                t = 0
+                for d in self.data_cycles:
+                    t += len(d)
+                print("size 3: ", t)
+
             
             self.data = pd.DataFrame(self.data_cycles)
             self.num_cycles = len(self.data_cycles)
@@ -376,45 +404,18 @@ class HCFDataset(Dataset):
         self.data = pd.read_csv(self.raw_paths[0], header=None)
         self.data = convert_to_literals(self.data)
 
-        if self.cycles:
-            if self.cycle_preset != None:
-                self.data_cycles = self.cycle_preset
+        for index, row in tqdm(self.data.iterrows(), total=self.data.shape[0]):
+            # Featurize molecule
+            data = data_to_tensor(row)
+
+            if self.test:
+                torch.save(data, 
+                    os.path.join(self.processed_dir, 
+                                f'data_test_{index}.pt'))
             else:
-                self.data_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
-            
-            self.data = pd.DataFrame(self.data_cycles)
-            self.num_cycles = len(self.data_cycles)
-            for index, row in enumerate(tqdm(self.data_cycles, total=len(self.data_cycles[0]))):
-                
-                self.cycle_indices.append(len(row))
-
-                # Featurize molecule
-                data = data_to_tensor(row)
-                if self.test:
-                    torch.save(data, 
-                        os.path.join(self.processed_dir, 
-                                    f'data_test_{index}.pt'))
-                else:
-                    torch.save(data, 
-                        os.path.join(self.processed_dir, 
-                                    f'data_{index}.pt'))
-                
-                t_data = torch.load(os.path.join(self.processed_dir, 
-                        f'data_{index}.pt'))             
-        else:
-
-            for index, row in tqdm(self.data_cycles.iterrows(), total=self.data_cycles.shape[0]):
-                # Featurize molecule
-                data = data_to_tensor(row)
-
-                if self.test:
-                    torch.save(data, 
-                        os.path.join(self.processed_dir, 
-                                    f'data_test_{index}.pt'))
-                else:
-                    torch.save(data, 
-                        os.path.join(self.processed_dir, 
-                                    f'data_{index}.pt'))
+                torch.save(data, 
+                    os.path.join(self.processed_dir, 
+                                f'data_{index}.pt'))
 
     def len(self):
         return self.data.shape[0]

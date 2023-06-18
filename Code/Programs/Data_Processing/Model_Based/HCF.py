@@ -16,22 +16,24 @@ def get_gait_cycles(joint_data, images):
         if joints[0] == current_instance:
             instance.append(joints)
         else:
-            #Check if previous gait cycle too small (less than 5) and in that case just add it to one further back
-            #print("instance lens: ", len(instance))
-            #if len(instance) < 5:
-            #    if len(instances) > 0:
-            #        instances[-1] += instance
-            #else:
             instances.append(copy.deepcopy(instance))
             instance = []
             instance.append(joints)
             current_instance = joints[0]
+    #Add the last instance hanging off missed by the loop
+    instances.append(copy.deepcopy(instance))
 
+    t = 0
+    for d in instances:
+        t += len(d)
+
+    print("size 4: ", t)
 
     gait_cycles = []
     gait_cycle = []
 
     #For each instance
+    inst_count = 0
     for i, inst in enumerate(instances):
 
         if i > 0:
@@ -52,6 +54,7 @@ def get_gait_cycles(joint_data, images):
         row_18_previous = -1
 
         for j, row in enumerate(inst):
+
             #Only register initial direction if they aren't equal
             if found_initial_direction == False:
                 if row[18][1] > row[19][1]:
@@ -90,6 +93,7 @@ def get_gait_cycles(joint_data, images):
                 #There is either no cross over or the rows are totally equal, in which case just add as usual
                 gait_cycle.append(row)
 
+
             #row 16 is right leg at crossover point
             #print("crossover count: {} and current instance length: {}, direction: {}, row 18: {}, row 19: {} ".format(crossovers, len(gait_cycle), direction, row[18], row[19]))
             #Render.render_joints(images[j], row, delay=True, use_depth=False)
@@ -113,6 +117,9 @@ def get_gait_cycles(joint_data, images):
                 #Otherwise just add this one and reset it before the next instance starts.
                     gait_cycles.append(gait_cycle)
                     gait_cycle = []
+
+    #Append final gait cycle missed by loop
+    gait_cycles.append(gait_cycle)
 
     #Illustrate results
     col = (0,0,255)
