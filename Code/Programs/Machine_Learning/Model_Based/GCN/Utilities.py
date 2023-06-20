@@ -195,7 +195,8 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
 
             loss = criterion(out, data.y)
             total_loss += loss / len(loader[0])
-            #print("train outputs: ", data.y)
+            print("train outputs: ", data.y)
+            print("vs predictions: ", out.argmax(dim=1))
             acc += accuracy(out.argmax(dim=1), data.y) / len(loader[0])
             loss.backward()
             optimizer.step()
@@ -263,8 +264,8 @@ def test(model, loaders, generator, train = False):
         #_, out = model(data.x, data.edge_index, data.batch, train)
         _, out = model(data_x, data_i, data_b, train)
         loss += criterion(out, data.y) / len(loaders[0])
-        #print("val or test acc: ", acc, data.y)
-        #print("accuracy counts: ", out.argmax(dim=1))
+        print("val or test acc: ", acc, data.y)
+        print("val or test predictions: ", out.argmax(dim=1))
         acc += accuracy(out.argmax(dim=1), data.y) / len(loaders[0])
 
     return loss, acc

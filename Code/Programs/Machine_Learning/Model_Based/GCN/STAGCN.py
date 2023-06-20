@@ -34,7 +34,8 @@ class STGCNBlock(torch.nn.Module):
         return x
 
 class MultiInputSTGACN(torch.nn.Module):
-    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, hcf = False, stgcn_size = 3, stgcn_filters = [64, 128, 256]):
+    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, hcf = False, stgcn_size = 3, stgcn_filters = [64, 128, 256], 
+                 multi_layer_feedback = False):
         super(MultiInputSTGACN, self).__init__()
 
         dim_half = int(dim_h/2)
@@ -72,15 +73,18 @@ class MultiInputSTGACN(torch.nn.Module):
 
         #Final processing after combination
          #Extra linear layer to compensate for more data
-        total_num_layers = len(self.streams)
-        linear_input = (total_num_layers - 1) * (dim_h + dim_half + dim_4th + dim_8th)
-        #HCF only concatenates the last (or smallest) hidden layer, GAT convs take all 4 layers
-        if self.hcf:
-            linear_input += dim_8th
-        else:
-            (dim_h + dim_half + dim_4th + dim_8th)
 
-        self.fc1 = Linear(456, 128)
+        if multi_layer_feedback:
+            linear_input = dim_h * 2 * (len(self.data_dims) -1)
+            #HCF only concatenates the last (or smallest) hidden layer, GAT convs take all 4 layers
+        else:
+            linear_input = self.stgcn_filters[-1]
+
+        if self.hcf:
+            #Add output of final hcf layer
+            linear_input += dim_8th
+
+        self.fc1 = Linear(linear_input, 128)
         self.b1 = BatchNorm1d(128)
         self.fc2 = Linear(128, 64)
         self.b2 = BatchNorm1d(64)
@@ -132,8 +136,10 @@ class MultiInputSTGACN(torch.nn.Module):
                         #print("last layer appended only (hcf): ", i)
                         hidden_layer_stream.append(h)
                 else:
-                   # print("appending layer in stream {} at layer {}".format(stream_no, i))
-                    hidden_layer_stream.append(h)
+                    #Only add the last layer (simplified)
+                    if i == len(stream) - 1:
+                        #print("appending layer in stream {} at layer {}".format(stream_no, i))
+                        hidden_layer_stream.append(h)
 
             hidden_layers.append(hidden_layer_stream)
             
