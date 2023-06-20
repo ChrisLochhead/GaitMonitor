@@ -35,7 +35,7 @@ class GAT(torch.nn.Module):
     def forward(self, xs, edge_indices, batches, train):
         #This will be passed as a 1D array if a normal GAT with only a single input stream
         x = xs[0].to("cuda")
-        print("type: ", xs[0], type(xs[0]))
+        #print("type: ", xs[0], type(xs[0]))
         stop = 5/0
         edge_index = edge_indices[0].to("cuda")
         batch = batches[0].to("cuda")
@@ -96,9 +96,10 @@ class MultiInputGAT(torch.nn.Module):
 
         for i in range(self.num_inputs):
             i_stream = []
-            if i == len(range(self.num_inputs)) - 1 and hcf == True:
-                print("Building HCF module: ,", i) # This is a normal linear net for HCF data without graphical structure
-                i_stream.append(Linear(dim_in, dim_h))
+            if i == len(range(self.num_inputs)) - 1 and self.hcf == True:
+                print("Building HCF module: ,", i, dim_in) # This is a normal linear net for HCF data without graphical structure
+                
+                i_stream.append(Linear(dim_in[i], dim_h))
                 i_stream.append(BatchNorm1d(dim_h))
                 i_stream.append(Linear(dim_h, dim_half))
                 i_stream.append(BatchNorm1d(dim_half))
@@ -107,8 +108,8 @@ class MultiInputGAT(torch.nn.Module):
                 i_stream.append(Linear(dim_4th, dim_8th))
                 i_stream.append(BatchNorm1d(dim_8th))
             else:
-                print("Building GAT module: ,", i)
-                i_stream.append(GATv2Conv(dim_in, dim_h, heads=heads[0]))
+                print("Building GAT module: ,", i, dim_in)
+                i_stream.append(GATv2Conv(dim_in[i], dim_h, heads=heads[0]))
                 i_stream.append(BatchNorm1d(dim_h))
                 i_stream.append(GATv2Conv(dim_h*heads[1], dim_half, heads=heads[2]))
                 i_stream.append(BatchNorm1d(dim_half))
@@ -134,11 +135,19 @@ class MultiInputGAT(torch.nn.Module):
                                           weight_decay=5e-4)
 
         #Extra linear layer to compensate for more data
-        self.lin1 = Linear(256 * n_inputs, 128 * n_inputs)
-        self.m1 = BatchNorm1d(128* n_inputs)
-        self.lin2 = Linear(128* n_inputs, 64 * n_inputs)
-        self.m2 = BatchNorm1d(64* n_inputs)
-        self.lin3 = Linear(64* n_inputs, dim_out)
+        total_num_layers = len(self.streams)
+        linear_input = (total_num_layers - 1) * (dim_h + dim_half + dim_4th + dim_8th)
+        #HCF only concatenates the last (or smallest) hidden layer, GAT convs take all 4 layers
+        if self.hcf:
+            linear_input += dim_8th
+        else:
+            (dim_h + dim_half + dim_4th + dim_8th)
+
+        self.lin1 = Linear(linear_input, 256)
+        self.m1 = BatchNorm1d(256)
+        self.lin2 = Linear(256, 64)
+        self.m2 = BatchNorm1d(64)
+        self.lin3 = Linear(64, dim_out)
 
     def forward(self, data, edge_indices, batches, train):
         for i, x in enumerate(data):
@@ -147,55 +156,55 @@ class MultiInputGAT(torch.nn.Module):
             if edge_indices[i] is not None:
                 edge_indices[i] = edge_indices[i].to("cuda")
             batches[i] = batches[i].to("cuda")
-        #print("original : ", x.shape)
+
 
         hidden_layers = []
         stream_outputs = []
         h = data[i]
+        #print("input: ", h.shape)
         for stream_no, stream in enumerate(self.streams):
-            print("all streams: ", self.streams)
+           # print("processing stream: ", stream_no)
             h = data[stream_no]
+            hidden_layer_stream = []
             for i, layer in enumerate(stream):
+              #  print("processing layer no: ", i)
                 #Only stop at each GATConv Layer
-                if i / 2 == 0:
+                if i % 2 == 0:
                     #This is the usual convolution block #if hcf, this is just a linear layer
-                    print("layer: ", i, layer, stream_no)
                     if stream_no == len(self.streams) - 1 and self.hcf:
                         h = F.relu(layer(h))
+                        #print("hcf layer: ", layer, i, self.hcf, h.shape)
                     else:
-                        print("layer: ", layer, i, self.hcf)
                         h = F.relu(layer(h, edge_indices[stream_no]))
+                        #print("GAT layer: ", layer, i, self.hcf, h.shape)
                     #Batch norm always the next one
                     h = stream[i + 1](h)
                     h = F.dropout(h, p=0.1, training=train)
                     #Record each  hidden layer value
-                    print("length of stream", i, len(stream))
-                    hidden_layers.append(h)
+                    if self.hcf and stream_no + 1 == len(self.streams):
+                        if i == len(stream) - 2:
+                            #print("last layer appended only (hcf): ", i)
+                            hidden_layer_stream.append(h)
+                    else:
+                        #print("appending layer in stream {} at layer {}".format(stream_no, i))
+                        hidden_layer_stream.append(h)
+
+            hidden_layers.append(hidden_layer_stream)
             
-            #After the stream is done, concatenate each streams layers
-            h_layers = []
-            for i, hidden in enumerate(hidden_layers):
-                h_layers.append(global_add_pool(hidden_layers[i], batches[i]))
+        #After the stream is done, concatenate each streams layers
+        h_layers = []
+        for i, hidden_stream in enumerate(hidden_layers):
+            #print("new stream", i)
+            for j, layer in enumerate(hidden_stream):
+                #print("stream {} layer {}".format(i, j))
+                #print("size: ", hidden_layers[i][j].shape, j)
+                h_layers.append(global_add_pool(hidden_layers[i][j], batches[i]))
 
-            #h1 = global_add_pool(hidden_layers[0], batches[0])
-            #h2 = global_add_pool(hidden_layers[1], batches[1])
-            #h3 = global_add_pool(hidden_layers[2], batches[2])
-            #h4 = global_add_pool(hidden_layers[3], batches[3])
-
-            # Concatenate graph embeddings
-            #print("sizes: ", h1.shape, h2.shape, h3.shape)#, h4.shape)
-            stream_outputs.append(torch.cat(([l for l in h_layers]), dim=1))
-
-        #Concatenate all stream outputs
-        h_out = stream_outputs[0]
-        for i, output in enumerate(stream_outputs):
-            if i != 0:
-                h_out = torch.cat((h_out, output), dim=1)
-
-        print("shape of concatenated output: ", h_out.shape)
+        # Concatenate graph embeddings
+        h_out = torch.cat(([l for l in h_layers]), dim=1)
 
         # Classifier
-        h = F.relu(self.lin1(h))
+        h = F.relu(self.lin1(h_out))
         h = self.m1(h)
         h = F.dropout(h, p=0.1, training=train)
         h = F.relu(self.lin2(h))

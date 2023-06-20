@@ -8,6 +8,7 @@ from tqdm import tqdm
 from torchvision import transforms
 import Programs.Data_Processing.Model_Based.Render as Render
 import Programs.Data_Processing.Model_Based.HCF as HCF
+import copy
 
 class JointDataset(Dataset):
     def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip, cycles = False, cycle_preset = []):
@@ -21,8 +22,7 @@ class JointDataset(Dataset):
         self.joint_connections = joint_connections
         self.cycles = cycles
         self.num_cycles = 0
-        self.cycle_indices = cycle_preset
-
+        self.cycle_indices = copy.deepcopy(cycle_preset)
         super(JointDataset, self).__init__(root, transform, pre_transform)
         
     @property
@@ -50,8 +50,6 @@ class JointDataset(Dataset):
     def process_data_from_preset(self, data):
         gait_cycles = []
         indice_count = 0
-        print("total: ", sum(self.cycle_indices))
-        #done = 5/0
         for i, cycle in enumerate(self.cycle_indices):
             gait_cycle = []
             for j in range(cycle):
@@ -66,37 +64,51 @@ class JointDataset(Dataset):
 
     def process(self):
         self.data = pd.read_csv(self.raw_paths[0], header=None)
-        print("size: ", self.data.shape)
         self.data = convert_to_literals(self.data)
         coo_matrix = get_COO_matrix(self.joint_connections)
 
         if self.cycles:
             if len(self.cycle_indices) != 0:
-                self.data_cycles = self.process_data_from_preset(self.data.to_numpy())
-            #t = 0
-            #for c in self.data_cycles:
-            #    t += len(c)
-            #print("total len: ", t)
-            #d=  5/0
-                
+                self.data_cycles = self.process_data_from_preset(self.data.to_numpy())              
             else:
                 self.data_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
-                t = 0
-                for d in self.data_cycles:
-                    t += len(d)
-                print("size 3: ", t)
 
+
+            t = 0
+            max_cycle = 0
+            for i, d in enumerate(self.data_cycles):
+                t += len(d)
+                if len(d) > max_cycle:
+                    max_cycle = len(d)
             
-            self.data = pd.DataFrame(self.data_cycles)
-            self.num_cycles = len(self.data_cycles)
-            for index, row in enumerate(tqdm(self.data_cycles, total=len(self.data_cycles[0]))):
-                
-                self.cycle_indices.append(len(row))
+            self.padded_cycles = copy.deepcopy(self.data_cycles)
+            #Pad all examples out to make every graph the same size
+            for i, cycle in enumerate(self.padded_cycles):
+                if len(cycle) < max_cycle:
+                    diff = abs(int(max_cycle - len(cycle)))
+                    iter_tool = 0
+                    for j in range(diff):
+                        if iter_tool < len(cycle):
+                            self.padded_cycles[i].append(self.padded_cycles[i][iter_tool])
+                            iter_tool += 1
+                        else:
+                            iter_tool = 0
+                            self.padded_cycles[i].append(self.padded_cycles[i][iter_tool])
+            
+            #This deactivates padded cycles
+            self.padded_cycles = copy.deepcopy(self.data_cycles)
 
+            self.data = pd.DataFrame(self.padded_cycles)
+            self.num_cycles = len(self.padded_cycles)
+            for index, row in enumerate(tqdm(self.padded_cycles, total=len(self.padded_cycles[0]))):
+                
+                self.cycle_indices.append(len(self.data_cycles[index]))
+                    
                 #Start from scratch with coo matrix every cycle as cycles will be different lengths
                 coo_matrix = get_COO_matrix(self.joint_connections)
                 mod_coo_matrix = self.modify_COO_matrix(len(row), self.joint_connections, coo_matrix)
                 # Featurize molecule
+                #print("row: ", len(row), row)
                 data = data_to_graph(row, mod_coo_matrix)
                 if self.test:
                     torch.save(data, 
@@ -113,7 +125,7 @@ class JointDataset(Dataset):
                  
         else:
 
-            for index, row in tqdm(self.data_cycles.iterrows(), total=self.data_cycles.shape[0]):
+            for index, row in tqdm(self.data.iterrows(), total=self.data.shape[0]):
                 # Featurize molecule
                 data = data_to_graph(row, coo_matrix)
 
@@ -272,7 +284,7 @@ def convert_to_literals(data):
                 tmp = ast.literal_eval(row[col_index])
                 data.iat[i, col_index] = copy.deepcopy(tmp)
             else:
-                data.iat[i, col_index] = int(data.iat[i, col_index])
+                data.iat[i, col_index] = data.iat[i, col_index]
 
     return data
             
@@ -290,7 +302,7 @@ def data_to_graph(row, coo_matrix):
         y = int(row.iloc[2])
 
         data = Data(x=torch.tensor(row_as_array, dtype=torch.float),
-                    y=torch.tensor([y], dtype=torch.long),
+                    y=torch.tensor(y, dtype=torch.long),
                     edge_index=torch.tensor(coo_matrix, dtype=torch.long),
                     #This isn't needed
                     #edge_attr=torch.tensor(edge_attr,dtype=torch.float)
@@ -551,9 +563,9 @@ def data_to_tensor(row):
         #Turn into one-hot vector
         y = int(row.iloc[2])
 
-        data = Data(x=torch.tensor(row_as_array, dtype=torch.float),
+        data = Data(x=torch.tensor([row_as_array], dtype=torch.float),
                     y=torch.tensor([y], dtype=torch.long))
-        
+                
         return data
     #The multi-instance case (with gait cycles, row is a full cycle of frames or varying length)
     else:

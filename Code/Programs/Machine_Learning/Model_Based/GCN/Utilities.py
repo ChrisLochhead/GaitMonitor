@@ -3,6 +3,8 @@ import torch
 from torch_geometric.loader import DataLoader as GeoLoader
 from torch.utils.data import RandomSampler
 import Programs.Machine_Learning.Model_Based.GCN.GAT as gat
+from torch.nn.utils.rnn import pad_sequence
+import copy
 
 def assess_data(dataset):
     print("Dataset type: ", type(dataset), type(dataset[0]))
@@ -26,8 +28,38 @@ def assess_data(dataset):
 def accuracy(pred_y, y):
     return (pred_y == y).sum() / len(y)
 
+def collate_fn(data_list):
+
+    print("is collate even being used????")
+    # Separate the graphs, labels, and edge indices
+    graphs = [data.x for data in data_list]
+    labels = [data.y for data in data_list]
+    edge_indices = [data.edge_index for data in data_list]
+
+    # Pad the graphs to the maximum size within the batch
+    batched_graph = pad_sequence(graphs, batch_first=True)
+
+    # Compute the cumulative number of nodes per graph
+    num_nodes = [data.num_nodes for data in data_list]
+    cum_num_nodes = torch.tensor([0] + num_nodes).cumsum(dim=0)
+
+    # Offset the node indices in each graph to make them unique across the batch
+    for i, data in enumerate(data_list):
+        data.edge_index += cum_num_nodes[i]
+        data.edge_attr += cum_num_nodes[i]
+        data.x += cum_num_nodes[i]
+
+    # Combine the edge indices into a single tensor
+    edge_indices_offset = []
+    for i, edge_index in enumerate(edge_indices):
+        edge_indices_offset.append(edge_index + cum_num_nodes[i])
+
+    # Combine the graphs, labels, and edge indices into a single Data object
+    batched_data = torch.Data(x=[1, 3], y=torch.tensor(labels), edge_index=torch.cat(edge_indices_offset, dim=1))
+    return 5
+
 # define a cross validation function
-def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=None,k_fold=5, batch = 32, inputs_size = 1, epochs = 100):
+def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=None,k_fold=3, batch = 16, inputs_size = 1, epochs = 100):
     
     train_score = []
     val_score = []
@@ -62,17 +94,23 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         G = torch.Generator()
 
         #There will always be at least one dataset, use samplers made for that first dataset for all of them
-        train_sample = RandomSampler(datasets[0][train_indices], generator=G)
+        train_sample = RandomSampler(datasets[0][train_indices], generator=G, num_samples=batch)
         val_sample = RandomSampler(datasets[0][val_indices], generator=G)
         test_sample = RandomSampler(test_dataset[0], generator=G)
 
         init = G.get_state()
-        for dataset in datasets:
+        for i, dataset in enumerate(datasets):
             train_set = dataset[train_indices]
             val_set = dataset[val_indices]
-            test_set = test_dataset[0]
+            test_set = test_dataset[i]
+            #print("train set: ", train_set)
+            #print("first example: ", train_set[0])
+            #print("batch: ", batch)
+            train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler = val_sample, drop_last = True))
 
-            train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler = train_sample, drop_last = True))
+            #for b, d in enumerate(train_loaders[-1]):
+            #    print("data example: ", d, b)
+
             val_loaders.append(GeoLoader(val_set, batch_size=batch, sampler = val_sample, drop_last = True))
             test_loaders.append(GeoLoader(test_set, batch_size=batch, sampler = test_sample, drop_last = True))
 
@@ -81,7 +119,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
 
         G.set_state(init)
 
-        model = MY_model
+        model = copy.deepcopy(MY_model)
         model = model.to("cuda")
 
         #model = gat.GAT(dim_in = datasets[0].num_node_features, dim_h=128, dim_out=3)
@@ -133,7 +171,6 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
             generator.set_state(init)
             for j, data in enumerate(load):
                 data = data.to("cuda")
-                #print("size here", data.x.size())
                 xs_batch[i].append(data.x)
                 indice_batch[i].append(data.edge_index)
                 batch_batch[i].append(data.batch)
@@ -155,6 +192,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
             #h, out = model([xs_batch[0][index]], [indice_batch[0][index]], [batch_batch[0][index]], train=True)
 
             #First data batch with Y has to have the right outputs
+
             loss = criterion(out, data.y)
             total_loss += loss / len(loader[0])
             #print("train outputs: ", data.y)
@@ -225,7 +263,8 @@ def test(model, loaders, generator, train = False):
         #_, out = model(data.x, data.edge_index, data.batch, train)
         _, out = model(data_x, data_i, data_b, train)
         loss += criterion(out, data.y) / len(loaders[0])
-        #print("acc: ", acc, data.y)
+        #print("val or test acc: ", acc, data.y)
+        #print("accuracy counts: ", out.argmax(dim=1))
         acc += accuracy(out.argmax(dim=1), data.y) / len(loaders[0])
 
     return loss, acc

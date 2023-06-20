@@ -150,16 +150,20 @@ def process_data():
                                                       image_data)
 #########################################################################################################################
 
-def load_2_region_data(cycles, preset = None):
+def load_2_region_data(cycle, preset = None):
+    tmp = copy.deepcopy(cycle)
+    print("len first: ", len(tmp))
+
     top_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_top',
                                         '16_Combined_Data_2Region_top.csv',
-                                        joint_connections=Render.top_joint_connections, cycles=copy.deepcopy(cycles))
+                                        joint_connections=Render.top_joint_connections, cycles=True, cycle_preset=tmp)
     
+    print("len now: ", len(tmp))
     bottom_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/16_Combined_Data_2Region_bottom',
                                         '16_Combined_Data_2Region_bottom.csv',
-                                        joint_connections=Render.bottom_joint_connection, cycles=copy.deepcopy(cycles))
+                                        joint_connections=Render.bottom_joint_connection, cycles=True, cycle_preset=tmp)
         
-    if cycles:
+    if cycle:
         top_cycles, bottom_cycles = preset.split_cycles()
         top_region.data_cycles = top_cycles
         bottom_region.data_cycles = bottom_cycles
@@ -169,21 +173,21 @@ def load_2_region_data(cycles, preset = None):
 def load_5_region_data(cycles, preset = None):
     left_leg = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionl_leg',
                                               '17_Combined_Data_5Regionl_leg.csv',
-                                              joint_connections=Render.limb_connections, cycles=copy.deepcopy(cycles))
+                                              joint_connections=Render.limb_connections, cycles=True, cycle_preset = copy.deepcopy(cycles))
     
     right_leg = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionr_leg',
                                            '17_Combined_Data_5Regionr_leg.csv',
-                                            joint_connections=Render.limb_connections, cycles=copy.deepcopy(cycles))
+                                            joint_connections=Render.limb_connections, cycles=True, cycle_preset = copy.deepcopy(cycles))
     left_arm = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionl_arm',
                                               '17_Combined_Data_5Regionl_arm.csv',
-                                              joint_connections=Render.limb_connections, cycles=copy.deepcopy(cycles))
+                                              joint_connections=Render.limb_connections, cycles=True, cycle_preset = copy.deepcopy(cycles))
     
     right_arm = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionr_arm',
                                            '17_Combined_Data_5Regionr_arm.csv',
-                                            joint_connections=Render.limb_connections, cycles=copy.deepcopy(cycles))   
+                                            joint_connections=Render.limb_connections, cycles=True, cycle_preset = copy.deepcopy(cycles))   
     head_data = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/17_Combined_Data_5Regionhead',
                                               '17_Combined_Data_5Regionhead.csv',
-                                              joint_connections=Render.head_joint_connections, cycles=copy.deepcopy(cycles))
+                                              joint_connections=Render.head_joint_connections, cycles=True, cycle_preset= copy.deepcopy(cycles))
     
 
     if cycles:
@@ -224,7 +228,7 @@ def load_datasets(types, cycles):
 
         elif t == 1 and cycles == False:
             dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/Office_Dataset/15.5_Combined_Data(normed)', '15.5_Combined_Data(normed).csv',
-                                        joint_connections=Render.joint_connections_m_hip, cycles=True, cycle_preset=copy.deepcopy(gait_cycles_data.cycle_indices))
+                                        joint_connections=Render.joint_connections_m_hip, cycles=False)
             datasets.append(dataset)
         #Type 2: HCF dataset
         elif t == 2 and cycles:
@@ -236,12 +240,14 @@ def load_datasets(types, cycles):
             print("d: ", dataset[0].x)
         #Type 3: 2 region
         elif t == 3:
-            top_region, bottom_region = load_2_region_data(cycles, full_region)
+            print("len here: ", len(gait_cycles_data.cycle_indices))
+            top_region, bottom_region = load_2_region_data(gait_cycles_data.cycle_indices, full_region)
             datasets.append(top_region)
             datasets.append(bottom_region)
         #Type 4: 5 region
         elif t == 4:
-            l_l, r_l, l_a, r_a, h = load_5_region_data(cycles, full_region)
+            print("len here: ", len(gait_cycles_data.cycle_indices))
+            l_l, r_l, l_a, r_a, h = load_5_region_data(copy.deepcopy(gait_cycles_data.cycle_indices), full_region)
             datasets.append(l_l)
             datasets.append(r_l)
             datasets.append(l_a)
@@ -254,22 +260,23 @@ def load_datasets(types, cycles):
 
 def process_datasets(datasets, dataset_size):
     print("Processing data...")
-    train_val_indices = random.sample(range(dataset_size), int(0.8 * dataset_size))
-    test_indices = random.sample(set(range(dataset_size)) - set(train_val_indices), int(0.2 * dataset_size))
+    train_val_indices = random.sample(range(dataset_size), int(0.85 * dataset_size))
+    test_indices = random.sample(set(range(dataset_size)) - set(train_val_indices), int(0.15 * dataset_size))
 
     #These regions will be the same for both datasets
     multi_input_train_val = []
     multi_input_test = []
     for i, dataset in enumerate(datasets):
         print("dataset {} of {}.".format(i + 1, len(datasets)))
-        print("values:", min(train_val_indices), max(train_val_indices))
-        print("values:", min(test_indices), max(test_indices))
-        print("values: ", len(dataset))
         print("info: ", dataset)
         multi_input_train_val.append(dataset[train_val_indices])
         multi_input_test.append(dataset[test_indices])
     
+    
     print("Dataset processing complete.")
+    print("m1: ", multi_input_train_val)
+    print("m2: ", multi_input_test)
+
     return multi_input_train_val, multi_input_test
 
 def process_results(train_scores, val_scores, test_scores):
@@ -360,18 +367,17 @@ def process_autoencoder():
     Utilities.save_dataset(concatenated_regions, './Code/Datasets/Joint_Data/Office_Dataset/18_encoded_concat_2region/raw/encoded_concat_2region.csv')
     print("Concatenation sucessful...")
 
-def run_model(dataset_types, cycles, model_type):
+def run_model(dataset_types, cycles, model_type, hcf):
 
     #Load the full dataset alongside HCF with gait cycles
     datasets = load_datasets(dataset_types, cycles)
-    
+
     #Process datasets by manually shuffling to account for cycles
     multi_input_train_val, multi_input_test = process_datasets(datasets, len(datasets[0]))
 
     print("Creating GAT model with {} datasets: ".format(len(datasets)))
     if model_type == "GAT":
-        print("these: ",datasets[0].num_features, datasets[0].num_node_features, datasets[1].num_features, datasets[1].num_node_features )
-        model = gat.MultiInputGAT(dim_in=datasets[0].num_node_features, dim_h=16, dim_out=3, hcf=True)
+        model = gat.MultiInputGAT(dim_in=[d.num_node_features for d in datasets], dim_h=64, dim_out=3, hcf=hcf, n_inputs=len(datasets))
         model = model.to("cuda")
     elif model_type == "ST-AGCN":
         model = stgcn.MultiInputSTGACN(datasets[0].num_features, datasets[0].num_node_features, dim_h=16, num_classes=3, n_inputs=len(datasets))
@@ -381,7 +387,7 @@ def run_model(dataset_types, cycles, model_type):
         return
 
     #Run cross-validated training
-    train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val, k_fold=5, batch=32, epochs=20)
+    train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val, k_fold=3, batch=16, epochs=100)
 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
@@ -394,4 +400,4 @@ def run_model(dataset_types, cycles, model_type):
 if __name__ == '__main__':
     #process_data()
     #process_autoencoder()
-    run_model(dataset_types= [1,2], cycles = True, model_type = "GAT")
+    run_model(dataset_types= [1,3,2], cycles = True, model_type = "GAT", hcf=True)
