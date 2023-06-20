@@ -11,7 +11,8 @@ import Programs.Data_Processing.Model_Based.HCF as HCF
 import copy
 
 class JointDataset(Dataset):
-    def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip, cycles = False, cycle_preset = []):
+    def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip,
+                  cycles = False, cycle_preset = [], padding = False):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
@@ -23,6 +24,7 @@ class JointDataset(Dataset):
         self.cycles = cycles
         self.num_cycles = 0
         self.cycle_indices = copy.deepcopy(cycle_preset)
+        self.padding = padding
         super(JointDataset, self).__init__(root, transform, pre_transform)
         
     @property
@@ -81,22 +83,24 @@ class JointDataset(Dataset):
                 if len(d) > max_cycle:
                     max_cycle = len(d)
             
+
             self.padded_cycles = copy.deepcopy(self.data_cycles)
-            #Pad all examples out to make every graph the same size
-            for i, cycle in enumerate(self.padded_cycles):
-                if len(cycle) < max_cycle:
-                    diff = abs(int(max_cycle - len(cycle)))
-                    iter_tool = 0
-                    for j in range(diff):
-                        if iter_tool < len(cycle):
-                            self.padded_cycles[i].append(self.padded_cycles[i][iter_tool])
-                            iter_tool += 1
-                        else:
-                            iter_tool = 0
-                            self.padded_cycles[i].append(self.padded_cycles[i][iter_tool])
-            
+            if self.padding:
+                #Pad all examples out to make every graph the same size
+                for i, cycle in enumerate(self.padded_cycles):
+                    if len(cycle) < max_cycle:
+                        diff = abs(int(max_cycle - len(cycle)))
+                        iter_tool = 0
+                        for j in range(diff):
+                            if iter_tool < len(cycle):
+                                self.padded_cycles[i].append(self.padded_cycles[i][iter_tool])
+                                iter_tool += 1
+                            else:
+                                iter_tool = 0
+                                self.padded_cycles[i].append(self.padded_cycles[i][iter_tool])
+                
             #This deactivates padded cycles
-            self.padded_cycles = copy.deepcopy(self.data_cycles)
+            #self.padded_cycles = copy.deepcopy(self.data_cycles)
 
             self.data = pd.DataFrame(self.padded_cycles)
             self.num_cycles = len(self.padded_cycles)
