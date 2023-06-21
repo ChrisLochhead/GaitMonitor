@@ -262,8 +262,8 @@ def load_datasets(types, cycles, padding):
 
 def process_datasets(datasets, dataset_size):
     print("Processing data...")
-    train_val_indices = random.sample(range(dataset_size), int(0.85 * dataset_size))
-    test_indices = random.sample(set(range(dataset_size)) - set(train_val_indices), int(0.15 * dataset_size))
+    train_val_indices = random.sample(range(dataset_size), int(0.75 * dataset_size))
+    test_indices = random.sample(set(range(dataset_size)) - set(train_val_indices), int(0.25 * dataset_size))
 
     #These regions will be the same for both datasets
     multi_input_train_val = []
@@ -369,7 +369,7 @@ def process_autoencoder():
     Utilities.save_dataset(concatenated_regions, './Code/Datasets/Joint_Data/Office_Dataset/18_encoded_concat_2region/raw/encoded_concat_2region.csv')
     print("Concatenation sucessful...")
 
-def run_model(dataset_types, cycles, model_type, hcf):
+def run_model(dataset_types, cycles, model_type, hcf, batch_size, epochs):
 
     #Padding only necessary if using ST-GCN for 2D temporal convolutions
     padding = True
@@ -385,23 +385,24 @@ def run_model(dataset_types, cycles, model_type, hcf):
 
     print("Creating GAT model with {} datasets: ".format(len(datasets)))
     if model_type == "GAT":
-        model = gat.MultiInputGAT(dim_in=[d.num_node_features for d in datasets], dim_h=64, dim_out=3, hcf=hcf, n_inputs=len(datasets))
+        model = gat.MultiInputGAT(dim_in=[d.num_node_features for d in datasets], dim_h=32, dim_out=3, hcf=hcf, n_inputs=len(datasets))
         model = model.to("cuda")
     elif model_type == "ST-AGCN":
         data_dims = []
         for dataset in datasets:
             data_pair = [dataset.num_features, dataset.num_node_features]
             data_dims.append(data_pair)
-        
-        model = stgcn.MultiInputSTGACN(datasets[0].num_node_features,
-                                        dim_h=64, num_classes=3, n_inputs=len(datasets), data_dims=data_dims, hcf=hcf)
+
+        model = stgcn.MultiInputSTGACN(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=3,
+                                        batch_size=batch_size, n_inputs=len(datasets), data_dims=data_dims, hcf=hcf)
         model = model.to("cuda")
     else:
         print("Invalid model type.")
         return
 
     #Run cross-validated training
-    train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val, k_fold=3, batch=16, epochs=100)
+    train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
+                                                                     k_fold=3, batch=batch_size, epochs=epochs)
 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
@@ -414,4 +415,4 @@ def run_model(dataset_types, cycles, model_type, hcf):
 if __name__ == '__main__':
     #process_data()
     #process_autoencoder()
-    run_model(dataset_types= [1,2], cycles = True, model_type = "ST-AGCN", hcf=True)
+    run_model(dataset_types= [1,2], cycles = True, model_type = "ST-AGCN", hcf=True, batch_size = 32, epochs = 100)

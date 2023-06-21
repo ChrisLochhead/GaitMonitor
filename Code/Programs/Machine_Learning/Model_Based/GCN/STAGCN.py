@@ -7,7 +7,7 @@ from Programs.Machine_Learning.Model_Based.GCN.Dataset_Obj import *
 from torch_geometric.nn import ChebConv
 
 class STGCNBlock(torch.nn.Module):
-    def __init__(self, in_channels, dim_h, temporal_kernel_size):
+    def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size):
         super(STGCNBlock, self).__init__()
         self.temporal_conv1 = torch.nn.Conv1d(in_channels, dim_h, kernel_size=temporal_kernel_size, padding='same').to("cuda")
         self.spatial_conv = GATv2Conv(dim_h, dim_h, heads=1).to("cuda")
@@ -16,6 +16,8 @@ class STGCNBlock(torch.nn.Module):
         self.temporal_conv2 = torch.nn.Conv1d(dim_h, dim_h, kernel_size=temporal_kernel_size, padding='same').to("cuda")
         self.relu = ReLU()
         self.pooling = torch.nn.MaxPool2d(kernel_size=(1, 0.5)).to("cuda")
+        self.batch_size = batch_size
+        self.cycle_size = cycle_size
 
     def forward(self, x, edge_index):
         #print("x", x.shape)
@@ -28,32 +30,34 @@ class STGCNBlock(torch.nn.Module):
         #print("made it here 1", x.shape)
         x = self.b1(x)
         #Convert to 3D representation for Temporal layer
-        x = x.view(16, x.shape[1], 360)
+        x = x.view(self.batch_size, x.shape[1], self.cycle_size)
         x = self.relu(self.temporal_conv2(x))
         #print("made it to the end ", x.shape)
         return x
 
 class MultiInputSTGACN(torch.nn.Module):
-    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, hcf = False, stgcn_size = 3, stgcn_filters = [64, 128, 256], 
-                 multi_layer_feedback = False):
+    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 3, stgcn_filters = [64, 128, 256], 
+                 multi_layer_feedback = False, cycle_size = 360):
         super(MultiInputSTGACN, self).__init__()
 
         dim_half = int(dim_h/2)
         dim_4th = int(dim_half/2)
         dim_8th = int(dim_4th/2)
+        self.dim_in = dim_in[0]
         self.num_inputs = n_inputs
         self.streams = []
         self.hcf = hcf
         self.size_stgcn = stgcn_size
         self.stgcn_filters = stgcn_filters
-
+        self.batch_size = batch_size
         self.data_dims = data_dims
+        self.cycle_size = cycle_size
 
         for i in range(self.num_inputs):
             i_stream = []
             if i == len(range(self.num_inputs)) - 1 and hcf == True :
                  # This is a normal linear net for HCF data without graphical structure
-                i_stream.append(Linear(23, dim_h).to("cuda"))
+                i_stream.append(Linear(dim_in[1], dim_h).to("cuda"))
                 i_stream.append(BatchNorm1d(dim_h).to("cuda"))
                 i_stream.append(Linear(dim_h, dim_half).to("cuda"))
                 i_stream.append(BatchNorm1d(dim_half).to("cuda"))
@@ -62,10 +66,10 @@ class MultiInputSTGACN(torch.nn.Module):
                 i_stream.append(Linear(dim_4th, dim_8th).to("cuda"))
                 i_stream.append(BatchNorm1d(dim_8th).to("cuda"))
             else:
-                i_stream.append(STGCNBlock(dim_in, self.stgcn_filters[0], 5))
+                i_stream.append(STGCNBlock(dim_in[0], self.stgcn_filters[0], 5, self.batch_size, self.cycle_size))
                 for i in range(self.size_stgcn):
                     if i > 0:
-                        i_stream.append(STGCNBlock(self.stgcn_filters[i-1], self.stgcn_filters[i], 5))
+                        i_stream.append(STGCNBlock(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size))
 
             self.streams.append(i_stream)
         
@@ -111,7 +115,7 @@ class MultiInputSTGACN(torch.nn.Module):
                 #batch, channel, num nodes per cycle, num features
                 #print("being passed: ", 16, self.data_dims[stream_no][0], self.data_dims[stream_no][1])
                 #print("shape before: ", h.shape)
-                h = h.view(16, 9, 360)
+                h = h.view(self.batch_size, self.dim_in, self.cycle_size)
                 #print("shape now: ", h.shape)
 
 

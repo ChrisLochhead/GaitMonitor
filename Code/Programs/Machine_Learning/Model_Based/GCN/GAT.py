@@ -103,20 +103,20 @@ class MultiInputGAT(torch.nn.Module):
                 i_stream.append(BatchNorm1d(dim_h))
                 i_stream.append(Linear(dim_h, dim_half))
                 i_stream.append(BatchNorm1d(dim_half))
-                i_stream.append(Linear(dim_half, dim_4th))
-                i_stream.append(BatchNorm1d(dim_4th))
-                i_stream.append(Linear(dim_4th, dim_8th))
-                i_stream.append(BatchNorm1d(dim_8th))
+                #i_stream.append(Linear(dim_half, dim_4th))
+                #i_stream.append(BatchNorm1d(dim_4th))
+                #i_stream.append(Linear(dim_4th, dim_8th))
+                #i_stream.append(BatchNorm1d(dim_8th))
             else:
                 print("Building GAT module: ,", i, dim_in)
                 i_stream.append(GATv2Conv(dim_in[i], dim_h, heads=heads[0]))
                 i_stream.append(BatchNorm1d(dim_h))
                 i_stream.append(GATv2Conv(dim_h*heads[1], dim_half, heads=heads[2]))
                 i_stream.append(BatchNorm1d(dim_half))
-                i_stream.append(GATv2Conv(dim_half*heads[2], dim_4th, heads=heads[3]))
-                i_stream.append(BatchNorm1d(dim_4th))
-                i_stream.append(GATv2Conv(dim_4th*heads[3], dim_8th, heads=heads[3]))
-                i_stream.append(BatchNorm1d(dim_8th))
+                #i_stream.append(GATv2Conv(dim_half*heads[2], dim_4th, heads=heads[3]))
+                #i_stream.append(BatchNorm1d(dim_4th))
+                #i_stream.append(GATv2Conv(dim_4th*heads[3], dim_8th, heads=heads[3]))
+                #i_stream.append(BatchNorm1d(dim_8th))
             self.streams.append(i_stream)
         
         #Send to the GPU
@@ -136,12 +136,10 @@ class MultiInputGAT(torch.nn.Module):
 
         #Extra linear layer to compensate for more data
         total_num_layers = len(self.streams)
-        linear_input = (total_num_layers - 1) * (dim_h + dim_half + dim_4th + dim_8th)
+        linear_input = (total_num_layers - 1) * (dim_h + dim_half)# + dim_4th + dim_8th)
         #HCF only concatenates the last (or smallest) hidden layer, GAT convs take all 4 layers
         if self.hcf:
-            linear_input += dim_8th
-        else:
-            (dim_h + dim_half + dim_4th + dim_8th)
+            linear_input += dim_half# dim_8th
 
         self.lin1 = Linear(linear_input, 256)
         self.m1 = BatchNorm1d(256)
@@ -179,7 +177,7 @@ class MultiInputGAT(torch.nn.Module):
                         #print("GAT layer: ", layer, i, self.hcf, h.shape)
                     #Batch norm always the next one
                     h = stream[i + 1](h)
-                    h = F.dropout(h, p=0.1, training=train)
+                    h = F.dropout(h, p=0.9, training=train)
                     #Record each  hidden layer value
                     if self.hcf and stream_no + 1 == len(self.streams):
                         if i == len(stream) - 2:

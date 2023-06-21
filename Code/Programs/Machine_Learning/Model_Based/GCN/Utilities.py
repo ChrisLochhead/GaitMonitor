@@ -94,7 +94,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         G = torch.Generator()
 
         #There will always be at least one dataset, use samplers made for that first dataset for all of them
-        train_sample = RandomSampler(datasets[0][train_indices], generator=G, num_samples=batch)
+        train_sample = RandomSampler(datasets[0][train_indices], generator=G)
         val_sample = RandomSampler(datasets[0][val_indices], generator=G)
         test_sample = RandomSampler(test_dataset[0], generator=G)
 
@@ -106,7 +106,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
             #print("train set: ", train_set)
             #print("first example: ", train_set[0])
             #print("batch: ", batch)
-            train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler = val_sample, drop_last = True))
+            train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler = train_sample, drop_last = True))
 
             #for b, d in enumerate(train_loaders[-1]):
             #    print("data example: ", d, b)
@@ -129,7 +129,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         #stop = 5/0
             
         model, embeddings, losses, accuracies, outputs, vals, tests = train(model, train_loaders, val_loaders, test_loaders, G, epochs)
-        train_score.append(accuracies[1])
+        train_score.append(accuracies[-1])
         #val_acc = valid(res_model,criterion,optimizer,val_loader)
         val_score.append(vals[-1])
         test_score.append(tests[-1])
@@ -195,8 +195,8 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
 
             loss = criterion(out, data.y)
             total_loss += loss / len(loader[0])
-            print("train outputs: ", data.y)
-            print("vs predictions: ", out.argmax(dim=1))
+            #print("train outputs: ", data.y)
+            #print("vs predictions: ", out.argmax(dim=1))
             acc += accuracy(out.argmax(dim=1), data.y) / len(loader[0])
             loss.backward()
             optimizer.step()
@@ -221,7 +221,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
                 f'| Val Acc: {val_acc * 100:.2f}%')
 
     if test_loader != None:
-        test_loss, test_acc = test(model, test_loader, generator)
+        test_loss, test_acc = test  (model, test_loader, generator, validation=False)
         print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
         test_accs.append(test_acc)
     #return model
@@ -229,7 +229,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
     return model, embeddings, losses, accuracies, outputs, val_accs, test_accs
 
 @torch.no_grad()
-def test(model, loaders, generator, train = False):
+def test(model, loaders, generator, train = False, validation = True):
     init = generator.get_state()
     criterion = torch.nn.CrossEntropyLoss()
     model.eval()
@@ -264,8 +264,11 @@ def test(model, loaders, generator, train = False):
         #_, out = model(data.x, data.edge_index, data.batch, train)
         _, out = model(data_x, data_i, data_b, train)
         loss += criterion(out, data.y) / len(loaders[0])
-        print("val or test acc: ", acc, data.y)
-        print("val or test predictions: ", out.argmax(dim=1))
         acc += accuracy(out.argmax(dim=1), data.y) / len(loaders[0])
+
+        #if validation == False:
+        #    print("test acc: ", acc, data.y)
+        #    print("test predictions: ", out.argmax(dim=1))
+
 
     return loss, acc
