@@ -187,30 +187,52 @@ def run_depth_sample(folder_name, joints_info):
 #Exclude 2D depth coord calculations to just get pixel data and depth value, otherwise it will return actual distances good for ML but
 #not possible to properly display for debugging without re-projecting back to pixel data.
 def run_images(folder_name, out_folder, exclude_2D = False, write_mode = "w+", start_point = 0):
-    directory = os.fsencode(folder_name)#
-    print("dir: ", os.getcwd())
     model = SimpleHigherHRNet.SimpleHigherHRNet(32, 17, "./Code/Programs/Machine_Learning/Model_Based/Simple_HigherHRNet/weights/pose_higher_hrnet_w32_512.pth")
+    
+    #Location info for the dataset
     file_iter = 0
-    subdir_iter = -3
+    subdir_iter = 0
+    #Check between normals, freezes and obstacles
+    phase_iter = 1
+
+    #metadata
     data_class = 0
+    obstacle = 0
+    freeze = 0
+    person = -2
+
     #Format for the joints file
     #Instance Number: Sequence number: Class : Joint positions 1 - 17
     joints_file = []
     joints_file_metres = []
 
-    for directory_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
+    for directory_iter, (subdir, dirs, files) in enumerate(os.walk(os.fsencode(folder_name))):
         dirs.sort(key=Utilities.numericalSort)
         #Skip any instances already recorded
         if directory_iter < start_point:
             subdir_iter += 1
             continue
+        
 
-        if subdir_iter % 5 == 0:
+        if subdir_iter % 20 == 0 and subdir_iter != 0:
             data_class += 1
             if data_class > 2:
                 data_class = 0
 
-        first_depth = True
+        #First 10 of the phase are just normal walks
+        if phase_iter <= 10:
+            freeze = 0
+            obstacle = 0
+        #Next 5 are freezes
+        if phase_iter > 10 and phase_iter < 15:
+            freeze = 1
+            obstacle = 0
+        #Final 5 are obstacles
+        elif phase_iter > 15:
+            freeze = 0
+            obstacle = 1
+
+        #first_depth = True
         count_in_directory = 0
 
         for f, file in enumerate(files):
@@ -232,7 +254,7 @@ def run_images(folder_name, out_folder, exclude_2D = False, write_mode = "w+", s
 
             # Get corresponding depth image, this is always same index += half the length of the instance
             dep_image = cv2.imread(sub_dir + "/" + os.fsdecode(files[int(f + (len(files)/2))]), cv2.IMREAD_ANYDEPTH)
-            corr_image = cv2.imread(sub_dir + "/" + file_name, cv2.IMREAD_ANYCOLOR )
+            #corr_image = cv2.imread(sub_dir + "/" + file_name, cv2.IMREAD_ANYCOLOR )
 
             if len(joints) > 0:
                 if len(joints[0]) < 1:
@@ -244,8 +266,8 @@ def run_images(folder_name, out_folder, exclude_2D = False, write_mode = "w+", s
                 refined_joints = [ [0,0,0] for _ in range(17) ]
                 refined_joints_metres = [ [0,0,0] for _ in range(17) ]
 
-            new_entry = [subdir_iter, file_iter, data_class]
-            new_metres_entry = [subdir_iter, file_iter, data_class]
+            new_entry = [subdir_iter, file_iter, data_class, freeze, obstacle, person]
+            new_metres_entry = [subdir_iter, file_iter, data_class, freeze, obstacle, person]
             # 0 is instance, 1 is num in sequence, 2 is class, 3 is array of joints
             for i, joint in enumerate(refined_joints):
                 #Convert so it saves with comma delimiters within the joint-sets
@@ -262,10 +284,16 @@ def run_images(folder_name, out_folder, exclude_2D = False, write_mode = "w+", s
             joints_file_metres.append(new_metres_entry)
 
             file_iter += 1
-        subdir_iter +=1
+        if len(files) > 0:
+            phase_iter += 1
+            if phase_iter == 21:
+                phase_iter = 1
+            subdir_iter +=1
+        else:
+            person += 1
 
         #Save after every folder
-        if os.path.exists("Absolute_Data.csv"):
+        if os.path.exists( out_folder + "Absolute_Data.csv"):
             write_mode = "a"
         else:
             write_mode = "w"
@@ -273,11 +301,11 @@ def run_images(folder_name, out_folder, exclude_2D = False, write_mode = "w+", s
         #Save to .csv
         print("SAVING", write_mode)
 
-        with open("Absolute_Data.csv", write_mode, newline='') as my_csv:
+        with open( out_folder + "Absolute_Data.csv", write_mode, newline='') as my_csv:
             csvWriter = csv.writer(my_csv,delimiter=',')
             csvWriter.writerows(joints_file)
             joints_file = []
-        with open("Absolute_Data_Metres.csv",write_mode, newline='') as my_csv:
+        with open(out_folder + "Absolute_Data_Metres.csv",write_mode, newline='') as my_csv:
             csvWriter = csv.writer(my_csv,delimiter=',')
             csvWriter.writerows(joints_file_metres)
             joints_file_metres = []
@@ -306,23 +334,4 @@ def create_dataset_with_chestpoint(jointfile, folder, save = True, debug = False
     if save:
             #Convert to dataframe 
         new_dataframe.to_csv("./EDA/Chest_Dataset.csv",index=False, header=False)
-
-def run_velocity_debugger(folder, jointfile, save = False, debug = False):
-        
-        joint_data = Utilities.load(jointfile)
-        image_data = Utilities.load_images(folder, ignore_depth=False)
-        velocity_dataset = []
-        for i, joints in enumerate(joint_data):
-            if i+1 < len(joint_data) and i > 0:
-                velocity_dataset.append(plot_velocity_vectors(image_data[i], joint_data[i - 1], joints, joint_data[i + 1], debug=debug))
-            elif i+1 < len(joint_data) and i <= 0:
-                velocity_dataset.append(plot_velocity_vectors(image_data[i], [0], joints, joint_data[i + 1], debug=debug))
-            elif i+1 >= len(joint_data) and i > 0:
-                velocity_dataset.append(plot_velocity_vectors(image_data[i], joint_data[i - 1], joints, [0], debug=debug))
-        
-        new_dataframe = pd.DataFrame(velocity_dataset, columns = Utilities.colnames)
-        if save:
-                #Convert to dataframe 
-            new_dataframe.to_csv("./EDA/Finished_Data/pixel_velocity_relative.csv",index=False, header=False)
-    
 
