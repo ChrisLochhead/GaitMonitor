@@ -282,7 +282,7 @@ def render_joints_series(image_source, joints, size, delay = True, use_depth = T
             render_joints(images[i], joints[i], delay, use_depth)
             cv2.destroyWindow("Joint Utilities Image")
 
-def render_joints(image, joints, delay = False, use_depth = True, metadata = 3, colour = (255, 0, 0)):
+def render_joints(image, joints, delay = False, use_depth = True, metadata = 6, colour = (255, 0, 0)):
     tmp_image = copy.deepcopy(image)
     tmp_image = draw_joints_on_frame(tmp_image, joints, use_depth_as_colour=use_depth, metadata = metadata, colour=colour)
     cv2.imshow('Joint Utilities Image',tmp_image)
@@ -295,7 +295,7 @@ def render_velocity_series(joint_data, velocity_data, image_data, size):
     for i in range(size):
         render_velocities(joint_data[i], velocity_data[i], image_data[i])
 
-def render_velocities(joint_data, velocity_data, image_data, delay = True, metadata = 3):
+def render_velocities(joint_data, velocity_data, image_data, delay = True, metadata = 6):
     for i, coord in enumerate(joint_data):
         if i >= metadata:
             #print("velocity data: ", velocity_data[i], len(velocity_data), len(velocity_data[i]), len(joint_data))
@@ -319,26 +319,26 @@ def click_event(event, x, y, flags, params):
     if event == cv2.EVENT_RBUTTONDOWN:
         quit()
 
-def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 3, colour = (0, 150, 200)):
+def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 6, colour = (0, 150, 200)):
 
     tmp_frame = copy.deepcopy(frame)
     tmp_joints = copy.deepcopy(joints)
     connections = joint_connections
 
     #Top region
-    if len(tmp_joints) == 14:
+    if len(tmp_joints) == 17:
         connections = top_joint_connections 
     #Bottom region
-    elif len(tmp_joints) == 10:
+    elif len(tmp_joints) == 13:
         connections = bottom_joint_connection
     #Head region
-    elif len(tmp_joints) == 8:
+    elif len(tmp_joints) == 11:
         connections = head_joint_connections
     #limbs
-    elif len(tmp_joints) == 6:
+    elif len(tmp_joints) == 9:
         connections = limb_connections
     #Otherwise its the normal dataset with a mid-hip appended
-    elif len(tmp_joints) == 21:
+    elif len(tmp_joints) == 24:
         connections = joint_connections_m_hip
 
     for joint_pair in connections:
@@ -364,7 +364,7 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
         if joint[1] >= 424:
             joint[1] = 423
         
-        if i == 14 or i == 16 or i == 18:
+        if i == 17 or i == 19 or i == 21:
             tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(255,255,255), thickness=4)
         elif use_depth_as_colour == False:
             tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=colour, thickness=4)

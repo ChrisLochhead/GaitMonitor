@@ -9,7 +9,7 @@ import copy
 
 from sklearn.preprocessing import normalize
 
-def normalize_values(data, joint_output, hcf = False):
+def normalize_values(data, joint_output, hcf = False, meta = 5):
     if hcf:
         data, _ = Utilities.process_data_input(data, None, cols=Utilities.hcf_colnames)
     else:
@@ -19,7 +19,7 @@ def normalize_values(data, joint_output, hcf = False):
     joint_data = []
 
     for i, column in enumerate(zip(*data)): 
-        if i < 3: 
+        if i <= meta: 
             meta_data.append(column)
         else:
             #print("column before: ", len(column), column)
@@ -68,7 +68,7 @@ def normalize_values(data, joint_output, hcf = False):
         Utilities.save_dataset(final, joint_output)
     return final
 
-def combine_datasets(rel_data, vel_data, angle_data, images, joints_output):
+def combine_datasets(rel_data, vel_data, angle_data, images, joints_output, meta = 5):
     print("Combining datasets...")
     rel_data, images = Utilities.process_data_input(rel_data, images)
     vel_data, _ = Utilities.process_data_input(vel_data, None)
@@ -77,9 +77,9 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joints_output):
     combined_dataset = []
     for i, row in enumerate(tqdm(rel_data)):
         #Metadata is the same as usual
-        combined_row = row[0:3]
+        combined_row = row[0:meta + 1]
         for j, joint in enumerate(row):
-            if j > 2:
+            if j > meta:
                 #print("row before: ", combined_row[0:5])
                 combined_row.append([joint[0], joint[1], joint[2],
                                      vel_data[i][j][0], vel_data[i][j][1], vel_data[i][j][2], 
@@ -108,7 +108,7 @@ def combined_ground_truth_dataset(hcf, ground_truths, joints_output):
     Utilities.save_dataset(combined_data, joints_output, colnames=Utilities.combined_colnames)
 
 
-def create_ground_truth_dataset(pre_abs_data, abs_data, rel_data, vel_data, hcf_data, images, joints_output):
+def create_ground_truth_dataset(pre_abs_data, abs_data, rel_data, vel_data, hcf_data, images, joints_output, meta = 5):
     #Intuition: just averaging data will do little to outline potential discriminating data, especially with absolute data, rel or velocities.
     #Instead 
     print("Creating ground truth datasets...")
@@ -139,9 +139,9 @@ def create_ground_truth_dataset(pre_abs_data, abs_data, rel_data, vel_data, hcf_
     ground_truth_dataset = []
     #Enumerate standard HCF data
     for i, row in enumerate(hcf_data):
-        ground_truth_row  = row[0:3]
+        ground_truth_row  = row[0:meta + 1]
         for j, value in enumerate(row):
-            if j > 2:
+            if j > meta:
                 ground_truth_row.append([value - hcf_normal_ground[j],
                                          value - hcf_limp_ground[j],
                                          value - hcf_stag_ground[j]])
@@ -161,7 +161,6 @@ def assign_class_labels(num_switches, num_classes, joint_file, joint_output):
 def process_empty_frames(joint_file, image_file, joint_output, image_output):
     print("\nProcessing Empty frames...")
     joint_data, image_data = Utilities.process_data_input(joint_file, image_file, cols=Utilities.colnames)
-    print("LENS: ", len(joint_data), len(image_data))
     joint_data, image_data = Data_Correction.remove_empty_frames(joint_data, image_data)
     Utilities.save_dataset(joint_data, joint_output)
     Utilities.save_images(joint_data, image_data, image_output)
@@ -179,7 +178,7 @@ def process_trimmed_frames(joint_file, image_file, joint_output, image_output, t
     return joint_data, image_data
 
     
-def create_relative_dataset(abs_data, image_data, joint_output):
+def create_relative_dataset(abs_data, image_data, joint_output, meta = 5):
     print("\nCreating relative value dataset...")
     abs_data, image_data = Utilities.process_data_input(abs_data, image_data)
     rel_data = []
@@ -189,10 +188,10 @@ def create_relative_dataset(abs_data, image_data, joint_output):
         #Render.render_joints(image_data[i], joints, True)
         for j, coord in enumerate(joints):
             #Ignore metadata
-            origin = joints[3]
-            if j < 3:
+            origin = joints[meta + 1]
+            if j <= meta:
                 rel_row.append(coord)
-            elif j == 3:
+            elif j == meta + 1:
                 #Origin point, set to 0
                 rel_row.append([0,0,0])
             else:
@@ -230,7 +229,7 @@ def create_scaled_dataset(joint_data, image_data, joint_output):
     print("Data scale processing complete.")
     return joint_data
 
-def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output):
+def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output, meta = 5):
     print("\nCreating flipped dataset...")
     abs_data, images = Utilities.process_data_input(abs_data, images)
     rel_data, _ = Utilities.process_data_input(rel_data, images)
@@ -246,13 +245,13 @@ def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output):
         last = sequence_data[i][-1]
 
         #This is going from right to left: the ones we want to flip
-        if first[3][1] > last[3][1]:
+        if first[meta+1][1] > last[meta+1][1]:
             for joints in seq:
                 #Append with metadata
-                flipped_joints = joints[0:3]
+                flipped_joints = joints[0:meta + 1]
                 for j, joint in enumerate(joints):
                     #Flip X value on each individual co-ordinate
-                    if j > 2:
+                    if j > meta:
                         flipped_joints.append([joint[0], -joint[1], joint[2]])
                 #Append flipped joints instance to the list
                 flipped_data.append(flipped_joints)
@@ -308,21 +307,21 @@ def append_midhip(abs_data, images, joint_output):
     Utilities.save_dataset(midhip_dataset, joint_output, colnames=Utilities.colnames_midhip)
     return midhip_dataset
 
-def create_bone_dataset(abs_data, images, joint_output):
+def create_bone_dataset(abs_data, images, joint_output, meta = 6):
     abs_data, images = Utilities.process_data_input(abs_data, images)
 
     bone_dataset = []
     for i, joints in enumerate(abs_data):
-        bone_row = list(joints[0:3])
+        bone_row = list(joints[0:meta])
         for j, coords in enumerate(joints):
             for bone_pair in Utilities.bone_connections:
-                if bone_pair[0] + 3 == j:
+                if bone_pair[0] + meta == j:
                     #Check if bone is an extremity
                     if bone_pair[1] != -1:
                         #Get direction
-                        tmp_vector = [joints[bone_pair[1] + 3][0] - coords[0],
-                                    joints[bone_pair[1] + 3][1] - coords[1],
-                                    joints[bone_pair[1] + 3][2] - coords[2]]
+                        tmp_vector = [joints[bone_pair[1] + meta][0] - coords[0],
+                                    joints[bone_pair[1] + meta][1] - coords[1],
+                                    joints[bone_pair[1] + meta][2] - coords[2]]
                         
                         #Then normalize
                         norm = math.sqrt(tmp_vector[0] ** 2 + tmp_vector[1] ** 2 + tmp_vector[2] ** 2)
@@ -340,12 +339,12 @@ def create_bone_dataset(abs_data, images, joint_output):
     Utilities.save_dataset(bone_dataset, joint_output, colnames=Utilities.colnames_midhip)
     return bone_dataset                  
 
-def create_joint_angle_dataset(abs_data, images, joint_output):
+def create_joint_angle_dataset(abs_data, images, joint_output, meta = 6):
     print("Creating joint angle dataset (integrated)...")
     joint_angle_dataset = []
     for i, joints in enumerate(tqdm(abs_data)):
         #Add metadata to list and ignore
-        joint_angles = joints[0:3]
+        joint_angles = joints[0:meta]
         for j, coords in enumerate(joints):
             #This should end up length 2 every time.
             if j > 2:
@@ -397,22 +396,22 @@ def create_joint_angle_dataset(abs_data, images, joint_output):
     print("Joint angle dataset (integrated) Completed.")
     return joint_angle_dataset
 
-def create_2_regions_dataset(abs_data, joint_output, images):
+def create_2_regions_dataset(abs_data, joint_output, images, meta = 6):
     #This will split the data into 2 datasets, top and bottom.
     abs_data, images = Utilities.process_data_input(abs_data, images)
     top_dataset = []
     bottom_dataset = []
 
     for i, joints in enumerate(tqdm(abs_data)):
-        top_row = list(joints[0:3])
-        bottom_row = list(joints[0:3])
+        top_row = list(joints[0:meta])
+        bottom_row = list(joints[0:meta])
         #Append the mid-hip to bottom row in place of the origin ::::  This is now done earlier
         #bottom_row.append(Utilities.midpoint(joints[14], joints[15]))
 
         for j, coords in enumerate(joints):
-            if j >= 14:
+            if j >= 17:
                 bottom_row.append(coords)
-            elif j > 2:
+            elif j > 5:
                 top_row.append(coords)
 
         #Render.render_joints(images[i], top_row, delay=True)
@@ -420,12 +419,12 @@ def create_2_regions_dataset(abs_data, joint_output, images):
         bottom_dataset.append(bottom_row)
 
     #Extract correct column names
-    top_colnames = list(Utilities.colnames[0:3])
-    bottom_colnames = list(Utilities.colnames[0:3])
+    top_colnames = list(Utilities.colnames[0:meta])
+    bottom_colnames = list(Utilities.colnames[0:meta])
     bottom_colnames += ["joint_0"]
 
-    top_colnames += Utilities.colnames[2: 13]
-    bottom_colnames += Utilities.colnames[14:]
+    top_colnames += Utilities.colnames[5: 16]
+    bottom_colnames += Utilities.colnames[17:]
 
     Utilities.save_dataset(top_dataset, joint_output + "_top.csv", top_colnames)
     Utilities.save_dataset(bottom_dataset, joint_output + "_bottom.csv", bottom_colnames)
@@ -437,7 +436,7 @@ def append_specific_joints(my_list, joints, indices):
         my_list.append(joints[i])
     return my_list
 
-def create_5_regions_dataset(abs_data, joint_output, images):
+def create_5_regions_dataset(abs_data, joint_output, images, meta = 5):
     abs_data, images = Utilities.process_data_input(abs_data, images)
     #The regions are left_arm, left_leg, right_arm, right_leg, head, so essentially exodia.
     region_datasets = [[],[],[],[],[]]
@@ -448,15 +447,15 @@ def create_5_regions_dataset(abs_data, joint_output, images):
         #Append metadata to each region
         for j, region in enumerate(region_rows):
             #print("region rows: ", region_rows[j], list(joints[0:3]))
-            region_rows[j] = list(joints[0:3])
+            region_rows[j] = list(joints[0:meta + 1])
         
         #region_rows[0] += joints[3:8] # Head joints
-        region_rows[0] += [k for index, k in enumerate(joints) if index > 2 and index < 8]
-
-        region_rows[1] = append_specific_joints(region_rows[1], joints, [8,10,12])
-        region_rows[2] = append_specific_joints(region_rows[2], joints, [9,11,13])
-        region_rows[3] = append_specific_joints(region_rows[3], joints, [14,16,18])
-        region_rows[4] = append_specific_joints(region_rows[4], joints, [15,17,19])
+        region_rows[0] += [k for index, k in enumerate(joints) if index > meta  and index < 11]
+                                                                        #8 is 11
+        region_rows[1] = append_specific_joints(region_rows[1], joints, [11,13,15])
+        region_rows[2] = append_specific_joints(region_rows[2], joints, [12,14,16])
+        region_rows[3] = append_specific_joints(region_rows[3], joints, [17,19,21])
+        region_rows[4] = append_specific_joints(region_rows[4], joints, [18,20,22])
 
         #Check I've got the right coordinates
         #for j, region in enumerate(region_rows):
@@ -466,8 +465,8 @@ def create_5_regions_dataset(abs_data, joint_output, images):
             r.append(region_rows[k])
     
     output_suffixes = ["head", "r_arm", "l_arm", "r_leg", "l_leg"]
-    col_names = ["Instance", "No_In_Sequence", "Class", "Joint_0", "Joint_1", "Joint_2"]
-    head_col_names = ["Instance", "No_In_Sequence", "Class", "Joint_0", "Joint_1", "Joint_2", "Joint_3", "Joint_4"]
+    col_names = ["Instance", "No_In_Sequence", "Class", 'Freeze', 'Obstacle', 'Person', "Joint_0", "Joint_1", "Joint_2"]
+    head_col_names = ["Instance", "No_In_Sequence", "Class",'Freeze', 'Obstacle', 'Person',  "Joint_0", "Joint_1", "Joint_2", "Joint_3", "Joint_4"]
 
     for i, r in enumerate(region_datasets):
         if i == 0:
@@ -475,6 +474,7 @@ def create_5_regions_dataset(abs_data, joint_output, images):
         else:
             output_cols = col_names
 
+        print("lens: ", len(output_cols), len(r), len(r[0]))
         Utilities.save_dataset(r, joint_output + output_suffixes[i] + ".csv", output_cols)
         
     print("Regions dataset (5-tier) completed.")
@@ -493,7 +493,7 @@ def transform_gait_cycle_data(cycles, data):
     
     return gait_cycles
 
-def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, images, joints_output, check = 0):
+def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, images, joints_output, meta = 5):
     abs_joint_data, images = Utilities.process_data_input(abs_joints, images)
     pre_scale, _ = Utilities.process_data_input(pre_abs_joints, None)
     rel_joint_data, _ =  Utilities.process_data_input(rel_joints, None)
@@ -566,7 +566,7 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
     gait_cycles_dataset = []
     for i, cycle in enumerate(gait_cycles):
         #Add metadata
-        hcf_cycle = cycle[0][0:3]#[0], cycle[0][1], cycle[0][2]]
+        hcf_cycle = cycle[0][0:meta + 1]#[0], cycle[0][1], cycle[0][2]]
         #hcf_cycle.append(cadences[i])
         hcf_cycle.append(feet_heights[i][0])
         hcf_cycle.append(feet_heights[i][1])

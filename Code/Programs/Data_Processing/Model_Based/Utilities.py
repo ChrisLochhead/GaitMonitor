@@ -40,19 +40,19 @@ actual: Format
 No chest
 '''   
 
-colnames=['Instance', 'No_In_Sequence', 'Class', 'Joint_1','Joint_2','Joint_3','Joint_4','Joint_5','Joint_6','Joint_7',
+colnames=['Instance', 'No_In_Sequence', 'Class', 'Freeze', 'Obstacle', 'Person', 'Joint_1','Joint_2','Joint_3','Joint_4','Joint_5','Joint_6','Joint_7',
     'Joint_8','Joint_9','Joint_10','Joint_11','Joint_12','Joint_13','Joint_14','Joint_15','Joint_16', 'Joint_17'] 
 
-colnames_midhip = ['Instance', 'No_In_Sequence', 'Class', 'Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
+colnames_midhip = ['Instance', 'No_In_Sequence', 'Class', 'Freeze', 'Obstacle', 'Person', 'Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
     'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', "M_hip"] 
 
-colnames_top = ['Instance', 'No_In_Sequence', 'Class', 'Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
+colnames_top = ['Instance', 'No_In_Sequence', 'Class', 'Freeze', 'Obstacle', 'Person', 'Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
     'L_elbow','R_elbow','L_hand','R_hand'] 
 
-colnames_bottom = ['Instance', 'No_In_Sequence', 'Class', 'L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', "M_hip"] 
+colnames_bottom = ['Instance', 'No_In_Sequence', 'Class', 'Freeze', 'Obstacle', 'Person', 'L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', "M_hip"] 
 
 
-hcf_colnames = ["Instance", "No_In_Sequence", "Class", "Feet_Height_0", "Feet_Height_1",
+hcf_colnames = ["Instance", "No_In_Sequence", "Class", 'Freeze', 'Obstacle', 'Person', "Feet_Height_0", "Feet_Height_1",
                  "Time_LOG_0", "Time_LOG_1", "Time_No_Movement", "Speed", "Stride_Gap", "Stride_Length", "Max_Gap", 'l_co 1',
                  'l_co 2', 'l_co 3', 'l_co 4', 'l_co 5', 'l_co 6', 'l_co 7', 'r_co 1', 'r_co 2', 'r_co 3', 'r_co 4', 'r_co 5', 'r_co 6', 'r_co 7']
 
@@ -119,10 +119,18 @@ def ang(point_1, point_2, point_3):
     #print("p12, p13, p23: ", p12, p13, p23)
     top = ((p12 ** 2) + (p13 ** 2) - (p23 ** 2))
     denominator = (2 * p12 * p13)
+    #Prevent division by 0
     if denominator == 0:
         denominator = 0.01
 
     result = top/denominator
+
+    #Keep within Acos range
+    if result > 1:
+        result = 0.99
+    elif result < -1:
+        result = -0.99
+
     #print(" top: {},  \ndenominator: {} \nand result: {}".format(top, denominator, result))
     #Calculate the angle given the 3 points
     ang = math.degrees(math.acos(result))
@@ -139,15 +147,15 @@ def build_knee_joint_data(gait_cycles, images):
         r_angles = []
         for j, frame in enumerate(gait_cycle):
             #Left hip to left knee, left knee to left foot
-            lh_lk = [frame[14], frame[16]]
-            lk_lf = [frame[16], frame[18]]
+            lh_lk = [frame[17], frame[19]]
+            lk_lf = [frame[19], frame[21]]
 
             #Right hip to right knee, right knee to right foot
-            rh_rk = [frame[15], frame[17]]
-            rk_rf = [frame[17], frame[19]]
+            rh_rk = [frame[18], frame[20]]
+            rk_rf = [frame[20], frame[22]]
 
-            l_angles.append(ang(frame[16], frame[14], frame[18]))
-            r_angles.append(ang(frame[17], frame[15], frame[19]))
+            l_angles.append(ang(frame[19], frame[17], frame[21]))
+            r_angles.append(ang(frame[20], frame[18], frame[22]))
 
             #print("angles left: ", ang(frame[16], frame[14], frame[18]), " and right: ", ang(frame[17], frame[15], frame[19]))
             #Render.render_joints(images[image_iter], frame, delay = True)
@@ -214,20 +222,21 @@ def split_class_by_instance(data):
     return filtered_data
 
 #Returns a list of average values in a dataset
-def create_average_data_sample(data):
+def create_average_data_sample(data, meta = 5):
     dataset_size = len(data)
     running_total = data[0]
     for i, row in enumerate(data):
         if i > 0:
-            running_total = [x + y if j > 2 else x for j, (x, y) in enumerate(zip(running_total, row))]
+            running_total = [x + y if j > meta else x for j, (x, y) in enumerate(zip(running_total, row))]
     
     average = [x / dataset_size for x in running_total[0]]
     return average
 
-def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, debug = False):
+def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, debug = False, meta = 5):
     
     #Add meta data to the start of the row
-    joint_velocities = [joints_current[0], joints_current[1], joints_current[2]]
+    #joint_velocities = [joints_current[0], joints_current[1], joints_current[2]]
+    joint_velocities = joints_current[0:meta+1]
 
     #Convert to numpy arrays instead of lists
     joints_previous = list_to_arrays(joints_previous)
@@ -235,7 +244,7 @@ def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, d
     joints_next = list_to_arrays(joints_next)
 
     #-3 to account for metadata at front
-    for i in range(3, len(joints_current)):
+    for i in range(meta + 1, len(joints_current)):
         if len(joints_next) > 1:
             direction_vector_after = subtract_lists(joints_next[i], joints_current[i])
             #Unit vector
@@ -341,14 +350,13 @@ def convert_to_sequences(abs_data):
 def save_dataset(data, name, colnames = colnames):
     print("Saving joints")
     #Check for dataset type
-    if len(data[0]) == 21:
+    if len(data[0]) == 24:
         colnames = colnames_midhip
-    elif len(data[0]) == 10:
+    elif len(data[0]) == 13:
         colnames = colnames_bottom
-    elif len(data[0]) == 14:
+    elif len(data[0]) == 17:
         colnames = colnames_top
-    elif len(data[0]) == 26:
-        print("its this one: ")
+    elif len(data[0]) == 29:
         colnames = hcf_colnames
 
 
@@ -519,6 +527,7 @@ def save_images(joint_data, image_data, directory):
             file_no = str(row[1])
 
         folder = str(directory) + "Instance_" + str(float(row[0]))
+        #print("saving: ", folder + "/" + file_no + ".jpg")
         os.makedirs(folder, exist_ok = True)
         cv2.imwrite(folder + "/" + file_no + ".jpg", image_data[i])
 
@@ -548,10 +557,10 @@ def load(file = "image_data.csv", metadata = True, colnames = colnames_midhip):
     return joints
 
 
-def convert_to_literals(data, metadata = True):
+def convert_to_literals(data, metadata = True, m = 5):
     for i,  (index, row) in enumerate(data.iterrows()):
         for col_index, col in enumerate(row):
-            if col_index >= 3 and metadata == True or metadata == False:
+            if col_index > m and metadata == True or metadata == False:
                 tmp = ast.literal_eval(row[col_index])
                 data.iat[i, col_index] = copy.deepcopy(tmp)
             else:

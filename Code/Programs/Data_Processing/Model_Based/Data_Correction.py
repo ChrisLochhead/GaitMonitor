@@ -14,7 +14,7 @@ from Programs.Data_Processing.Model_Based.Render import *
 
 #normalization function
 #[x′ i, y′ i ] = [ imgwidth 2 ∗ xi − xmin xmax − xmin , imgheight 2 ∗ yi − ymin ymax − ymin ]
-def normalize_joint_scales(joints, images):
+def normalize_joint_scales(joints, images, meta = 5):
     norm_joints = []
     #Photo dimensions in pixels
     width = 424
@@ -23,16 +23,17 @@ def normalize_joint_scales(joints, images):
  
     for i, instance in enumerate(tqdm(joints)):
         #Add metadata
-        norm_joint_row = [instance[0], instance[1], instance[2]]
+        #norm_joint_row = [instance[0], instance[1], instance[2]]
+        norm_joint_row = instance[0:meta + 1]
 
         for j, joint in enumerate(instance):
             #Ignore metadata
-            if j <= 2:
+            if j <= meta:
                 continue
             
             #2D Calculations for when avoiding depth sensor data
-            all_x = [item[0] for j, item in enumerate(instance) if j > 2]
-            all_y = [item[1] for j, item in enumerate(instance) if j > 2]
+            all_x = [item[0] for j, item in enumerate(instance) if j > meta]
+            all_y = [item[1] for j, item in enumerate(instance) if j > meta]
             min_x = min(all_x)
             max_x = max(all_x)
             min_y = min(all_y)
@@ -116,13 +117,13 @@ def trim_frames(joint_data, image_data, trim):
 
     return trimmed_joints, trimmed_images
 
-def remove_empty_frames(joint_data, image_data):
+def remove_empty_frames(joint_data, image_data, meta_data = 5):
     cleaned_joints = []
     cleaned_images = []
     for i, row in enumerate(tqdm(joint_data)):
         empty_coords = 0
         for j, coord in enumerate(row):
-            if j > 2:
+            if j > meta_data:
                 if all(v == 0 for v in coord) == True:
                     empty_coords += 1
         
@@ -130,7 +131,7 @@ def remove_empty_frames(joint_data, image_data):
         if empty_coords < 1:
             cleaned_joints.append(row)
             cleaned_images.append(image_data[i])
-    
+
     return cleaned_joints, cleaned_images
 
 #Remember to remove this function after all done
@@ -299,34 +300,34 @@ def occlude_area_in_frame(occlusion_box, joint_data, image_data):
 
     return refined_image_data, refined_joint_data
 
-def normalize_outlier_values(joint_data, image_data, tolerance = 100):
+def normalize_outlier_values(joint_data, image_data, tolerance = 100, meta = 5):
     joint_data, image_data = Utilities.process_data_input(joint_data, image_data)
 
     for i, row in enumerate(tqdm(joint_data)):
         #Get row median to distinguish which of joint pairs are the outlier
-        x_coords = [coord[0] for j, coord in enumerate(row) if j > 2]
-        y_coords = [coord[1] for k, coord in enumerate(row) if k > 2]
+        x_coords = [coord[0] for j, coord in enumerate(row) if j > meta]
+        y_coords = [coord[1] for k, coord in enumerate(row) if k > meta]
         med_coord = [np.median(x_coords), np.median(y_coords)]
 
         #render_joints(image_data[i], joint_data[i], delay = True)
         for l, coord in enumerate(row):
             #Ignore metadata
-            if l > 2:
+            if l > meta:
                 for j_index in joint_connections:
                     outlier_reassigned = False
                     #Found connection
-                    joint_0_coord = [row[j_index[0] + 3][0], row[j_index[0] + 3][1]]
-                    joint_1_coord = [row[j_index[1] + 3][0], row[j_index[1] + 3][1]]
-                    if l - 3 == j_index[0] or l - 3 == j_index[1]:
+                    joint_0_coord = [row[j_index[0] + meta + 1][0], row[j_index[0] + meta + 1][1]]
+                    joint_1_coord = [row[j_index[1] + meta + 1][0], row[j_index[1] + meta + 1][1]]
+                    if l - meta - 1 == j_index[0] or l - meta - 1 == j_index[1]:
                         if math.dist(joint_0_coord, joint_1_coord) > tolerance:
                             #Work out which of the two is the outlier
                             if math.dist(med_coord, joint_0_coord) > math.dist(med_coord, joint_1_coord):
                                 #Just set outlier to it's neighbour to reduce damage done by outlier without getting rid of frame
                                 #I could replace this in future with the ground truth relative distance for a better approximation
-                                joint_data[i][j_index[0] + 3] = [joint_1_coord[0], joint_1_coord[1], row[j_index[1] + 3][2]]
+                                joint_data[i][j_index[0] + meta + 1] = [joint_1_coord[0], joint_1_coord[1], row[j_index[1] + meta + 1][2]]
                                 outlier_reassigned = True
                             else:
-                                joint_data[i][j_index[1] + 3] = [joint_0_coord[0], joint_0_coord[1], row[j_index[0] + 3][2]]
+                                joint_data[i][j_index[1] + meta + 1] = [joint_0_coord[0], joint_0_coord[1], row[j_index[0] + meta + 1][2]]
                                 outlier_reassigned = True
 
                     #Stop looping after first re-assignment: some joints have multiple connections.
@@ -338,7 +339,7 @@ def normalize_outlier_values(joint_data, image_data, tolerance = 100):
     return joint_data
     
 
-def normalize_outlier_depths(joints_data, image_data, plot3d = True):
+def normalize_outlier_depths(joints_data, image_data, plot3d = True, meta = 5):
     for i, row in enumerate(tqdm(joints_data)):
 
         #print("before")
@@ -347,7 +348,7 @@ def normalize_outlier_depths(joints_data, image_data, plot3d = True):
         depth_values = []
         #Get average depth of row
         for j, joints in enumerate(row):
-            if j > 2:
+            if j > meta:
                 depth_values.append(joints_data[i][j][2])
 
         quartiles = np.quantile(depth_values, [0,0.15,0.5,0.9,1])
@@ -377,8 +378,8 @@ def normalize_outlier_depths(joints_data, image_data, plot3d = True):
         for k, indice in enumerate(incorrect_depth_indices):
             for connection_pair in joint_connections:
                 #print("resetting indice: ", indice, joints_data[i][indice])
-                if connection_pair[0] + 3 == indice:
-                    connection_joint = joints_data[i][connection_pair[1] + 3][2]
+                if connection_pair[0] + meta + 1 == indice:
+                    connection_joint = joints_data[i][connection_pair[1] + meta + 1][2]
                     if connection_joint < quartiles[3] and connection_joint > quartiles[1]:
                         joints_data[i][indice][2] = connection_joint
                        # print("resetting connection joint depth", indice)
@@ -387,8 +388,8 @@ def normalize_outlier_depths(joints_data, image_data, plot3d = True):
                         joints_data[i][indice][2] = quartiles[2]
                       #  print("resetting connection joint depth with median", indice)
                         continue
-                elif connection_pair[1] + 3 == indice:
-                    connection_joint = joints_data[i][connection_pair[0] + 3][2]
+                elif connection_pair[1] + meta + 1 == indice:
+                    connection_joint = joints_data[i][connection_pair[0] + meta + 1][2]
                     if connection_joint < quartiles[3] and connection_joint > quartiles[1]:
                         joints_data[i][indice][2] = connection_joint
                        # print("resetting connection joint depth", indice)

@@ -57,34 +57,34 @@ def get_gait_cycles(joint_data, images):
 
             #Only register initial direction if they aren't equal
             if found_initial_direction == False:
-                if row[18][1] > row[19][1]:
+                if row[-2][1] > row[-1][1]:
                     direction = 0
                     found_initial_direction = True
-                elif row[18][1] < row[19][1]:
+                elif row[-2][1] < row[-1][1]:
                     direction = 1
                     found_initial_direction = True
 
             #Check for legs mixing up in frame, only need to check one leg
             #print("gap: ", abs(row_18_previous - row[18][1]), row_18_previous, row[18][1])
-            if abs(row_18_previous - row[18][1]) > 50 and found_initial_direction:
+            if abs(row_18_previous - row[-2][1]) > 50 and found_initial_direction:
                 gait_cycle.append(row)
                 #print("detected leg switch", j)
-                row_18_previous = row[18][1]
+                row_18_previous = row[-2][1]
                 #Render.render_joints(images[j], row, delay=True, use_depth=False)
                 continue
 
-            row_18_previous = row[18][1]
+            row_18_previous = row[-2][1]
             #Check if the direction matches the current movement and append as appropriate
-            if row[18][1] > row[19][1] and direction == 0:
+            if row[-2][1] > row[-1][1] and direction == 0:
                 gait_cycle.append(row)
-            elif row[18][1] < row[19][1] and direction == 1:
+            elif row[-2][1] < row[-1][1] and direction == 1:
                 gait_cycle.append(row)
-            elif row[18][1] > row[19][1] and direction == 1:
+            elif row[-2][1] > row[-1][1] and direction == 1:
                 crossovers += 1
                 #print("crossover detected a ", row[18][1], row[19][1], direction )
                 gait_cycle.append(row)
                 direction = 0
-            elif row[18][1] < row[19][1] and direction == 0:
+            elif row[-2][1] < row[-1][1] and direction == 0:
                 crossovers += 1
                 #print("crossover detected b ", row[18][1], row[19][1], direction)
                 gait_cycle.append(row)
@@ -162,7 +162,7 @@ def get_stride_gap(gait_cycles, images):
         max_gap = 0
         #Get distance between the feet in every frame and check if that's this cycle's maximum
         for j, joints in enumerate(frame):
-            gap = math.dist(joints[19], joints[18])
+            gap = math.dist(joints[22], joints[21])
             gaps_in_frames.append(gap)
             if gap > max_gap:
                 max_gap = gap
@@ -184,8 +184,8 @@ def get_stride_lengths(rel_gait_cycles, images, gait_cycles):
         stride_ratio = 0
         #Get max stride length values in this cycle
         for j, joints in enumerate(frame):
-            relative_stride_0 = math.dist(joints[18], joints[14])
-            relative_stride_1 = math.dist(joints[19], joints[15])
+            relative_stride_0 = math.dist(joints[21], joints[17])
+            relative_stride_1 = math.dist(joints[22], joints[18])
             if relative_stride_0 > max_stride_lengths[0]:
                 max_stride_lengths[0] = copy.deepcopy(relative_stride_0)
             if relative_stride_1  > max_stride_lengths[1]:
@@ -205,7 +205,7 @@ def get_speed(gait_cycles, images):
     for i, cycle in enumerate(gait_cycles):
         speed = 0
         #Sometimes first frame can be messy, get second one.
-        first = cycle[0]
+        first = cycle[1]
         #Get last frame (some last ones corrupted, get third from last)
         last = cycle[-1]
         #Get the average speed throughout the frames
@@ -223,10 +223,10 @@ def get_time_LofG(gait_cycles, velocity_joints, images):
         frames_not_moving = 0
         for j, joints in enumerate(frame):
             #Calculate relative velocities between hips and feet
-            left_velocity = abs(velocity_joints[image_iter][18][0]) + abs(velocity_joints[image_iter][18][1])+ abs(velocity_joints[image_iter][18][2])\
-                + abs(velocity_joints[image_iter][14][0])+ abs(velocity_joints[image_iter][14][1]+ abs(velocity_joints[image_iter][14][2]))
-            right_velocity = abs(velocity_joints[image_iter][19][0]) + abs(velocity_joints[image_iter][19][1])+ abs(velocity_joints[image_iter][19][2])\
-                + abs(velocity_joints[image_iter][15][0])+ abs(velocity_joints[image_iter][15][1]+ abs(velocity_joints[image_iter][15][2]))
+            left_velocity = abs(velocity_joints[image_iter][21][0]) + abs(velocity_joints[image_iter][21][1])+ abs(velocity_joints[image_iter][21][2])\
+                + abs(velocity_joints[image_iter][17][0])+ abs(velocity_joints[image_iter][17][1]+ abs(velocity_joints[image_iter][17][2]))
+            right_velocity = abs(velocity_joints[image_iter][22][0]) + abs(velocity_joints[image_iter][22][1])+ abs(velocity_joints[image_iter][22][2])\
+                + abs(velocity_joints[image_iter][18][0])+ abs(velocity_joints[image_iter][18][1]+ abs(velocity_joints[image_iter][18][2]))
 
 
             #print("velocities: ", left_velocity, right_velocity)
@@ -262,8 +262,8 @@ def get_feet_height(gait_cycles, images):
         for j, joints in enumerate(frame):
             #Illustrate feet height by gap between hip and foot to indicate
             #changing height from the ground
-            total_feet_height[0] += math.dist(joints[18], joints[14])
-            total_feet_height[1] += math.dist(joints[19], joints[15])
+            total_feet_height[0] += math.dist(joints[21], joints[17])
+            total_feet_height[1] += math.dist(joints[22], joints[18])
             
             #print("feet heights: ", feet_heights, total_feet_height, len(gait_cycles))
             #render_joints(images[image_iter], joints, delay=True, use_depth=False, colour=(255,0, 0))

@@ -21,9 +21,9 @@ def process_data():
 
     #Extract joints from images
     #run_images("./Code/Datasets/Office_Dataset/Raw_Images", "./", exclude_2D=False, start_point=0)
-    run_images("./Code/Datasets/Joint_Data/WeightGait/Test", out_folder="./Code/Datasets/Joint_Data/WeightGait/", exclude_2D=False, 
-               start_point=0)
-    done = 6/0
+    #run_images("./Code/Datasets/Joint_Data/WeightGait/Test", out_folder="./Code/Datasets/Joint_Data/WeightGait/", exclude_2D=False, 
+    #           start_point=0)
+
     
     #Sort class labels (for 0ffice Images_chris this is 20-0, 20-1, 20-2)
     #abs_joint_data = Creator.assign_class_labels(num_switches=20, num_classes=2, 
@@ -36,7 +36,7 @@ def process_data():
     #                     size = 20, delay=True, use_depth=True)
 
     #Remove empty frames
-    abs_joint_data, image_data = Creator.process_empty_frames(joint_file="./Code/Datasets/Joint_Data/WeightGait/1_Absolute_Data(classes applied).csv",
+    abs_joint_data, image_data = Creator.process_empty_frames(joint_file="./Code/Datasets/Joint_Data/WeightGait/1_Absolute_Data(classes applieddd).csv",
                                                   image_file="./Code/Datasets/WeightGait/Raw_Images/",
                                                   joint_output="./Code/Datasets/Joint_Data/WeightGait/2_Absolute_Data(empty frames removed).csv",
                                                   image_output="./Code/Datasets/WeightGait/2_Empty Frames Removed/")

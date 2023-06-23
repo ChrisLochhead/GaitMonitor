@@ -281,10 +281,10 @@ def get_COO_matrix(connections):
 import ast 
 import copy 
 
-def convert_to_literals(data):
+def convert_to_literals(data, meta = 5):
     for i,  (index, row) in enumerate(data.iterrows()):
         for col_index, col in enumerate(row):
-            if col_index >= 3 and type(row[col_index]) != np.float64:
+            if col_index >= meta + 1 and type(row[col_index]) != np.float64:
                 tmp = ast.literal_eval(row[col_index])
                 data.iat[i, col_index] = copy.deepcopy(tmp)
             else:
@@ -293,10 +293,10 @@ def convert_to_literals(data):
     return data
             
 #Input here would be each row
-def data_to_graph(row, coo_matrix):
+def data_to_graph(row, coo_matrix, meta = 5):
     #The single instance per row case (No gait cycles, row is a single frame)
     if isinstance(row[0], np.ndarray) == False and isinstance(row[0], list) == False:
-        refined_row = row.iloc[3:]
+        refined_row = row.iloc[meta + 1:]
         node_f= refined_row
 
         #This is standard Data that has edge shit
@@ -318,7 +318,7 @@ def data_to_graph(row, coo_matrix):
         gait_cycle = []
         y_arr = []
         for cycle_part in row:
-            refined_row = cycle_part[3:]    
+            refined_row = cycle_part[meta + 1 :]    
             row_as_array = np.array(refined_row)     
             y = int(cycle_part[2])  
 
