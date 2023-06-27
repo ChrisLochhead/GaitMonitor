@@ -161,6 +161,8 @@ def assign_class_labels(num_switches, num_classes, joint_file, joint_output):
 def process_empty_frames(joint_file, image_file, joint_output, image_output):
     print("\nProcessing Empty frames...")
     joint_data, image_data = Utilities.process_data_input(joint_file, image_file, cols=Utilities.colnames)
+    print(len(joint_data), len(image_data))
+
     joint_data, image_data = Data_Correction.remove_empty_frames(joint_data, image_data)
     Utilities.save_dataset(joint_data, joint_output)
     Utilities.save_images(joint_data, image_data, image_output)
@@ -426,8 +428,8 @@ def create_2_regions_dataset(abs_data, joint_output, images, meta = 6):
     top_colnames += Utilities.colnames[5: 16]
     bottom_colnames += Utilities.colnames[17:]
 
-    Utilities.save_dataset(top_dataset, joint_output + "_top.csv", top_colnames)
-    Utilities.save_dataset(bottom_dataset, joint_output + "_bottom.csv", bottom_colnames)
+    Utilities.save_dataset(top_dataset, joint_output + "_top", top_colnames)
+    Utilities.save_dataset(bottom_dataset, joint_output + "_bottom", bottom_colnames)
     print("Regions dataset (top and bottom) completed.")
     return top_dataset, bottom_dataset
 
@@ -475,7 +477,7 @@ def create_5_regions_dataset(abs_data, joint_output, images, meta = 5):
             output_cols = col_names
 
         print("lens: ", len(output_cols), len(r), len(r[0]))
-        Utilities.save_dataset(r, joint_output + output_suffixes[i] + ".csv", output_cols)
+        Utilities.save_dataset(r, joint_output + output_suffixes[i], output_cols)
         
     print("Regions dataset (5-tier) completed.")
     return region_datasets
@@ -522,6 +524,7 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
     print("test polynomial")
     #trend = hcf.get_knee_chart_polynomial(knee_data_cycles)
     knee_data_cycles = Utilities.build_knee_joint_data(pre_gait_cycles, images)
+    print("Lens: ", len(knee_data_cycles))
     knee_data_coeffs = Render.chart_knee_data(knee_data_cycles, False)
 
     #rel_gait_cycles = []

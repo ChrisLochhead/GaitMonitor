@@ -361,12 +361,16 @@ def save_dataset(data, name, colnames = colnames):
 
 
     new_dataframe = pd.DataFrame(data, columns = colnames)
+    
+    file_name = name.split("/")
+    file_name = file_name[-1]
 
     if len(data[0]) == 26:
         print("size: ", new_dataframe.shape)
         print(new_dataframe.head())
     #Convert to dataframe 
-    new_dataframe.to_csv(name,index=False, header=False)     
+    os.makedirs(name + "/raw/" ,exist_ok=True)
+    new_dataframe.to_csv(name + "/raw/" + file_name + ".csv",index=False, header=False)     
 
 
 def get_3D_coords(coords_2d, dep_img, pts3d_net = True, dilate = True, meta_data = 3):
@@ -548,6 +552,7 @@ def load(file = "image_data.csv", metadata = True, colnames = colnames_midhip):
     #Load in as a pandas dataset
     dataset = pd.read_csv(file, names=colnames, header=None)
 
+    print("dataset head: ", dataset.head())
     #Convert all data to literals
     dataset = convert_to_literals(dataset, metadata)
 

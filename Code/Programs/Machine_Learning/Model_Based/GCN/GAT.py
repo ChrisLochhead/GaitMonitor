@@ -24,9 +24,6 @@ class GAT(torch.nn.Module):
         self.m4 = BatchNorm1d(dim_8th)
         self.m = AvgPool1d(3, stride=3, padding=1)
         self.norm = BatchNorm1d(3)
-        self.optimizer = torch.optim.Adam(self.parameters(),
-                                          lr=0.005,
-                                          weight_decay=5e-4)
 
         self.lin1 = Linear(256, 128)
         self.m5 = BatchNorm1d(128)
@@ -82,6 +79,34 @@ class GAT(torch.nn.Module):
 
         return F.sigmoid(h), F.log_softmax(h, dim=1)
 
+class GATResNetBlock(torch.nn.Module):
+    def __init__(self, dim_in, dim_h, dim_out, heads = [1,1]):
+        super(GATResNetBlock, self).__init__()
+        #self.conv1 = torch.nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
+        self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads[0])
+        self.bn1 = torch.nn.BatchNorm1d(dim_h)
+        self.relu = torch.nn.ReLU(inplace=True)
+        self.gat2 = GATv2Conv(dim_h, dim_out, heads=heads[0])
+        #self.conv2 = torch.nn.Conv2d(dim_out, dim_out, kernel_size=3, stride=1, padding=1)
+        self.bn2 = torch.nn.BatchNorm1d(dim_out)
+        #if dim_in != dim_out:
+        self.shortcut = GATv2Conv(dim_in, dim_out, heads=heads[0])    
+        self.bn3 = torch.nn.BatchNorm1d(dim_out)
+
+    def forward(self, x, edge_indices):
+        residual = x
+        residual_edge = edge_indices
+        out = self.gat1(x, edge_indices)
+        out = self.bn1(out)
+        out = self.relu(out)
+        out = self.gat2(out, edge_indices)
+        out = self.bn2(out)
+        res_out = self.shortcut(residual, residual_edge)
+        res_out = self.bn3(res_out)
+        out += res_out  # Residual connection
+        out = self.relu(out)
+        return out
+
 
 class MultiInputGAT(torch.nn.Module):
     """Graph Attention Network"""
@@ -103,20 +128,15 @@ class MultiInputGAT(torch.nn.Module):
                 i_stream.append(BatchNorm1d(dim_h))
                 i_stream.append(Linear(dim_h, dim_half))
                 i_stream.append(BatchNorm1d(dim_half))
-                #i_stream.append(Linear(dim_half, dim_4th))
-                #i_stream.append(BatchNorm1d(dim_4th))
-                #i_stream.append(Linear(dim_4th, dim_8th))
-                #i_stream.append(BatchNorm1d(dim_8th))
+                i_stream.append(Linear(dim_half, dim_4th))
+                i_stream.append(BatchNorm1d(dim_4th))
+                i_stream.append(Linear(dim_4th, dim_8th))
+                i_stream.append(BatchNorm1d(dim_8th))
             else:
                 print("Building GAT module: ,", i, dim_in)
-                i_stream.append(GATv2Conv(dim_in[i], dim_h, heads=heads[0]))
-                i_stream.append(BatchNorm1d(dim_h))
-                i_stream.append(GATv2Conv(dim_h*heads[1], dim_half, heads=heads[2]))
-                i_stream.append(BatchNorm1d(dim_half))
-                #i_stream.append(GATv2Conv(dim_half*heads[2], dim_4th, heads=heads[3]))
-                #i_stream.append(BatchNorm1d(dim_4th))
-                #i_stream.append(GATv2Conv(dim_4th*heads[3], dim_8th, heads=heads[3]))
-                #i_stream.append(BatchNorm1d(dim_8th))
+                i_stream.append(GATResNetBlock(dim_in[i], dim_h, dim_half))
+                i_stream.append(GATResNetBlock(dim_half, dim_4th, dim_8th))
+
             self.streams.append(i_stream)
         
         #Send to the GPU
@@ -130,20 +150,22 @@ class MultiInputGAT(torch.nn.Module):
 
         self.m = AvgPool1d(3, stride=3, padding=1)
         self.norm = BatchNorm1d(3)
-        self.optimizer = torch.optim.Adam(self.parameters(),
-                                          lr=0.005,
-                                          weight_decay=5e-4)
 
         #Extra linear layer to compensate for more data
         total_num_layers = len(self.streams)
-        linear_input = (total_num_layers - 1) * (dim_h + dim_half)# + dim_4th + dim_8th)
+        if self.hcf:
+            linear_input = total_num_layers -1
+        else:
+            linear_input = total_num_layers
+
+        linear_input = linear_input * dim_half
         #HCF only concatenates the last (or smallest) hidden layer, GAT convs take all 4 layers
         if self.hcf:
-            linear_input += dim_half# dim_8th
+            linear_input += dim_8th
 
-        self.lin1 = Linear(linear_input, 256)
-        self.m1 = BatchNorm1d(256)
-        self.lin2 = Linear(256, 64)
+        self.lin1 = Linear(linear_input, 128)
+        self.m1 = BatchNorm1d(128)
+        self.lin2 = Linear(128, 64)
         self.m2 = BatchNorm1d(64)
         self.lin3 = Linear(64, dim_out)
 
@@ -157,8 +179,8 @@ class MultiInputGAT(torch.nn.Module):
 
 
         hidden_layers = []
-        stream_outputs = []
         h = data[i]
+
         #print("input: ", h.shape)
         for stream_no, stream in enumerate(self.streams):
            # print("processing stream: ", stream_no)
@@ -173,11 +195,10 @@ class MultiInputGAT(torch.nn.Module):
                         h = F.relu(layer(h))
                         #print("hcf layer: ", layer, i, self.hcf, h.shape)
                     else:
-                        h = F.relu(layer(h, edge_indices[stream_no]))
+                        h = layer(h, edge_indices[stream_no])
                         #print("GAT layer: ", layer, i, self.hcf, h.shape)
-                    #Batch norm always the next one
-                    h = stream[i + 1](h)
-                    h = F.dropout(h, p=0.9, training=train)
+                    #Dropout always the next one
+                    h = F.dropout(h, p=0.5, training=train)
                     #Record each  hidden layer value
                     if self.hcf and stream_no + 1 == len(self.streams):
                         if i == len(stream) - 2:
@@ -207,7 +228,7 @@ class MultiInputGAT(torch.nn.Module):
         h = F.dropout(h, p=0.1, training=train)
         h = F.relu(self.lin2(h))
         h = self.m2(h)
-        h = F.dropout(h, p=0.1, training=train)
+        #h = F.dropout(h, p=0.1, training=train)
         h = self.lin3(h)
 
         return F.sigmoid(h), F.log_softmax(h, dim=1)

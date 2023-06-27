@@ -81,6 +81,7 @@ def chart_knee_data(gait_cycles, display = False):
     #ax = fig.add_subplot(111)
     hcf_coefficients = []
     for i in range(len(gait_cycles[0])):
+        print("len of cycle: ", len(gait_cycles[0][i]))
 
         l_x = gait_cycles[0][i]
         l_y = [i for i in range(len(l_x))]

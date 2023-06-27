@@ -89,7 +89,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         test_loaders = []
 
         #Set up so identical seed is used
-        torch.manual_seed(1)
+        torch.manual_seed(42)
         seed = int(torch.empty((), dtype=torch.int64).random_().item())  # use the same seed as Scenario 1
         G = torch.Generator()
 
@@ -103,23 +103,32 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
             train_set = dataset[train_indices]
             val_set = dataset[val_indices]
             test_set = test_dataset[i]
-            #print("train set: ", train_set)
-            #print("first example: ", train_set[0])
-            #print("batch: ", batch)
+            print("train set: ", train_set)
+            print("first example: ", train_set[0])
+            print("first val: ", val_set)
+
+            train_classes = [0,0,0]
+            val_classes = [0,0,0]
+            for i in range(len(val_set)):
+                #print("train:", train_set[i])
+                #print("val: ", val_set[i])
+                train_classes[train_set[i].y.item()] += 1
+                val_classes[val_set[i].y.item()] += 1
+            
+            print("final val and test set scores: ", train_classes, val_classes)
+            print("testset: ", test_set, len(test_set), len(train_set), len(val_set))
+            
             train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler = train_sample, drop_last = True))
-
-            #for b, d in enumerate(train_loaders[-1]):
-            #    print("data example: ", d, b)
-
             val_loaders.append(GeoLoader(val_set, batch_size=batch, sampler = val_sample, drop_last = True))
             test_loaders.append(GeoLoader(test_set, batch_size=batch, sampler = test_sample, drop_last = True))
 
             #Reset the generator so every dataset gets the same sampling 
             G.set_state(init)
 
-        G.set_state(init)
+        #G.set_state(init)
 
         model = copy.deepcopy(MY_model)
+        #model = MY_model
         model = model.to("cuda")
 
         #model = gat.GAT(dim_in = datasets[0].num_node_features, dim_h=128, dim_out=3)
@@ -141,7 +150,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
     #print("types: ", type(model), type(loader), type(val_loader))
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(),
-                                lr=0.0001,
+                                lr=0.001,
                                 weight_decay=0.00005)
     epochs = epochs
     model.train()
@@ -155,26 +164,43 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
     hs = []
     test_accs = []
     
+    #First pass, append all the data together into arrays
+    xs_batch = [[] for l in range(len(loader))]
+    indice_batch = [[] for l in range(len(loader))]
+    batch_batch = [[] for l in range(len(loader))]
+    ys_batch = [[] for l in range(len(loader))]
+
+    #xs_batchl = [[] for l in range(len(val_loader))]
+    #indice_batchl = [[] for l in range(len(val_loader))]
+    #batch_batchl = [[] for l in range(len(val_loader))]
+    #y_batchl = [[] for l in range(len(val_loader))]
+    #print("lens: ", len(xs_batch))
+
+    for ind, load in enumerate(loader): 
+        generator.set_state(init)
+        for j, data in enumerate(load):
+            data = data.to("cuda")
+            xs_batch[ind].append(data.x)
+            indice_batch[ind].append(data.edge_index)
+            batch_batch[ind].append(data.batch)
+            ys_batch[ind].append(data.y)
+    
+    #for ind, load in enumerate(val_loader): 
+    #    generator.set_state(init)
+    #    for j, data in enumerate(load):
+    #        data = data.to("cuda")
+    #        xs_batchl[ind].append(data.x)
+    #        indice_batchl[ind].append(data.edge_index)
+    #        batch_batchl[ind].append(data.batch)
+    #        y_batchl[ind].append(data.y)
+
     for epoch in range(epochs + 1):
         total_loss = 0
         acc = 0
         val_loss = 0
         val_acc = 0
-
-        #First pass, append all the data together into arrays
-        xs_batch = [[] for l in range(len(loader))]
-        indice_batch = [[] for l in range(len(loader))]
-        batch_batch = [[] for l in range(len(loader))]
-        #print("lens: ", len(xs_batch))
-
-        for i, load in enumerate(loader): 
-            generator.set_state(init)
-            for j, data in enumerate(load):
-                data = data.to("cuda")
-                xs_batch[i].append(data.x)
-                indice_batch[i].append(data.edge_index)
-                batch_batch[i].append(data.batch)
-
+        #t_acc = 0
+        #t_loss = 0
         #Second pass: process the data 
         generator.set_state(init)
         for index, data in enumerate(loader[0]):
@@ -187,17 +213,28 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
             data_x = [xs_batch[i][index] for i in range(len(loader))]
             data_i = [indice_batch[i][index] for i in range(len(loader))]
             data_b = [batch_batch[i][index] for i in range(len(loader))]
+            data_y =  [ys_batch[i][index] for i in range(len(loader))]
+
+            #data_lx = [xs_batchl[i][0] for i in range(len(val_loader))]
+            #data_li = [indice_batchl[i][0] for i in range(len(val_loader))]
+            #data_lb = [batch_batchl[i][0] for i in range(len(val_loader))]
+            #data_ly =  [y_batchl[i][0] for i in range(len(val_loader))]
+
+            #print("lens: ", len(val_loader[0]), len(loader[0]))
+        
             #print("len: ", len(data_x))
             h, out = model(data_x, data_i, data_b, train=True)
             #h, out = model([xs_batch[0][index]], [indice_batch[0][index]], [batch_batch[0][index]], train=True)
-
             #First data batch with Y has to have the right outputs
 
-            loss = criterion(out, data.y)
+            loss = criterion(out, data_y[0])
             total_loss += loss / len(loader[0])
             #print("train outputs: ", data.y)
             #print("vs predictions: ", out.argmax(dim=1))
-            acc += accuracy(out.argmax(dim=1), data.y) / len(loader[0])
+            acc += accuracy(out.argmax(dim=1), data_y[0]) / len(loader[0])
+            #t_a, t_l = single_test(model, data_lx, data_li, data_lb, data_ly, loader)
+            #t_acc += t_a / len(loader[0])
+            #t_loss += t_l / len(loader[0])
             loss.backward()
             optimizer.step()
 
@@ -210,7 +247,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
 
 
         # Validation
-        val_loss, val_acc = test(model, val_loader, generator, train = False)
+        val_loss, val_acc = test(model, val_loader, generator, train = True, validation=True)
         val_accs.append(val_acc)
 
         # Print metrics every 10 epochs
@@ -221,15 +258,26 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
                 f'| Val Acc: {val_acc * 100:.2f}%')
 
     if test_loader != None:
-        test_loss, test_acc = test  (model, test_loader, generator, validation=False)
+
+        test_loss, test_acc = test(model, test_loader, generator, validation=True)
         print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
         test_accs.append(test_acc)
     #return model
     #print("returned lens: ", len(embeddings[0]), len(losses), len(accuracies), len(outputs), len(hs))
     return model, embeddings, losses, accuracies, outputs, val_accs, test_accs
 
-@torch.no_grad()
-def test(model, loaders, generator, train = False, validation = True):
+
+def single_test(model, data_x, data_i, data_b, data_y, loaders):
+    criterion = torch.nn.CrossEntropyLoss()
+    model.eval()
+    _, out = model(data_x, data_i, data_b, train = False)
+    loss = criterion(out, data_y[0]) #/ len(loaders[0])
+    acc = accuracy(out.argmax(dim=1), data_y[0]) #/ len(loaders[0])
+
+    #print("accuracy hereee: ", acc)
+    return acc, loss
+
+def test(model, loaders, generator, train = False, validation = False, x_b = None, i_b = None, b_b = None):
     init = generator.get_state()
     criterion = torch.nn.CrossEntropyLoss()
     model.eval()
@@ -240,6 +288,7 @@ def test(model, loaders, generator, train = False, validation = True):
     xs_batch = [[] for l in range(len(loaders))]
     indice_batch = [[] for l in range(len(loaders))]
     batch_batch = [[] for l in range(len(loaders))]
+    ys_batch = [[] for l in range(len(loaders))]
     #print("lens: ", len(xs_batch))
 
     for i, load in enumerate(loaders): 
@@ -250,25 +299,70 @@ def test(model, loaders, generator, train = False, validation = True):
             xs_batch[i].append(data.x)
             indice_batch[i].append(data.edge_index)
             batch_batch[i].append(data.batch)
+            ys_batch[i].append(data.y)
 
     #Second pass: process the data 
     generator.set_state(init)
+    with torch.no_grad():
+        for index, data in enumerate(loaders[0]):
+            #data = data.to("cuda")
 
-    for index, data in enumerate(loaders[0]):
-        data = data.to("cuda")
+            data_x = [xs_batch[i][index] for i in range(len(loaders))]
+            data_i = [indice_batch[i][index] for i in range(len(loaders))]
+            data_b = [batch_batch[i][index] for i in range(len(loaders))]
+            data_y = [ys_batch[i][index] for i in range(len(loaders))]
 
-        data_x = [xs_batch[i][index] for i in range(len(loaders))]
-        data_i = [indice_batch[i][index] for i in range(len(loaders))]
-        data_b = [batch_batch[i][index] for i in range(len(loaders))]
+            #print("same? " ,data.y)
+            #print("same? ", data_y)
 
-        #_, out = model(data.x, data.edge_index, data.batch, train)
-        _, out = model(data_x, data_i, data_b, train)
-        loss += criterion(out, data.y) / len(loaders[0])
-        acc += accuracy(out.argmax(dim=1), data.y) / len(loaders[0])
+            #_, out = model(data.x, data.edge_index, data.batch, train)
+            #print("validation data: ", data_x)
+            #print("length: ", data_x[0].size())
+            #print("y value: ", data_y)
+            #print("batches: ", data_b, data_b[0].size())
 
-        #if validation == False:
-        #    print("test acc: ", acc, data.y)
-        #    print("test predictions: ", out.argmax(dim=1))
+            #batch_indices = data_b[0].tolist()
+            #indice_now = 0
+            #indice_counts = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+
+            #for indice in batch_indices:
+            #    if indice_now != indice:
+            ##        indice_now = indice
+            #    else:
+            #        indice_counts[indice] += 1
+
+            #print("batch values:", indice_counts)
+            #my_data = data_x[0].tolist()
+            #iter_count = 0
+            #current_batch = indice_counts[0]
+            #current_batch_indice = 0
+            #for i, d in enumerate(my_data):
+                #Display first of each batch
+            #    if iter_count == 1:
+            #        print("display data: ", d)
+            #        print("batch: ", current_batch_indice)
+            #        print("corresponding y: ", data_y)
+                
+            #    iter_count += 1
+
+            #    if iter_count >= current_batch:
+            #        iter_count = 0
+            #        current_batch_indice += 1
+            #        if current_batch_indice < len(indice_counts):
+            #            current_batch = indice_counts[current_batch_indice]
+                            
+
+            #print("total: ", sum(indice_counts), len(data_x[0]))
+
+
+            #stop = 5/0
+            _, out = model(data_x, data_i, data_b, train)
+            loss += criterion(out, data_y[0]) / len(loaders[0])
+            acc += accuracy(out.argmax(dim=1), data_y[0]) / len(loaders[0])
+
+        #if validation == True:
+        #    print("test acc: ", acc)# data.y)
+                    #print("test predictions: ", out.argmax(dim=1))
 
 
     return loss, acc

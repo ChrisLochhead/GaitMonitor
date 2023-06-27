@@ -36,15 +36,15 @@ def get_gait_cycles(joint_data, images):
     inst_count = 0
     for i, inst in enumerate(instances):
 
-        if i > 0:
-            if len(gait_cycle) > 0:
-                crossovers = 0
-                if len(gait_cycles) > 0:
-                    for g in gait_cycle:
-                        gait_cycles[-1].append(g)
-                else:
-                    gait_cycles.append(copy.deepcopy(gait_cycle))                    
-                gait_cycle = []
+        #if i > 0:
+        #    if len(gait_cycle) > 0:
+        #        crossovers = 0
+        #        if len(gait_cycles) > 0:
+        #            for g in gait_cycle:
+        ##                gait_cycles[-1].append(g)
+        #        else:
+        #            gait_cycles.append(copy.deepcopy(gait_cycle))                    
+        #        gait_cycle = []
 
 
         found_initial_direction = False
@@ -101,10 +101,16 @@ def get_gait_cycles(joint_data, images):
             #Check the number of crossovers 
             #If there has been 2 this is one full gait cycle, append it to the gait cycles and reset the 
             #current gait cycle.
-            if crossovers > 1 and len(gait_cycle) > 5:
+            if crossovers > 1 and len(gait_cycle) > 5 or len(gait_cycle) > 19:
                 crossovers = 0
                 gait_cycles.append(copy.deepcopy(gait_cycle))
                 gait_cycle = []
+
+            if len(gait_cycle) > 19:
+                print("adding this gait cycle?", len(gait_cycle))
+                crossovers = 0
+                gait_cycles.append(copy.deepcopy(gait_cycle))
+                gait_cycle = [] 
 
             #Check if we are at the end of the instance and adjust the last cycle accordingly so we dont end up with length 1 gait cycles.
             if j == len(inst):
@@ -116,10 +122,12 @@ def get_gait_cycles(joint_data, images):
                 else:
                 #Otherwise just add this one and reset it before the next instance starts.
                     gait_cycles.append(gait_cycle)
+                    print("appending here??", len(gait_cycle))
                     gait_cycle = []
 
     #Append final gait cycle missed by loop
-    gait_cycles.append(gait_cycle)
+    if len(gait_cycle) > 0:
+        gait_cycles.append(gait_cycle)
 
     #Illustrate results
     col = (0,0,255)
@@ -130,11 +138,14 @@ def get_gait_cycles(joint_data, images):
             col = (255,0,0)
         else:
             col = (0,0,255)
+        
         for i, row in enumerate(cycle):
             #Render every frame
-            #print("frame ", i, " of ", len(cycle))
-            #print("row: ", row)
-            #Render.render_joints(images[image_iter], row, delay=True, use_depth=False, colour=col)
+            #if len(cycle) > 21:
+            #    print("frame ", i, " of ", len(cycle))
+            #    print("row: ", row)
+            #    Render.render_joints(images[image_iter], row, delay=True, use_depth=False, colour=col)
+
             image_iter += 1
             
     return gait_cycles

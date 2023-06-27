@@ -12,7 +12,7 @@ import copy
 
 class JointDataset(Dataset):
     def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip,
-                  cycles = False, cycle_preset = [], padding = False):
+                  cycles = False, cycle_preset = [], padding = False, meta = 5):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
@@ -25,6 +25,8 @@ class JointDataset(Dataset):
         self.num_cycles = 0
         self.cycle_indices = copy.deepcopy(cycle_preset)
         self.padding = padding
+        self.num_nodes_per_graph = 0
+        self.meta = meta
         super(JointDataset, self).__init__(root, transform, pre_transform)
         
     @property
@@ -76,20 +78,25 @@ class JointDataset(Dataset):
                 self.data_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
 
 
+            self.num_nodes_per_graph = len(self.data.columns) - self.meta - 1
+
             t = 0
-            max_cycle = 0
+            self.max_cycle = 0
             for i, d in enumerate(self.data_cycles):
                 t += len(d)
-                if len(d) > max_cycle:
-                    max_cycle = len(d)
+
+                if len(d) > self.max_cycle:
+                    self.max_cycle = len(d)
             
+            #Count number of each cycle with each person and get weights
 
             self.padded_cycles = copy.deepcopy(self.data_cycles)
+            print("padded cycles size: ", len(self.padded_cycles), len(self.padded_cycles[0]))
             if self.padding:
                 #Pad all examples out to make every graph the same size
                 for i, cycle in enumerate(self.padded_cycles):
-                    if len(cycle) < max_cycle:
-                        diff = abs(int(max_cycle - len(cycle)))
+                    if len(cycle) < self.max_cycle:
+                        diff = abs(int(self.max_cycle - len(cycle)))
                         iter_tool = 0
                         for j in range(diff):
                             if iter_tool < len(cycle):
@@ -99,6 +106,8 @@ class JointDataset(Dataset):
                                 iter_tool = 0
                                 self.padded_cycles[i].append(self.padded_cycles[i][iter_tool])
                 
+            print("padded cycles size: ", len(self.padded_cycles), len(self.padded_cycles[0]))
+
             #This deactivates padded cycles
             #self.padded_cycles = copy.deepcopy(self.data_cycles)
 
@@ -294,6 +303,7 @@ def convert_to_literals(data, meta = 5):
             
 #Input here would be each row
 def data_to_graph(row, coo_matrix, meta = 5):
+    
     #The single instance per row case (No gait cycles, row is a single frame)
     if isinstance(row[0], np.ndarray) == False and isinstance(row[0], list) == False:
         refined_row = row.iloc[meta + 1:]
@@ -379,7 +389,8 @@ def data_to_graph(row, coo_matrix, meta = 5):
 
 
 class HCFDataset(Dataset):
-    def __init__(self, root, filename, test=False, transform=None, pre_transform=None, cycles = False, cycle_preset = None):
+    def __init__(self, root, filename, test=False, transform=None, pre_transform=None,
+                  cycles = False, cycle_preset = None):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
@@ -391,7 +402,8 @@ class HCFDataset(Dataset):
         self.num_cycles = 0
         self.cycle_indices = []
         self.cycle_preset = cycle_preset
-
+        self.max_cycle = 1
+        self.num_nodes_per_graph = 1
         super(HCFDataset, self).__init__(root, transform, pre_transform)
         
     @property

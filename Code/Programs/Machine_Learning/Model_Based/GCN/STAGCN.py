@@ -9,21 +9,21 @@ from torch_geometric.nn import ChebConv
 class STGCNBlock(torch.nn.Module):
     def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size):
         super(STGCNBlock, self).__init__()
-        self.temporal_conv1 = torch.nn.Conv1d(in_channels, dim_h, kernel_size=temporal_kernel_size, padding='same').to("cuda")
+        self.temporal_conv1 = torch.nn.Conv2d(in_channels, dim_h, kernel_size=temporal_kernel_size, padding='same').to("cuda")
         self.spatial_conv = GATv2Conv(dim_h, dim_h, heads=1).to("cuda")
         #self.spatial_conv = ChebConv(dim_h, dim_h, K=3)
         self.b1 = BatchNorm1d(dim_h).to("cuda")
-        self.temporal_conv2 = torch.nn.Conv1d(dim_h, dim_h, kernel_size=temporal_kernel_size, padding='same').to("cuda")
+        self.temporal_conv2 = torch.nn.Conv2d(dim_h, dim_h, kernel_size=temporal_kernel_size, padding='same').to("cuda")
         self.relu = ReLU()
         self.pooling = torch.nn.MaxPool2d(kernel_size=(1, 0.5)).to("cuda")
         self.batch_size = batch_size
         self.cycle_size = cycle_size
 
     def forward(self, x, edge_index):
-        #print("x", x.shape)
+        print("x", x.shape)
         x = self.relu(self.temporal_conv1(x))
         #Convert to 2D representation for GAT layer
-        x = x.view(x.shape[2] * x.shape[0], x.shape[1])
+        #x = x.view(x.shape[2] * x.shape[0], x.shape[1])
         #print("before spatial convolution: ", x.shape)
 
         x = self.relu(self.spatial_conv(x, edge_index))
@@ -37,7 +37,7 @@ class STGCNBlock(torch.nn.Module):
 
 class MultiInputSTGACN(torch.nn.Module):
     def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 3, stgcn_filters = [64, 128, 256], 
-                 multi_layer_feedback = False, cycle_size = 360):
+                 multi_layer_feedback = False, max_cycle = 20, num_nodes_per_graph = 18):
         super(MultiInputSTGACN, self).__init__()
 
         dim_half = int(dim_h/2)
@@ -51,13 +51,14 @@ class MultiInputSTGACN(torch.nn.Module):
         self.stgcn_filters = stgcn_filters
         self.batch_size = batch_size
         self.data_dims = data_dims
-        self.cycle_size = cycle_size
+        self.num_nodes_per_graph = num_nodes_per_graph
+        self.cycle_size = max_cycle * num_nodes_per_graph
 
         for i in range(self.num_inputs):
             i_stream = []
             if i == len(range(self.num_inputs)) - 1 and hcf == True :
                  # This is a normal linear net for HCF data without graphical structure
-                i_stream.append(Linear(dim_in[1], dim_h).to("cuda"))
+                i_stream.append(Linear(dim_in[-1], dim_h).to("cuda"))
                 i_stream.append(BatchNorm1d(dim_h).to("cuda"))
                 i_stream.append(Linear(dim_h, dim_half).to("cuda"))
                 i_stream.append(BatchNorm1d(dim_half).to("cuda"))
@@ -73,7 +74,7 @@ class MultiInputSTGACN(torch.nn.Module):
 
             self.streams.append(i_stream)
         
-        print("number of streams built: ", len(self.streams), self.streams[0][0], self.streams[1][0])
+        #print("number of streams built: ", len(self.streams), self.streams[0][0], self.streams[1][0])
 
         #Final processing after combination
          #Extra linear layer to compensate for more data
@@ -87,6 +88,9 @@ class MultiInputSTGACN(torch.nn.Module):
         if self.hcf:
             #Add output of final hcf layer
             linear_input += dim_8th
+            
+        if self.hcf and len(self.data_dims) == 1:
+            linear_input = dim_8th
 
         self.fc1 = Linear(linear_input, 128)
         self.b1 = BatchNorm1d(128)
@@ -130,7 +134,8 @@ class MultiInputSTGACN(torch.nn.Module):
                     #print("only in here")
                     #h = h.view(5760,9)
                     if i < self.size_stgcn:
-                        #print("layer stgcn: ", layer, stream_no, type(layer), self.hcf, len(stream))
+                        print("layer stgcn: ", layer, stream_no, type(layer), self.hcf, len(stream))
+                        h = h.view(h.shape[1], h.shape[0], h.shape[2])
                         h = F.relu(layer(h, edge_indices[stream_no]))
                         h = F.dropout(h, p=0.1, training=train)
 
@@ -174,7 +179,7 @@ class MultiInputSTGACN(torch.nn.Module):
         h = F.dropout(h, p=0.1, training=train)
         h = F.relu(self.fc2(h))
         h = self.b2(h)
-        h = F.dropout(h, p=0.1, training=train)
+        #h = F.dropout(h, p=0.1, training=train)
         h = self.fc3(h)
 
         return F.sigmoid(h), F.log_softmax(h, dim=1)
