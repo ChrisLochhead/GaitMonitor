@@ -31,6 +31,15 @@ joint_connections = [[15, 13], [13, 11], # left foot to hip
                      [1, 3], [2, 4], # ears to eyes
                      [3, 0], [4, 0]]# Eyes to origin = total of 11
 
+joint_connections_no_head_m_hip = [[10, 8], [8, 6], # left foot to hip 
+                     [11, 9], [9, 7], # right foot to hip
+                     [6, 12], [7, 12], # hips to origin #total of 7 including mid-hip
+
+                    #Top dataset
+                     [4, 2], [2, 0], # left hand to shoulder
+                     [5, 3], [1, 3], #right hand to shoulder
+                     [0, 12], [1, 12]] # Shoulders to origin (origin is midhip)
+
 joint_connections_m_hip = [[15, 13], [13, 11], # left foot to hip 
                      [16, 14], [14, 12], # right foot to hip
                      [11, 17], [12, 17], [17,0],# hips to origin #total of 7 including mid-hip
@@ -81,7 +90,6 @@ def chart_knee_data(gait_cycles, display = False):
     #ax = fig.add_subplot(111)
     hcf_coefficients = []
     for i in range(len(gait_cycles[0])):
-        print("len of cycle: ", len(gait_cycles[0][i]))
 
         l_x = gait_cycles[0][i]
         l_y = [i for i in range(len(l_x))]

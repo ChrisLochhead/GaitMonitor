@@ -27,8 +27,6 @@ def get_gait_cycles(joint_data, images):
     for d in instances:
         t += len(d)
 
-    print("size 4: ", t)
-
     gait_cycles = []
     gait_cycle = []
 
@@ -107,7 +105,6 @@ def get_gait_cycles(joint_data, images):
                 gait_cycle = []
 
             if len(gait_cycle) > 19:
-                print("adding this gait cycle?", len(gait_cycle))
                 crossovers = 0
                 gait_cycles.append(copy.deepcopy(gait_cycle))
                 gait_cycle = [] 
@@ -122,7 +119,6 @@ def get_gait_cycles(joint_data, images):
                 else:
                 #Otherwise just add this one and reset it before the next instance starts.
                     gait_cycles.append(gait_cycle)
-                    print("appending here??", len(gait_cycle))
                     gait_cycle = []
 
     #Append final gait cycle missed by loop
@@ -153,7 +149,6 @@ def get_gait_cycles(joint_data, images):
 def get_knee_chart_polynomial(data):
     trends = []
     for i in range(len(data[0])):
-        print("charting knee polynomials", len(data), len(data[0]), len(data[1]), data[0][i], data[1][i])
         trend = np.polyfit(data[0][i], data[1][i], 3)
         plt.plot(data[0][i],data[1][i],'o')
         trendpoly = np.poly1d(trend) 

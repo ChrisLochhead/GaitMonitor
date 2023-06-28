@@ -62,7 +62,6 @@ class JointDataset(Dataset):
 
             gait_cycles.append(gait_cycle)
         
-        #print("gait cycle count: {}, gait indice count: {}".format(len(gait_cycles), indice_count))
         return gait_cycles
                   
 
@@ -91,7 +90,6 @@ class JointDataset(Dataset):
             #Count number of each cycle with each person and get weights
 
             self.padded_cycles = copy.deepcopy(self.data_cycles)
-            print("padded cycles size: ", len(self.padded_cycles), len(self.padded_cycles[0]))
             if self.padding:
                 #Pad all examples out to make every graph the same size
                 for i, cycle in enumerate(self.padded_cycles):
@@ -106,7 +104,7 @@ class JointDataset(Dataset):
                                 iter_tool = 0
                                 self.padded_cycles[i].append(self.padded_cycles[i][iter_tool])
                 
-            print("padded cycles size: ", len(self.padded_cycles), len(self.padded_cycles[0]))
+
 
             #This deactivates padded cycles
             #self.padded_cycles = copy.deepcopy(self.data_cycles)
@@ -121,7 +119,6 @@ class JointDataset(Dataset):
                 coo_matrix = get_COO_matrix(self.joint_connections)
                 mod_coo_matrix = self.modify_COO_matrix(len(row), self.joint_connections, coo_matrix)
                 # Featurize molecule
-                #print("row: ", len(row), row)
                 data = data_to_graph(row, mod_coo_matrix)
                 if self.test:
                     torch.save(data, 
@@ -162,7 +159,6 @@ class JointDataset(Dataset):
     def get(self, idx):
 
         if self.cycles:
-            #print("calling inside self cycles", idx)
             frame_count = 0
             for i, c in enumerate(self.cycle_indices):
                 if idx <= frame_count:
@@ -170,9 +166,6 @@ class JointDataset(Dataset):
                     break
                 else:
                     frame_count += c
-
-            #print("true indice: ", idx, true_indice)
-            #idx = true_indice
 
     
         if self.test:
@@ -182,7 +175,6 @@ class JointDataset(Dataset):
             data = torch.load(os.path.join(self.processed_dir, 
                                  f'data_{idx}.pt'))    
 
-        #print("returned data", data, data.y, idx, true_indice)    
         return data
     
     def split_cycles(self, split_type = 2):
@@ -208,6 +200,24 @@ class JointDataset(Dataset):
                 bottom_cycles.append(bottom_cycle)
 
             return top_cycles, bottom_cycles
+        
+        elif split_type == 1:
+            headless_cycles = []
+            for cycle in (self.data_cycles):
+                headless_cycle = []
+                for row in cycle:
+                    cycle_row = list(row[0:6])
+
+                    for i, coord in enumerate(row):
+                        if i > 10:
+                            cycle_row.append(coord)
+
+                    
+                    headless_cycle.append(cycle_row)
+                
+                headless_cycles.append(headless_cycle)
+
+            return headless_cycles
 
         #Order should be returned: l_leg, r_leg, l_arm, r_arm, head
         elif split_type == 5:
@@ -450,7 +460,6 @@ class HCFDataset(Dataset):
 
     def get(self, idx):
         if self.cycles:
-            #print("calling inside self cycles", idx)
             frame_count = 0
             for i, c in enumerate(self.cycle_indices):
                 if idx <= frame_count:
@@ -458,9 +467,6 @@ class HCFDataset(Dataset):
                     break
                 else:
                     frame_count += c
-
-            #print("true indice: ", idx, true_indice)
-            #idx = true_indice
 
     
         if self.test:
@@ -470,7 +476,6 @@ class HCFDataset(Dataset):
             data = torch.load(os.path.join(self.processed_dir, 
                                  f'data_{idx}.pt'))    
 
-        #print("returned data", data, data.y, idx, true_indice)    
         return data
     
     def split_cycles(self, split_type = 2):

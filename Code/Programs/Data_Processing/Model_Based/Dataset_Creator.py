@@ -398,6 +398,33 @@ def create_joint_angle_dataset(abs_data, images, joint_output, meta = 6):
     print("Joint angle dataset (integrated) Completed.")
     return joint_angle_dataset
 
+
+def create_decimated_dataset(abs_data, joint_output, images, meta = 10):
+    #This will split the data into 2 datasets, top and bottom.
+    abs_data, images = Utilities.process_data_input(abs_data, images)
+    dataset = []
+
+    for i, joints in enumerate(tqdm(abs_data)):
+        top_row = list(joints[0:meta])
+        #Append the mid-hip to bottom row in place of the origin ::::  This is now done earlier
+        #bottom_row.append(Utilities.midpoint(joints[14], joints[15]))
+
+        for j, coords in enumerate(joints):
+            if j > 10:
+                top_row.append(coords)
+
+        #Render.render_joints(images[i], top_row, delay=True)
+        dataset.append(top_row)
+
+    #Extract correct column names
+    top_colnames = list(Utilities.colnames_midhip[0:meta])
+    top_colnames += Utilities.colnames_midhip[11:]
+
+    Utilities.save_dataset(dataset, joint_output + "_decimated", top_colnames)
+
+    print("Decimated dataset completed.")
+    return dataset
+
 def create_2_regions_dataset(abs_data, joint_output, images, meta = 6):
     #This will split the data into 2 datasets, top and bottom.
     abs_data, images = Utilities.process_data_input(abs_data, images)
@@ -521,10 +548,8 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
     gait_cycles = transform_gait_cycle_data(pre_gait_cycles, abs_joint_data)
     rel_gait_cycles = transform_gait_cycle_data(pre_gait_cycles, rel_joint_data)
 
-    print("test polynomial")
     #trend = hcf.get_knee_chart_polynomial(knee_data_cycles)
     knee_data_cycles = Utilities.build_knee_joint_data(pre_gait_cycles, images)
-    print("Lens: ", len(knee_data_cycles))
     knee_data_coeffs = Render.chart_knee_data(knee_data_cycles, False)
 
     #rel_gait_cycles = []
@@ -585,7 +610,6 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
         for c in knee_data_coeffs[i]:
             hcf_cycle.append(c)
         #hcf_cycle.append(stride_ratios[i])
-        print("here's the row: ", len(hcf_cycle))
         gait_cycles_dataset.append(copy.deepcopy(hcf_cycle))
 
    # hcf_names = ["Instance", "No_In_Sequence", "Class", "Feet_Height_0", "Feet_Height_1",
