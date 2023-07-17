@@ -134,8 +134,8 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
         generator.set_state(init)
         for j, data in enumerate(load):
             data = data.to("cuda")
-            print("data here: ", data.x.shape)
             xs_batch[ind].append(data.x)
+            print("data x going in: ", data)
             indice_batch[ind].append(data.edge_index)
             batch_batch[ind].append(data.batch)
             ys_batch[ind].append(data.y)  

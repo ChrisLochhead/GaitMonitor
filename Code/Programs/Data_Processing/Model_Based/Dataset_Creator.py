@@ -425,7 +425,7 @@ def create_decimated_dataset(abs_data, joint_output, images, meta = 10):
     print("Decimated dataset completed.")
     return dataset
 
-def create_2_regions_dataset(abs_data, joint_output, images, meta = 6):
+def create_2_regions_dataset(abs_data, joint_output, images, meta = 6, size = 9):
     #This will split the data into 2 datasets, top and bottom.
     abs_data, images = Utilities.process_data_input(abs_data, images)
     top_dataset = []
@@ -434,14 +434,17 @@ def create_2_regions_dataset(abs_data, joint_output, images, meta = 6):
     for i, joints in enumerate(tqdm(abs_data)):
         top_row = list(joints[0:meta])
         bottom_row = list(joints[0:meta])
+        empties = list(np.zeros(size))
         #Append the mid-hip to bottom row in place of the origin ::::  This is now done earlier
         #bottom_row.append(Utilities.midpoint(joints[14], joints[15]))
 
         for j, coords in enumerate(joints):
             if j >= 17:
                 bottom_row.append(coords)
+                top_row.append(empties)
             elif j > 5:
                 top_row.append(coords)
+                bottom_row.append(empties)
 
         #Render.render_joints(images[i], top_row, delay=True)
         top_dataset.append(top_row)
@@ -460,12 +463,17 @@ def create_2_regions_dataset(abs_data, joint_output, images, meta = 6):
     print("Regions dataset (top and bottom) completed.")
     return top_dataset, bottom_dataset
 
-def append_specific_joints(my_list, joints, indices):
-    for i in indices:
-        my_list.append(joints[i])
+def append_specific_joints(my_list, joints, indices, size = 9):
+    empties = list(np.zeros(size))
+    for i in range(len(joints)):
+        if i in indices:
+            my_list.append(joints[i])
+        else:
+            if i > 5:
+                my_list.append(empties)
     return my_list
 
-def create_5_regions_dataset(abs_data, joint_output, images, meta = 5):
+def create_5_regions_dataset(abs_data, joint_output, images, meta = 5, size = 9):
     abs_data, images = Utilities.process_data_input(abs_data, images)
     #The regions are left_arm, left_leg, right_arm, right_leg, head, so essentially exodia.
     region_datasets = [[],[],[],[],[]]
@@ -479,12 +487,18 @@ def create_5_regions_dataset(abs_data, joint_output, images, meta = 5):
             region_rows[j] = list(joints[0:meta + 1])
         
         #region_rows[0] += joints[3:8] # Head joints
-        region_rows[0] += [k for index, k in enumerate(joints) if index > meta  and index < 11]
+        for index, k in enumerate(joints):
+            if index > meta and index < 11:
+                region_rows[0].append(k)
+            else:
+                if index > meta:
+                    region_rows[0].append([0,0,0])
+        #region_rows[0] = [k for index, k in enumerate(joints) if index > meta and index < 11 else [0,0,0]]
                                                                         #8 is 11
-        region_rows[1] = append_specific_joints(region_rows[1], joints, [11,13,15])
-        region_rows[2] = append_specific_joints(region_rows[2], joints, [12,14,16])
-        region_rows[3] = append_specific_joints(region_rows[3], joints, [17,19,21])
-        region_rows[4] = append_specific_joints(region_rows[4], joints, [18,20,22])
+        region_rows[1] = append_specific_joints(region_rows[1], joints, [11,13,15], size=size)
+        region_rows[2] = append_specific_joints(region_rows[2], joints, [12,14,16], size=size)
+        region_rows[3] = append_specific_joints(region_rows[3], joints, [17,19,21], size=size)
+        region_rows[4] = append_specific_joints(region_rows[4], joints, [18,20,22], size=size)
 
         #Check I've got the right coordinates
         #for j, region in enumerate(region_rows):
@@ -494,17 +508,17 @@ def create_5_regions_dataset(abs_data, joint_output, images, meta = 5):
             r.append(region_rows[k])
     
     output_suffixes = ["head", "r_arm", "l_arm", "r_leg", "l_leg"]
-    col_names = ["Instance", "No_In_Sequence", "Class", 'Freeze', 'Obstacle', 'Person', "Joint_0", "Joint_1", "Joint_2"]
-    head_col_names = ["Instance", "No_In_Sequence", "Class",'Freeze', 'Obstacle', 'Person',  "Joint_0", "Joint_1", "Joint_2", "Joint_3", "Joint_4"]
+    #col_names = ["Instance", "No_In_Sequence", "Class", 'Freeze', 'Obstacle', 'Person', "Joint_0", "Joint_1", "Joint_2"]
+    #head_col_names = ["Instance", "No_In_Sequence", "Class",'Freeze', 'Obstacle', 'Person',  "Joint_0", "Joint_1", "Joint_2", "Joint_3", "Joint_4"]
 
     for i, r in enumerate(region_datasets):
-        if i == 0:
-            output_cols = head_col_names
-        else:
-            output_cols = col_names
+        #if i == 0:
+        #    output_cols = head_col_names
+        #else:
+        #    output_cols = col_names
 
-        print("lens: ", len(output_cols), len(r), len(r[0]))
-        Utilities.save_dataset(r, joint_output + output_suffixes[i], output_cols)
+        #print("lens: ", len(output_cols), len(r), len(r[0]))
+        Utilities.save_dataset(r, joint_output + output_suffixes[i])
         
     print("Regions dataset (5-tier) completed.")
     return region_datasets
@@ -620,3 +634,52 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
     print("HCF dataset completed.")
     return gait_cycles_dataset
 
+
+def create_dummy_dataset(data, output_name):
+    #Get single datapoint of all 3 classes
+    data, _ = Utilities.process_data_input(data, None)
+    class_examples = [[], [], []]
+    frame_counter = -1
+    current_class = 0
+    for i, datapoint in enumerate(data):
+        print("data: ", current_class, frame_counter, datapoint[1], datapoint[2])
+        if datapoint[2] == current_class:
+            if datapoint[1] > frame_counter:
+                class_examples[current_class].append(datapoint)
+                frame_counter += 1
+            else:
+                current_class += 1
+                frame_counter = -1
+    
+    print("finished:", len(class_examples), len(class_examples[0]), len(class_examples[1]), len(class_examples[2]))
+
+    #Apply gaussian noise to each 1000*
+    mean = 0  # Mean of the Gaussian distribution
+    std_dev = 0.1 
+    fake_examples = []
+
+    for i, example in enumerate(class_examples):
+        for j in range(1000):
+            for frame in example:
+                print("here's the frame: ", frame, len(frame))
+                frame_metadata = frame[0:6]
+                print("original: ", frame_metadata)
+                joints_frame = frame[6:]
+                noisy_frame = joints_frame + np.random.normal(mean, std_dev, (len(joints_frame), len(joints_frame[0])))
+
+                #Convert from numpy arrays to lists so it saves to csv nicely
+                noisy_frame = list(noisy_frame)
+                for k, tmp in enumerate(noisy_frame):
+                    noisy_frame[k] = list(noisy_frame[k])
+
+                #Unravel the denoised frame and attach to the metadata
+                for f in noisy_frame:
+                    frame_metadata.append(f)
+
+                print("final: ", frame_metadata)
+
+                fake_examples.append(frame_metadata)
+
+    #Save as csv
+    Utilities.save_dataset(fake_examples, output_name)
+    return fake_examples

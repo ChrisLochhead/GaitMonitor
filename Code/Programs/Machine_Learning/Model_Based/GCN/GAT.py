@@ -99,42 +99,6 @@ class GATResNetBlock(torch.nn.Module):
         out += res_out  # Residual connection
         return out
 
-class HCFNet(torch.nn.Module):
-    def __init__(self, dim_in, dim_h, dim_out, heads=[1,1,1,1], n_inputs = 2, hcf = False):
-        super().__init__()
-        dim_half = int(dim_h/2)
-        dim_4th = int(dim_half/2)
-        dim_8th = int(dim_4th/2)
-
-        self.stream = torch.nn.Sequential(
-            torch.nn.Linear(dim_in, dim_h),
-            torch.nn.BatchNorm1d(dim_h),
-            torch.nn.Linear(dim_h, dim_half),
-            torch.nn.BatchNorm1d(dim_half),
-            torch.nn.Linear(dim_half, dim_4th),
-            torch.nn.BatchNorm1d(dim_4th),
-            torch.nn.Linear(dim_4th, dim_8th),
-            torch.nn.BatchNorm1d(dim_8th),
-            torch.nn.Linear(dim_8th, dim_out)
-        )
-
-    def forward(self, data, edge_indices=None, batches=None, train=True):
-        for i, x in enumerate(data):
-            data[i] = data[i].to("cuda")
-            h = data[i]
-
-            for j, layer in enumerate(self.stream):
-                if j != len(self.stream) - 1:
-                    if j % 2 == 0:
-                        h = F.relu(layer(h))
-                    else:
-                        h = layer(h)
-                        F.dropout(h, 0.5, training=train)
-                else:
-                    h = layer(h)
-
-        return torch.sigmoid(h), h
-
 class MultiInputGAT(torch.nn.Module):
     """Graph Attention Network"""
     def __init__(self, dim_in, dim_h, dim_out, heads=[1,1,1,1], n_inputs = 2, hcf = False):

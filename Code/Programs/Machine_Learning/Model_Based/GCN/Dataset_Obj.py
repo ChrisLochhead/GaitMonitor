@@ -41,7 +41,7 @@ class JointDataset(Dataset):
         """ If these files are found in raw_dir, processing is skipped"""
         self.data = pd.read_csv(self.raw_paths[0], header=None)
         
-        print("data being read from: ", self.raw_paths[0], type(self.raw_paths[0]))
+        print("\ndata being read from: ", self.raw_paths[0])
         if self.test:
             return [f'data_test_{i}.pt' for i in list(self.data.index)]
         else:
@@ -149,10 +149,6 @@ class JointDataset(Dataset):
                                     f'data_{index}.pt'))
             
 
-    #def _get_label(self, label):
-    #    label = np.asarray([label])
-    #    return torch.tensor(label, dtype=torch.int64)
-
     def len(self):
         return self.data.shape[0]
 
@@ -185,14 +181,17 @@ class JointDataset(Dataset):
                 top_cycle = []
                 bottom_cycle = []
                 for row in cycle:
-                    top_cycle_row = [row[0], row[1], row[2]]
-                    bottom_cycle_row = [row[0], row[1], row[2]]
+                    top_cycle_row = list(row[0:6])
+                    bottom_cycle_row = list(row[0:6])
                     for i, coord in enumerate(row):
-                        if i > 2 and i < 14:
+                        if i > 5 and i < 17:
                             top_cycle_row.append(coord)
-                        elif i >= 14:
+                            #bottom_cycle_row.append([0,0,0])
+                        elif i >= 17:
                             bottom_cycle_row.append(coord)
+                            #top_cycle_row.append([0,0,0])
                     
+                    #print("len of cycles: ", len(top_cycle_row), len(bottom_cycle_row))
                     top_cycle.append(top_cycle_row)
                     bottom_cycle.append(bottom_cycle_row)
                 
@@ -227,7 +226,7 @@ class JointDataset(Dataset):
                 for row in cycle:
                     row_cycle = [[],[],[],[],[]]
                     for i, c in enumerate(single_cycle):
-                        row_cycle[i]  = [row[0], row[1], row[2]]
+                        row_cycle[i]  = row[0:6]
                     
                     for i, coord in enumerate(row):
                         #Head coords 
@@ -319,9 +318,9 @@ def data_to_graph(row, coo_matrix, meta = 5):
         refined_row = row.iloc[meta + 1:]
         node_f= refined_row
 
-        #This is standard Data that has edge shit
+        #This is standard Data that has edges
         row_as_array = np.array(node_f.values.tolist())
-
+        print("len: ", len(row_as_array), row_as_array)
         #Turn into one-hot vector
         y = int(row.iloc[2])
 
@@ -348,7 +347,6 @@ def data_to_graph(row, coo_matrix, meta = 5):
             else:   
                 gait_cycle = np.concatenate((gait_cycle, row_as_array), axis=0)
 
-        
         #Verify gait cycle is calculated correctly:
         #Pass entire cycle as single graph
         data = Data(x=torch.tensor(list(gait_cycle), dtype=torch.float),
