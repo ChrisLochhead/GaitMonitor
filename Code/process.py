@@ -203,7 +203,7 @@ def load_5_region_data(cycles, preset = None, padding = False, folder = "Chris",
 
     return left_leg, right_leg, left_arm, right_arm, head_data
 
-#Types are 1 = normal, 2 = HCF, 3 = 2 region, 4 = 5 region. Pass types as an array of type numbers, always put hcf (2) at the END if including. If including HCF, you MUST include
+#Types are 1 = normal, 2 = HCF, 3 = 2 region, 4 = 5 region, 5 = Dummy. Pass types as an array of type numbers, always put hcf (2) at the END if including. If including HCF, you MUST include
 #as cycles = True
 def load_datasets(types, cycles, padding, folder):
     datasets = []
@@ -262,6 +262,11 @@ def load_datasets(types, cycles, padding, folder):
             datasets.append(l_a)
             datasets.append(r_a)
             datasets.append(h)
+        elif t == 5:
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/0_Dummy_Data',
+                                                      '0_Dummy_Data.csv',
+                                                    joint_connections=Render.joint_connections_m_hip, cycles=True, padding=padding))
+                        
 
     print("datasets loaded.")
     #Return requested datasets
@@ -413,13 +418,13 @@ def run_model(dataset_types, cycles, model_type, hcf, batch_size, epochs, folder
 
     #Run cross-validated training
     train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                     k_fold=10, batch=batch_size, epochs=epochs, type=model_type)
+                                                                     k_fold=3, batch=batch_size, epochs=epochs, type=model_type)
 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    process_data("Chris")
+    process_data("WeightGait")
     #process_autoencoder()
 
     #Run the model:
@@ -434,5 +439,5 @@ if __name__ == '__main__':
     #multi: indicates if the multi-stream variant of the chosen model should be used (multi variant 
     # models are compatible with both single and multiple datasets)
 
-    #run_model(dataset_types= [1, 3, 2], cycles = True, model_type = "ST-AGCN", hcf=True,
-    #           batch_size = 16, epochs = 1000, folder="Chris", multi=True)
+    run_model(dataset_types= [1,3,2], cycles = True, model_type = "ST-AGCN", hcf=True,
+               batch_size = 32, epochs = 150, folder="WeightGait", multi=True)

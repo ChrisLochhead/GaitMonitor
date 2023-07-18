@@ -78,12 +78,12 @@ class MultiInputSTGACN(torch.nn.Module):
                 self.streams.append(i_stream)
         
         #Assign input value for final linear layers after combination
-        len_steams = len(self.streams)
+        self.len_steams = len(self.streams)
         if self.hcf:
-            len_steams -= 1
+            self.len_steams -= 1
 
-        linear_input = self.stgcn_filters[-1] * self.cycle_size * len_steams
-        print("Linear input info: ", self.stgcn_filters, dim_8th, len(self.streams), self.num_inputs, self.cycle_size)
+        linear_input = self.stgcn_filters[-1] * self.cycle_size * self.len_steams
+        print("Linear input info: ", self.stgcn_filters, dim_8th, len(self.streams), self.num_inputs, self.cycle_size, self.len_steams)
 
         #If HCF data is being used, append the length of it's final layer 
         #to the linear input. If there is only one stream and self.hcf is true,
@@ -95,7 +95,6 @@ class MultiInputSTGACN(torch.nn.Module):
                 linear_input = dim_8th
             
         print("Final: ", linear_input)
-        #done = 5/0
 
         self.combination_layer = torch.nn.Sequential(
         Linear(linear_input, 128), ReLU(), BatchNorm1d(128), torch.nn.Dropout(0.5),
@@ -110,7 +109,6 @@ class MultiInputSTGACN(torch.nn.Module):
         hidden_layers = []
         for i, stream in enumerate(self.streams):
             #Get the data and pass it to the GPU
-            #for i, x in enumerate(data):
             data[i] = data[i].to("cuda")
             #If the data being passed is HCF data, it won't have edge indices.
             if edge_indices[i] != None:
@@ -127,7 +125,7 @@ class MultiInputSTGACN(torch.nn.Module):
             else:
                 #Reshape for temporal convolutions
                 #batch, channel, num nodes per cycle, num features
-                #print("h shape: ", h.shape, self.batch_size, self.cycle_size, self.dim_in, i)
+                print("h shape: ", h.shape, self.batch_size, self.cycle_size, self.dim_in, i)
                 h = h.view(self.batch_size, self.dim_in[i], self.cycle_size)
 
                 #In the case of ST-GCN this is a list object

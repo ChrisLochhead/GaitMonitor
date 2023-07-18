@@ -492,7 +492,7 @@ def create_5_regions_dataset(abs_data, joint_output, images, meta = 5, size = 9)
                 region_rows[0].append(k)
             else:
                 if index > meta:
-                    region_rows[0].append([0,0,0])
+                    region_rows[0].append(list(np.zeros(size)))
         #region_rows[0] = [k for index, k in enumerate(joints) if index > meta and index < 11 else [0,0,0]]
                                                                         #8 is 11
         region_rows[1] = append_specific_joints(region_rows[1], joints, [11,13,15], size=size)
@@ -659,10 +659,11 @@ def create_dummy_dataset(data, output_name):
     fake_examples = []
 
     for i, example in enumerate(class_examples):
-        for j in range(1000):
+        for j in range(300):
             for frame in example:
                 print("here's the frame: ", frame, len(frame))
                 frame_metadata = frame[0:6]
+                frame_metadata[0] = j + (i * 300)
                 print("original: ", frame_metadata)
                 joints_frame = frame[6:]
                 noisy_frame = joints_frame + np.random.normal(mean, std_dev, (len(joints_frame), len(joints_frame[0])))

@@ -226,7 +226,7 @@ class JointDataset(Dataset):
                 for row in cycle:
                     row_cycle = [[],[],[],[],[]]
                     for i, c in enumerate(single_cycle):
-                        row_cycle[i]  = row[0:6]
+                        row_cycle[i]  = list(row[0:6])
                     
                     for i, coord in enumerate(row):
                         #Head coords 
@@ -320,7 +320,6 @@ def data_to_graph(row, coo_matrix, meta = 5):
 
         #This is standard Data that has edges
         row_as_array = np.array(node_f.values.tolist())
-        print("len: ", len(row_as_array), row_as_array)
         #Turn into one-hot vector
         y = int(row.iloc[2])
 
@@ -340,7 +339,7 @@ def data_to_graph(row, coo_matrix, meta = 5):
             refined_row = cycle_part[meta + 1 :]    
             row_as_array = np.array(refined_row)     
             y = int(cycle_part[2])  
-
+            #print("cycle part: ", y, cycle_part[0], cycle_part[1])
             y_arr.append(y)
             if len(gait_cycle) <= 0:
                 gait_cycle = row_as_array
