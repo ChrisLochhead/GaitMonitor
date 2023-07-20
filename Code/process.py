@@ -83,8 +83,6 @@ def process_data(folder = "Chris"):
     #Create relative dataset
     relative_joint_data = Creator.create_relative_dataset(abs_joint_data, image_data,
                                                  joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/6_Relative_Data(relative)")
-
-    fake_data = Creator.create_dummy_dataset(relative_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data")
     
     print("\nStage 6:")
     #render_joints_series("None", relative_joint_data, size=5, plot_3D=True, x_rot = -90, y_rot = 180)
@@ -145,6 +143,8 @@ def process_data(folder = "Chris"):
     combined_norm_data = Creator.normalize_values(combined_data, 
                                              joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_Combined_Data(normed)")
 
+    fake_data = Creator.create_dummy_dataset(combined_norm_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data")
+    
     print("\nStage 14:")
     #Create regions data of combined data
     top_region_dataset, bottom_region_dataset = Creator.create_2_regions_dataset(combined_norm_data, #CHANGE BACK TO ABS_JOINT_DATA
@@ -262,28 +262,50 @@ def load_datasets(types, cycles, padding, folder):
             datasets.append(l_a)
             datasets.append(r_a)
             datasets.append(h)
+        #Type 5: Dataset with dummy datapoints
         elif t == 5:
+            #Dummy dataset
             datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/0_Dummy_Data',
                                                       '0_Dummy_Data.csv',
                                                     joint_connections=Render.joint_connections_m_hip, cycles=True, padding=padding))
-                        
+            
+            #15.5 COMBINED DATASET (original version of the dummy dataset)
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_Combined_Data(normed)', '15.5_Combined_Data(normed).csv',
+                                                    joint_connections=Render.joint_connections_m_hip, cycles=True, padding=padding))                        
 
     print("datasets loaded.")
     #Return requested datasets
     return datasets
 
-def process_datasets(datasets, dataset_size):
+def process_datasets(datasets, dataset_size, dummy_size = 0):
     print("Processing data...")
-    train_val_indices = random.sample(range(dataset_size), int(0.9 * dataset_size))
-    test_indices = random.sample(set(range(dataset_size)) - set(train_val_indices), int(0.1 * dataset_size))
+    train_val_indices = []
+    test_indices = []
+
+    #Append indices based on the first dataset length
+    size_0 = random.sample(range(dataset_size), int(0.9 * dataset_size))
+    size_1 = random.sample(set(range(dataset_size)) - set(size_0), int(0.1 * dataset_size))
+    train_val_indices.append(size_0)
+    test_indices.append(size_1)
+    
+    #In the case of using dummy data the datasets aren't all the same length, modify accordingly.
+    if dummy_size != 0:
+        tmp_0 = random.sample(range(dummy_size), int(0.9 * dummy_size))
+        tmp_1 = random.sample(set(range(dummy_size)) - set(tmp_0), int(0.1 * dummy_size))
+        train_val_indices.append(tmp_0)
+        test_indices.append(tmp_1)
+
 
     #These regions will be the same for both datasets
     multi_input_train_val = []
     multi_input_test = []
     for i, dataset in enumerate(datasets):
-        multi_input_train_val.append(dataset[train_val_indices])
-        multi_input_test.append(dataset[test_indices])
-    
+        if dummy_size != 0:
+            multi_input_train_val.append(dataset[train_val_indices[i]])
+            multi_input_test.append(dataset[test_indices[i]])
+        else:
+            multi_input_train_val.append(dataset[train_val_indices[0]])
+            multi_input_test.append(dataset[test_indices[0]])
     
     print("Dataset processing complete.")
 
@@ -392,18 +414,23 @@ def run_model(dataset_types, cycles, model_type, hcf, batch_size, epochs, folder
         data_pair = [dataset.num_features, dataset.num_node_features]
         data_dims.append(data_pair)
 
+    num_datasets = len(datasets)
+    if 5 in dataset_types:
+        num_datasets -= 1
+
+    
     #Process datasets by manually shuffling to account for cycles
-    multi_input_train_val, multi_input_test = process_datasets(datasets, len(datasets[0]))
+    multi_input_train_val, multi_input_test = process_datasets(datasets, len(datasets[0]), dummy_size=len(datasets[1]))
 
     print("\nCreating {} model with {} datasets: ".format(model_type, len(datasets)))
     if model_type == "GAT":
         if multi:
-            model = gat.MultiInputGAT(dim_in=[d.num_node_features for d in datasets], dim_h=128, dim_out=3, hcf=hcf, n_inputs=len(datasets))
+            model = gat.MultiInputGAT(dim_in=[d.num_node_features for d in datasets], dim_h=128, dim_out=3, hcf=hcf, n_inputs=num_datasets)
         else:
             model = gat.GAT(dim_in=datasets[0].num_node_features, dim_h=128, dim_out=3)
     elif model_type == "ST-AGCN":
         if multi:
-            model = stgcn.MultiInputSTGACN(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=3, n_inputs=len(datasets),
+            model = stgcn.MultiInputSTGACN(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=3, n_inputs=num_datasets,
                                         data_dims=data_dims, batch_size=batch_size, hcf=hcf,
                                         max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph)
         else:
@@ -416,15 +443,27 @@ def run_model(dataset_types, cycles, model_type, hcf, batch_size, epochs, folder
         return
     model = model.to("cuda")
 
+    for tr in multi_input_train_val:
+        print("tr: ", tr)
+        for i, trr in enumerate(tr):
+            if i == 0:
+                print("trr:", trr)
+    for tv in multi_input_test:
+        print("tv: ", tv)
+        for i, tvv in enumerate(tv):
+            if i == 0:
+                print("tvv: ", tvv)
+
+
     #Run cross-validated training
-    train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
+    train_scores, val_scores, test_scores = graph_utils.cross_valid(model, [multi_input_test[-1]], datasets=[multi_input_train_val[0]],
                                                                      k_fold=3, batch=batch_size, epochs=epochs, type=model_type)
 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    process_data("WeightGait")
+    process_data("Chris")
     #process_autoencoder()
 
     #Run the model:
@@ -439,5 +478,5 @@ if __name__ == '__main__':
     #multi: indicates if the multi-stream variant of the chosen model should be used (multi variant 
     # models are compatible with both single and multiple datasets)
 
-    run_model(dataset_types= [1,3,2], cycles = True, model_type = "ST-AGCN", hcf=True,
-               batch_size = 32, epochs = 150, folder="WeightGait", multi=True)
+    run_model(dataset_types= [5], cycles = True, model_type = "ST-AGCN", hcf=False,
+               batch_size = 16, epochs = 100, folder="Chris", multi=True)

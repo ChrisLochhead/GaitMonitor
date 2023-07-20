@@ -82,16 +82,6 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
             train_set = folded_train[i][fold]
             val_set = folded_val[i][fold]
 
-            #print("train : ", len(train_set), len(val_set), len(test_set))
-
-            #for tt in train_set:
-            #    print("tt.y", tt.y)
-            #for tv in val_set:
-            #    print("tv.y", tv.y)
-            #for to in test_set:
-            #    print("to.y: ", to.y)
-            #stop = 5/0
-
             train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler = train_sample, drop_last = True))
 
             #ST-GCNs, these are different because ST-GCN requires padded samples of all the same size
@@ -145,12 +135,9 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
         for j, data in enumerate(load):
             data = data.to("cuda")
             xs_batch[ind].append(data.x)
-            print("batch size: ", data, ind)
             indice_batch[ind].append(data.edge_index)
             batch_batch[ind].append(data.batch)
             ys_batch[ind].append(data.y)  
-
-    print("length of training batches: ", len(xs_batch))
     
     for epoch in range(epochs + 1):
         total_loss = 0
@@ -222,9 +209,9 @@ def test(model, loaders, generator, train = False, validation = False, x_b = Non
             ys_batch[i].append(data.y)
 
     #if validation:
-    #    print("validation batch: ", len(xs_batch))
+    #    print("validation batch: ", len(xs_batch[0]))
     #else:
-    #    print("test batch: ", len(xs_batch))
+    #    print("test batch: ", len(xs_batch[0]))
 
     #Second pass: process the data 
     generator.set_state(init)
@@ -240,5 +227,8 @@ def test(model, loaders, generator, train = False, validation = False, x_b = Non
             loss += criterion(out, data_y[0]) / len(loaders[0])            
             out = F.log_softmax(out, dim=1)
             acc += accuracy(out.argmax(dim=1), data_y[0]) / len(loaders[0])
+
+    #if validation == False:
+    #    print("test values: ", out, data_y[0])
 
     return loss, acc

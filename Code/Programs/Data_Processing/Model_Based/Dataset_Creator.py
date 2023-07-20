@@ -641,17 +641,23 @@ def create_dummy_dataset(data, output_name):
     class_examples = [[], [], []]
     frame_counter = -1
     current_class = 0
+    examples_of_class = 0
     for i, datapoint in enumerate(data):
-        print("data: ", current_class, frame_counter, datapoint[1], datapoint[2])
+        #print("data: ", current_class, frame_counter)
         if datapoint[2] == current_class:
             if datapoint[1] > frame_counter:
                 class_examples[current_class].append(datapoint)
                 frame_counter += 1
             else:
-                current_class += 1
+                examples_of_class += 1
                 frame_counter = -1
+
+                if examples_of_class >= 15:
+                    current_class +=1
+                    examples_of_class = 0
+
     
-    print("finished:", len(class_examples), len(class_examples[0]), len(class_examples[1]), len(class_examples[2]))
+    #print("finished:", len(class_examples), len(class_examples[0]), len(class_examples[1]), len(class_examples[2]))
 
     #Apply gaussian noise to each 1000*
     mean = 0  # Mean of the Gaussian distribution
@@ -659,12 +665,10 @@ def create_dummy_dataset(data, output_name):
     fake_examples = []
 
     for i, example in enumerate(class_examples):
-        for j in range(300):
+        for j in range(50):
             for frame in example:
-                print("here's the frame: ", frame, len(frame))
                 frame_metadata = frame[0:6]
-                frame_metadata[0] = j + (i * 300)
-                print("original: ", frame_metadata)
+                frame_metadata[0] = j + (i * 50)
                 joints_frame = frame[6:]
                 noisy_frame = joints_frame + np.random.normal(mean, std_dev, (len(joints_frame), len(joints_frame[0])))
 
@@ -676,8 +680,6 @@ def create_dummy_dataset(data, output_name):
                 #Unravel the denoised frame and attach to the metadata
                 for f in noisy_frame:
                     frame_metadata.append(f)
-
-                print("final: ", frame_metadata)
 
                 fake_examples.append(frame_metadata)
 

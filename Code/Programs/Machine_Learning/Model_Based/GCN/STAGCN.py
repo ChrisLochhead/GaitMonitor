@@ -125,7 +125,7 @@ class MultiInputSTGACN(torch.nn.Module):
             else:
                 #Reshape for temporal convolutions
                 #batch, channel, num nodes per cycle, num features
-                print("h shape: ", h.shape, self.batch_size, self.cycle_size, self.dim_in, i)
+                #print("h shape: ", h.shape, self.batch_size, self.cycle_size, self.dim_in, i)
                 h = h.view(self.batch_size, self.dim_in[i], self.cycle_size)
 
                 #In the case of ST-GCN this is a list object
