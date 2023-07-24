@@ -9,6 +9,44 @@ import copy
 
 from sklearn.preprocessing import normalize
 
+def average_coordinate(datapoint):
+    #Aggregate the 9 values of every datapoint in the set, normalized
+    aggregate = list(np.zeros(len(datapoint[0])))
+    for data in datapoint:
+        for i, coord in enumerate(data):
+            aggregate[i] += (coord / len(datapoint[0]))
+    
+    return aggregate
+
+
+def create_fused_dataset(data, joint_output, meta = 6):
+    fused_dataset = []
+    for row in data:
+        meta_data = row[0:meta]
+        head_data = row[meta:meta+6]
+        left_arm = [row[11], row[13], row[15]]
+        right_arm = [row[12], row[14], row[16]]
+        legs = row[17:]
+
+        #Aggregate the head and arms
+        head_agg = average_coordinate(head_data)
+        l_agg = average_coordinate(left_arm)
+        r_agg = average_coordinate(right_arm)
+
+        #Stack them back together
+        meta_data.append(head_agg)
+        meta_data.append(l_agg)
+        meta_data.append(r_agg)    
+
+        for d in legs:
+            meta_data.append(d)      
+
+        fused_dataset.append(meta_data)
+
+    Utilities.save_dataset(fused_dataset, joint_output)
+    return meta_data
+
+
 def normalize_values(data, joint_output, hcf = False, meta = 5):
     if hcf:
         data, _ = Utilities.process_data_input(data, None, cols=Utilities.hcf_colnames)
@@ -543,37 +581,14 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
     abs_veljoint_data, _ =  Utilities.process_data_input(abs_veljoints, None)
 
     print("Building HCF Dataset...")
-    #Gait cycle has instances of rows: each instance contains an array of rows
-    #denoting all of the frames in their respective gait cycle, appended with their
-    #metadata at the start
-    #if check == 1:
-    #    print(pre_scale[0])
-
-    pre_gait_cycles = hcf.get_gait_cycles(pre_scale, images)
-
-    #Experiment with getting and then charting knee data
-    #for i in range(len(gait_cycles)):
-    #    if i <= 2:
-    #        angles = Utilities.build_knee_joint_data(gait_cycles[i])
-    #        Utilities.chart_knee_data(angles)
-
-    #Replicate this pattern for the relative gait cycle and scaled gait data (if youn run it directly, 
-    #relative gait will return very marginally different gait cycles.)
-    gait_cycles = transform_gait_cycle_data(pre_gait_cycles, abs_joint_data)
-    rel_gait_cycles = transform_gait_cycle_data(pre_gait_cycles, rel_joint_data)
+    pre_gait_cycles = hcf.split_by_instance(pre_scale, pad=False)
+    gait_cycles = hcf.split_by_instance(abs_joint_data, pad=False)
+    rel_gait_cycles = hcf.split_by_instance(rel_joint_data, pad=False)
+    print("cycles: ")
 
     #trend = hcf.get_knee_chart_polynomial(knee_data_cycles)
     knee_data_cycles = Utilities.build_knee_joint_data(pre_gait_cycles, images)
     knee_data_coeffs = Render.chart_knee_data(knee_data_cycles, False)
-
-    #rel_gait_cycles = []
-    #joint_counter = 0
-    #for cycle in gait_cycles:
-    #    new_cycle = []
-    #    for frame in cycle:
-    #        new_cycle.append(rel_joint_data[joint_counter])
-    #        joint_counter += 1
-    #    rel_gait_cycles.append(copy.deepcopy(new_cycle))
 
 
     print("number of total gait cycles: ", len(gait_cycles))
@@ -641,48 +656,74 @@ def create_dummy_dataset(data, output_name):
     class_examples = [[], [], []]
     frame_counter = -1
     current_class = 0
+    current_instance = -1
     examples_of_class = 0
-    for i, datapoint in enumerate(data):
-        #print("data: ", current_class, frame_counter)
-        if datapoint[2] == current_class:
-            if datapoint[1] > frame_counter:
-                class_examples[current_class].append(datapoint)
-                frame_counter += 1
-            else:
-                examples_of_class += 1
-                frame_counter = -1
 
-                if examples_of_class >= 15:
-                    current_class +=1
+    #For every row in the normal dataset
+    current_sequence = []
+    for i, datapoint in enumerate(data):
+
+        #If the class of this row is the current class
+        if datapoint[2] == current_class:
+            #If current instance not currently set, set it to the first instance of the desired class
+            if current_instance == -1:
+                current_instance = datapoint[0]
+
+            #And if the instance number is still the same
+            if datapoint[0] == current_instance:
+                print("appending new example", datapoint[1], datapoint[2], current_class)
+                #class_examples[current_class].append(datapoint)
+                current_sequence.append(datapoint)
+            else:
+                #Iterate to the next class and reset the instance
+                examples_of_class += 1
+                current_instance += 1
+                class_examples[current_class].append(copy.deepcopy(current_sequence))
+                current_sequence = []
+
+                #If we have enough examples of this class now
+                if examples_of_class >= 19:
+                    #Move to the next class
+                    current_class += 1
                     examples_of_class = 0
+                    current_instance = -1
+                else:
+                    #Otherwise add this current one to the list
+                    #class_examples[current_class].append(datapoint)
+                    current_sequence.append(datapoint)
 
     
-    #print("finished:", len(class_examples), len(class_examples[0]), len(class_examples[1]), len(class_examples[2]))
+    print("finished:", len(class_examples), len(class_examples[0]), len(class_examples[1]), len(class_examples[2]))
 
     #Apply gaussian noise to each 1000*
     mean = 0  # Mean of the Gaussian distribution
     std_dev = 0.1 
     fake_examples = []
-
+    instance_counter = 0
     for i, example in enumerate(class_examples):
-        for j in range(50):
-            for frame in example:
-                frame_metadata = frame[0:6]
-                frame_metadata[0] = j + (i * 50)
-                joints_frame = frame[6:]
-                noisy_frame = joints_frame + np.random.normal(mean, std_dev, (len(joints_frame), len(joints_frame[0])))
+        for j in range(10):
+            for frame_block in example:
+                for frame in frame_block:
+                    print("frame: ", len(frame), len(example[2]), len(example), len(class_examples))
+                    frame_metadata = frame[0:6]
+                    frame_metadata[0] = instance_counter
+                    joints_frame = frame[6:]
+                    noisy_frame = joints_frame + np.random.normal(mean, std_dev, (len(joints_frame), len(joints_frame[0])))
 
-                #Convert from numpy arrays to lists so it saves to csv nicely
-                noisy_frame = list(noisy_frame)
-                for k, tmp in enumerate(noisy_frame):
-                    noisy_frame[k] = list(noisy_frame[k])
+                    #Convert from numpy arrays to lists so it saves to csv nicely
+                    noisy_frame = list(noisy_frame)
+                    for k, tmp in enumerate(noisy_frame):
+                        noisy_frame[k] = list(noisy_frame[k])
 
-                #Unravel the denoised frame and attach to the metadata
-                for f in noisy_frame:
-                    frame_metadata.append(f)
+                    #Unravel the denoised frame and attach to the metadata
+                    for f in noisy_frame:
+                        frame_metadata.append(f)
 
-                fake_examples.append(frame_metadata)
+                    fake_examples.append(frame_metadata)
+                instance_counter += 1
 
+    
+    print("final number of fake examples: ", len(fake_examples))
     #Save as csv
     Utilities.save_dataset(fake_examples, output_name)
     return fake_examples

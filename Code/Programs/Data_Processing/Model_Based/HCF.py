@@ -4,146 +4,51 @@ import numpy as np
 import matplotlib.pyplot as plt
 import Programs.Data_Processing.Model_Based.Render as Render
 
-#This will only work with relative data
-def get_gait_cycles(joint_data, images):
-    
-    instances = []
-    instance = []
-    current_instance = 0
-    #First separate the joints into individual instances
-    for joints in joint_data:
-        #Append joints as normal
-        if joints[0] == current_instance:
-            instance.append(joints)
-        else:
-            instances.append(copy.deepcopy(instance))
-            instance = []
-            instance.append(joints)
-            current_instance = joints[0]
-    #Add the last instance hanging off missed by the loop
-    instances.append(copy.deepcopy(instance))
 
-    t = 0
-    for d in instances:
-        t += len(d)
+def split_by_instance(joint_data, pad = True):
+
+    #Find longest instance first:
+    max_instance_length = 0
+    for row in joint_data:
+        if row[1] > max_instance_length:
+            max_instance_length = row[1]
+
+    print("max length: ", max_instance_length)
+
+    #set padded sequences to 40 unless there's examples that are bigger, otherwise set it to that.
+    std_inst_length = 40
+    if max_instance_length >= std_inst_length:
+        std_inst_length = max_instance_length
 
     gait_cycles = []
-    gait_cycle = []
+    current_cycle = []
+    current_instance = 0
+    for row in joint_data:
 
-    #For each instance
-    inst_count = 0
-    for i, inst in enumerate(instances):
-
-        #if i > 0:
-        #    if len(gait_cycle) > 0:
-        #        crossovers = 0
-        #        if len(gait_cycles) > 0:
-        #            for g in gait_cycle:
-        ##                gait_cycles[-1].append(g)
-        #        else:
-        #            gait_cycles.append(copy.deepcopy(gait_cycle))                    
-        #        gait_cycle = []
-
-
-        found_initial_direction = False
-        direction = -1
-        crossovers = 0
-
-        row_18_previous = -1
-
-        for j, row in enumerate(inst):
-
-            #Only register initial direction if they aren't equal
-            if found_initial_direction == False:
-                if row[-2][1] > row[-1][1]:
-                    direction = 0
-                    found_initial_direction = True
-                elif row[-2][1] < row[-1][1]:
-                    direction = 1
-                    found_initial_direction = True
-
-            #Check for legs mixing up in frame, only need to check one leg
-            #print("gap: ", abs(row_18_previous - row[18][1]), row_18_previous, row[18][1])
-            if abs(row_18_previous - row[-2][1]) > 50 and found_initial_direction:
-                gait_cycle.append(row)
-                #print("detected leg switch", j)
-                row_18_previous = row[-2][1]
-                #Render.render_joints(images[j], row, delay=True, use_depth=False)
-                continue
-
-            row_18_previous = row[-2][1]
-            #Check if the direction matches the current movement and append as appropriate
-            if row[-2][1] > row[-1][1] and direction == 0:
-                gait_cycle.append(row)
-            elif row[-2][1] < row[-1][1] and direction == 1:
-                gait_cycle.append(row)
-            elif row[-2][1] > row[-1][1] and direction == 1:
-                crossovers += 1
-                #print("crossover detected a ", row[18][1], row[19][1], direction )
-                gait_cycle.append(row)
-                direction = 0
-            elif row[-2][1] < row[-1][1] and direction == 0:
-                crossovers += 1
-                #print("crossover detected b ", row[18][1], row[19][1], direction)
-                gait_cycle.append(row)
-                direction = 1
-            else:
-                #There is either no cross over or the rows are totally equal, in which case just add as usual
-                gait_cycle.append(row)
-
-
-            #row 16 is right leg at crossover point
-            #print("crossover count: {} and current instance length: {}, direction: {}, row 18: {}, row 19: {} ".format(crossovers, len(gait_cycle), direction, row[18], row[19]))
-            #Render.render_joints(images[j], row, delay=True, use_depth=False)
-
-            #Check the number of crossovers 
-            #If there has been 2 this is one full gait cycle, append it to the gait cycles and reset the 
-            #current gait cycle.
-            if crossovers > 1 and len(gait_cycle) > 5 or len(gait_cycle) > 19:
-                crossovers = 0
-                gait_cycles.append(copy.deepcopy(gait_cycle))
-                gait_cycle = []
-
-            if len(gait_cycle) > 19:
-                crossovers = 0
-                gait_cycles.append(copy.deepcopy(gait_cycle))
-                gait_cycle = [] 
-
-            #Check if we are at the end of the instance and adjust the last cycle accordingly so we dont end up with length 1 gait cycles.
-            if j == len(inst):
-                #If the current gait cycle isn't at least 5 frames, just append it on to the latest one
-                if len(gait_cycle) < 5:
-                    for g in gait_cycle:
-                        gait_cycles[-1].append(g)
-                    gait_cycles = []
-                else:
-                #Otherwise just add this one and reset it before the next instance starts.
-                    gait_cycles.append(gait_cycle)
-                    gait_cycle = []
-
-    #Append final gait cycle missed by loop
-    if len(gait_cycle) > 0:
-        gait_cycles.append(gait_cycle)
-
-    #Illustrate results
-    col = (0,0,255)
-    image_iter = 0
-    for cycle in gait_cycles:
-        #Switch the cycle every new gait cycle
-        if col == (0,0,255):
-            col = (255,0,0)
+        if row[0] == current_instance:
+            current_cycle.append(row)
         else:
-            col = (0,0,255)
-        
-        for i, row in enumerate(cycle):
-            #Render every frame
-            #if len(cycle) > 21:
-            #    print("frame ", i, " of ", len(cycle))
-            #    print("row: ", row)
-            #    Render.render_joints(images[image_iter], row, delay=True, use_depth=False, colour=col)
+            current_instance += 1
+            if len(current_cycle) < std_inst_length:
+                zero_row = copy.deepcopy(current_cycle[-1])
+                for i, c in enumerate(zero_row):
+                    if i > 5:
+                        zero_row[i] = list(np.zeros(len(c)))
+                
+                if pad:
+                    while len(current_cycle) < std_inst_length:
+                        current_cycle.append(zero_row)
 
-            image_iter += 1
-            
+                #Appending gait cycle
+                gait_cycles.append(copy.deepcopy(current_cycle))
+                current_cycle = []
+    
+    #Appending final gait cycle
+    while len(current_cycle) < std_inst_length:
+        current_cycle.append(zero_row)
+    
+    gait_cycles.append(copy.deepcopy(current_cycle))
+
     return gait_cycles
 
 def get_knee_chart_polynomial(data):
@@ -229,6 +134,7 @@ def get_time_LofG(gait_cycles, velocity_joints, images):
         frames_not_moving = 0
         for j, joints in enumerate(frame):
             #Calculate relative velocities between hips and feet
+            print("values: ", image_iter, len(velocity_joints[image_iter]))
             left_velocity = abs(velocity_joints[image_iter][21][0]) + abs(velocity_joints[image_iter][21][1])+ abs(velocity_joints[image_iter][21][2])\
                 + abs(velocity_joints[image_iter][17][0])+ abs(velocity_joints[image_iter][17][1]+ abs(velocity_joints[image_iter][17][2]))
             right_velocity = abs(velocity_joints[image_iter][22][0]) + abs(velocity_joints[image_iter][22][1])+ abs(velocity_joints[image_iter][22][2])\

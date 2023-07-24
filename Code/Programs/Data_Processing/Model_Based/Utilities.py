@@ -56,6 +56,8 @@ hcf_colnames = ["Instance", "No_In_Sequence", "Class", 'Freeze', 'Obstacle', 'Pe
                  "Time_LOG_0", "Time_LOG_1", "Time_No_Movement", "Speed", "Stride_Gap", "Stride_Length", "Max_Gap", 'l_co 1',
                  'l_co 2', 'l_co 3', 'l_co 4', 'l_co 5', 'l_co 6', 'l_co 7', 'r_co 1', 'r_co 2', 'r_co 3', 'r_co 4', 'r_co 5', 'r_co 6', 'r_co 7']
 
+fused_colnames = ['Instance', 'No_In_Sequence', 'Class', 'Freeze', 'Obstacle', 'Person', 'Head','L_arm','R_arm','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', "M_hip"] 
+
                 #Head goes to hip, all other head joints go to nothing because they will be dropped
 bone_connections =[[0, 17], [1, -1], [2, -1], [3, -1], [4, -1],
                     #Right arm (extremities like hands and feet go to 0)
@@ -358,6 +360,8 @@ def save_dataset(data, name, colnames = colnames):
         colnames = colnames_top
     elif len(data[0]) == 29:
         colnames = hcf_colnames
+    elif len(data[0]) == 16:
+        colnames = fused_colnames
 
 
     new_dataframe = pd.DataFrame(data, columns = colnames)

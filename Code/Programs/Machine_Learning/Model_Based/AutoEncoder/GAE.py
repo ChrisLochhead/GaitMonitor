@@ -7,58 +7,61 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 import Programs.Data_Processing.Model_Based.Utilities as Utilities
+import Programs.Machine_Learning.Model_Based.GCN.STAGCN as STAGCN
 
 class VariationalEncoder(nn.Module):
-    def __init__(self, dim_in, dim_h, latent_dims, heads=[8,1]):  
+    def __init__(self, dim_in, dim_h, latent_dims, batch_size, cycle_size):  
         super(VariationalEncoder, self).__init__()
 
-        dim_half = int(dim_h/2)
-        self.dim_half = dim_half
         self.dim_in = dim_in
-        self.gcn1 = GCNConv(dim_in, dim_half)
+        self.dim_out = latent_dims
+        self.batch_size = batch_size
+        self.cycle_size = cycle_size
 
+        self.block1 = STAGCN.STGCNBlock(128, 64, 2, self.batch_size, self.cycle_size)
+        self.block2 = STAGCN.STGCNBlock(64, 32, 2, self.batch_size, self.cycle_size)
+        self.block3 = STAGCN.STGCNBlock(32, 16, 2, self.batch_size, self.cycle_size)
 
-        self.linear1 = nn.Linear(dim_half, latent_dims)
-        self.linear3 = nn.Linear(latent_dims, latent_dims)
-        #self.linear4 = nn.Linear(latent_dims, latent_dims)
-
-        # hack to get sampling on the GPU
-        self.N = torch.distributions.Normal(0, 1)
-        self.N.loc = self.N.loc.cuda()
-        self.N.scale = self.N.scale.cuda()
-        self.kl = 0
-        #########################################################
+        self.linear = nn.Linear(16, 16)
 
     def forward(self, x, edge_index, batch):
         x = x.to("cuda")
         edge_index = edge_index.to("cuda")
         batch = batch.to("cuda")
-        #print("x going in: ", x.shape, self.dim_in, self.dim_half)
-        #print("gcn", self.gcn1)
-        g1 = F.leaky_relu(self.gcn1(x, edge_index))
-        #print("1: ", g1.shape)
-        l1 = F.leaky_relu(self.linear1(g1))
-       # print("2: ", l1.shape)
-        l3 = self.linear3(l1)
-       # print("3: ", l3.shape)
+        
+        print("data shape: ", x.shape)
+        h = F.relu(self.block1(x, edge_index))
+        print("data shape after block 1: ", h.shape)
+        h = F.relu(self.block2(h, edge_index))
+        print("data shape after block 2: ", h.shape)
+        h = self.block3(h, edge_index)
 
-        #mu =  self.linear4(l3)
-        #sigma = torch.exp(self.linear4(l3))
-        #z = mu + sigma*self.N.sample(mu.shape)
-        #self.kl = (sigma**2 + mu**2 - torch.log(sigma) - 1/2).sum()
-        return l3 #z      
+        #Flatten
+        print("shape before: ", h.shape)
+        h = torch.flatten(h)
+        print("shape now: ", h)
+
+        #Pass through FC layer to finish
+        h = self.linear(h)
+
+        return h     
 
 
 
 class Decoder(nn.Module):
     
-    def __init__(self, latent_dims, out, dim_in, dim_h, heads=[8,1]):
+    def __init__(self, latent_dims, out, dim_in, dim_h, batch_size, cycle_size, unflatten_dims = torch.Size([32, 16])):
         super().__init__()
 
-        dim_half = int(dim_h/2)
-        self.linear1 = nn.Linear(latent_dims, latent_dims)
-        self.linear3 = nn.Linear(latent_dims, dim_half)
-        self.gcn2 = GCNConv(dim_half, dim_in)
+        self.batch_size = batch_size
+        self.cycle_size = cycle_size
+        self.unflatten_dims = unflatten_dims
+
+        self.linear = nn.Linear(16, 16)
+
+        self.block1 = STAGCN.STGCNBlock(64, 128, 2, self.batch_size, self.cycle_size)
+        self.block2 = STAGCN.STGCNBlock(32, 64, 2, self.batch_size, self.cycle_size)
+        self.block3 = STAGCN.STGCNBlock(16, 32, 2, self.batch_size, self.cycle_size)
 
         
     def forward(self, x, edge_index, batch):
@@ -66,28 +69,25 @@ class Decoder(nn.Module):
         edge_index = edge_index.to("cuda")
         batch = batch.to("cuda")
 
-        #print("output ", x.shape)
-        #This is 64,9
-        l1 = F.leaky_relu(self.linear1(x))
-        #print("after l3: ", l1.shape)
+        h = self.linear(x)
 
-        l3 = F.leaky_relu(self.linear3(l1))
-        #print("after l1", l3.shape)
+        h = torch.unflatten(h, self.unflatten_dims)
 
-        g2 = F.sigmoid(self.gcn2(l3, edge_index))
-        #print("after g1: ", g2.shape)
+        h = F.relu(self.block3(h, edge_index))
+        h = F.relu(self.block3(h, edge_index))
+        h = F.sigmoid(self.block3(h, edge_index))
 
-        return g2
+        return h
 
     
 
 
 class VariationalAutoencoder(nn.Module):
-    def __init__(self, dim_in, dim_h, latent_dims):
+    def __init__(self, dim_in, dim_h, latent_dims, batch_size, cycle_size):
         super(VariationalAutoencoder, self).__init__()
         #Default heads
-        self.encoder = VariationalEncoder(dim_in, dim_h, latent_dims)
-        self.decoder = Decoder(latent_dims, latent_dims, dim_in, dim_h)
+        self.encoder = VariationalEncoder(dim_in, dim_h, latent_dims, batch_size, cycle_size)
+        self.decoder = Decoder(latent_dims, latent_dims, dim_in, dim_h, batch_size, cycle_size)
 
     def forward(self, x, edge_index, batch):
         x = x.to(device)

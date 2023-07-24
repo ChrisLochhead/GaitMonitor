@@ -126,6 +126,7 @@ class MultiInputGAT(torch.nn.Module):
             else:
                 print("Building GAT module: ,", i, dim_in)
                 i_stream.append(GATResNetBlock(dim_in[i], dim_h, dim_half))
+                i_stream.append(GATResNetBlock(dim_half, dim_half, dim_half))
                 i_stream.append(GATResNetBlock(dim_half, dim_4th, dim_8th))
 
             self.streams.append(i_stream)
@@ -144,12 +145,12 @@ class MultiInputGAT(torch.nn.Module):
         else:
             linear_input = total_num_layers
 
-        linear_input = linear_input * dim_half
+        linear_input = 72 * len(self.streams)#  linear_input * dim_half + 40 #8 1, ?2, 1288
         #HCF only concatenates the last (or smallest) hidden layer, GAT convs take all 4 layers
         if self.hcf:
             linear_input += dim_8th
 
-        self.lin1 = Linear(linear_input, 128)
+        self.lin1 = Linear(40, 128)
         self.m1 = BatchNorm1d(128)
         self.lin2 = Linear(128, 64)
         self.m2 = BatchNorm1d(64)
@@ -181,7 +182,7 @@ class MultiInputGAT(torch.nn.Module):
                         h = F.relu(layer(h, edge_indices[stream_no]))
                    
                     #Dropout always the next one
-                    h = F.dropout(h, p=0.9, training=train)
+                    h = F.dropout(h, p=0.3, training=train)
 
 
                     if self.hcf and stream_no + 1 == len(self.streams):
@@ -195,15 +196,11 @@ class MultiInputGAT(torch.nn.Module):
         #After the stream is done, concatenate each streams layers
         h_layers = []
         for i, hidden_stream in enumerate(hidden_layers):
-            #print("new stream", i)
             for j, layer in enumerate(hidden_stream):
-                #print("stream {} layer {}".format(i, j))
-                #print("size: ", hidden_layers[i][j].shape, j)
                 h_layers.append(global_add_pool(hidden_layers[i][j], batches[i]))
 
         # Concatenate graph embeddings
         h_out = torch.cat(([l for l in h_layers]), dim=1)
-
         # Classifier
         h = F.relu(self.lin1(h_out))
         h = self.m1(h)

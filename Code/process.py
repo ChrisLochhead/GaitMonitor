@@ -12,7 +12,7 @@ import random
 import Programs.Machine_Learning.Model_Based.GCN.GAT as gat
 import Programs.Machine_Learning.Model_Based.GCN.STAGCN as stgcn
 import Programs.Machine_Learning.Model_Based.GCN.Utilities as graph_utils
-
+torch.cuda.empty_cache()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def process_data(folder = "Chris"):
@@ -36,9 +36,9 @@ def process_data(folder = "Chris"):
 
     #Remove empty frames
     #abs_joint_data, image_data = Creator.process_empty_frames(joint_file="./Code/Datasets/Joint_Data/" + str(folder) + "/Absolute_Data.csv",
-    #                                              image_file="./Code/Datasets/" + str(folder) + "/Full_Dataset/",
-    #                                              joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/2_Absolute_Data(empty frames removed)",
-    #                                              image_output="./Code/Datasets/" + str(folder) + "/2_Empty Frames Removed/")
+    #                                             image_file="./Code/Datasets/" + str(folder) + "/Full_Dataset/",
+    #                                             joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/2_Absolute_Data(empty frames removed)",
+    #                                             image_output="./Code/Datasets/" + str(folder) + "/2_Empty Frames Removed/")
 
     #Display first 2 instances of results
     print("\nStage 2: ")
@@ -132,8 +132,8 @@ def process_data(folder = "Chris"):
     print("\nStage 12:")
     #Create ground truth comparison set
     print("data going into gait cycle extractor: ", pre_scale[0])
-    ground_truths = Creator.create_ground_truth_dataset(pre_scale, abs_joint_data, relative_joint_data, velocity_data, hcf_data, image_data,
-                                                        joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/14_Ground_Truth_Data")
+    #ground_truths = Creator.create_ground_truth_dataset(pre_scale, abs_joint_data, relative_joint_data, velocity_data, hcf_data, image_data,
+    #                                                    joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/14_Ground_Truth_Data")
     
     print("\nStage 13:")
     #Combine datasets (relative, velocity, joint angles, regions)
@@ -143,120 +143,113 @@ def process_data(folder = "Chris"):
     combined_norm_data = Creator.normalize_values(combined_data, 
                                              joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_Combined_Data(normed)")
 
-    fake_data = Creator.create_dummy_dataset(combined_norm_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data")
+    fake_data = Creator.create_dummy_dataset(combined_norm_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_15.5")
     
     print("\nStage 14:")
     #Create regions data of combined data
     top_region_dataset, bottom_region_dataset = Creator.create_2_regions_dataset(combined_norm_data, #CHANGE BACK TO ABS_JOINT_DATA
                                                                                  joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/16_Combined_Data_2Region",
                                                                                  images = image_data)
-    regions_data = Creator.create_5_regions_dataset(combined_data,
+    regions_data = Creator.create_5_regions_dataset(combined_norm_data,
                                                     "./Code/Datasets/Joint_Data/" + str(folder) + "/17_Combined_Data_5Region",
                                                       image_data)
+    
+    fused_data = Creator.create_fused_dataset(combined_norm_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/18_Combined_Data_Fused")
+    #Append dummy info to all important datasets
+    #fake_top_data = Creator.create_dummy_dataset(top_region_dataset, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/  0_Dummy_Data_16_top")
+    #fake_bottom_data = Creator.create_dummy_dataset(top_region_dataset, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_16_bottom")
+
+    #fake_h_data = Creator.create_dummy_dataset(regions_data[0], output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_17_h")
+    #fake_ra_data = Creator.create_dummy_dataset(regions_data[1], output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_17_ra")
+    #fake_la_data = Creator.create_dummy_dataset(regions_data[2], output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_17_la")
+    #fake_rl_data = Creator.create_dummy_dataset(regions_data[3], output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_17_rl")
+    #fake_ll_data = Creator.create_dummy_dataset(regions_data[4], output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_17_ll")
+
 #########################################################################################################################
 
-def load_2_region_data(cycle, preset = None, padding = False, folder = "Chris"):
-    tmp = copy.deepcopy(cycle)
-
+def load_2_region_data(folder = "Chris"):
     top_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/16_Combined_Data_2Region_top',
                                         '16_Combined_Data_2Region_top.csv',
-                                        joint_connections=Render.joint_connections_m_hip, cycles=True, cycle_preset=tmp, padding=padding)
+                                        joint_connections=Render.joint_connections_m_hip, cycles=True)
     
     bottom_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/16_Combined_Data_2Region_bottom',
                                         '16_Combined_Data_2Region_bottom.csv',
-                                        joint_connections=Render.joint_connections_m_hip, cycles=True, cycle_preset=tmp, padding=padding)
-        
-    if cycle:
-        top_cycles, bottom_cycles = preset.split_cycles()
-        top_region.data_cycles = top_cycles
-        bottom_region.data_cycles = bottom_cycles
+                                        joint_connections=Render.joint_connections_m_hip, cycles=True)
     
+    #Dummy data version
+    #top_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/0_Dummy_Data_16_top',
+    #                                    '0_Dummy_Data_16_top.csv',
+    #                                    joint_connections=Render.joint_connections_m_hip, cycles=True)
+    
+    #bottom_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/0_Dummy_Data_16_bottom',
+    #                                    '0_Dummy_Data_16_bottom.csv',
+    #                                    joint_connections=Render.joint_connections_m_hip, cycles=True)
+        
     return top_region, bottom_region
 
-def load_5_region_data(cycles, preset = None, padding = False, folder = "Chris",):
+def load_5_region_data(folder = "Chris"):
     left_leg = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/17_Combined_Data_5Regionl_leg',
                                               '17_Combined_Data_5Regionl_leg.csv',
-                                              joint_connections=Render.limb_connections, cycles=True, cycle_preset = copy.deepcopy(cycles), padding=padding)
+                                              joint_connections=Render.limb_connections, cycles=True)
     
     right_leg = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/17_Combined_Data_5Regionr_leg',
                                            '17_Combined_Data_5Regionr_leg.csv',
-                                            joint_connections=Render.limb_connections, cycles=True, cycle_preset = copy.deepcopy(cycles), padding=padding)
+                                            joint_connections=Render.limb_connections, cycles=True)
     left_arm = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/17_Combined_Data_5Regionl_arm',
                                               '17_Combined_Data_5Regionl_arm.csv',
-                                              joint_connections=Render.limb_connections, cycles=True, cycle_preset = copy.deepcopy(cycles), padding=padding)
+                                              joint_connections=Render.limb_connections, cycles=True)
     
     right_arm = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/17_Combined_Data_5Regionr_arm',
                                            '17_Combined_Data_5Regionr_arm.csv',
-                                            joint_connections=Render.limb_connections, cycles=True, cycle_preset = copy.deepcopy(cycles), padding=padding)   
+                                            joint_connections=Render.limb_connections, cycles=True)   
     head_data = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/17_Combined_Data_5Regionhead',
                                               '17_Combined_Data_5Regionhead.csv',
-                                              joint_connections=Render.head_joint_connections, cycles=True, cycle_preset= copy.deepcopy(cycles), padding=padding)
-    
-
-    if cycles:
-        l_leg, r_leg, l_arm, r_arm, head = preset.split_cycles(split_type=5)
-        left_leg.data_cycles = l_leg
-        right_leg.data_cycles = r_leg
-        left_arm.data_cycles = l_arm
-        right_arm.data_cycles = r_arm
-        head_data.data_cycles = head
+                                              joint_connections=Render.head_joint_connections, cycles=True)
 
     return left_leg, right_leg, left_arm, right_arm, head_data
 
 #Types are 1 = normal, 2 = HCF, 3 = 2 region, 4 = 5 region, 5 = Dummy. Pass types as an array of type numbers, always put hcf (2) at the END if including. If including HCF, you MUST include
 #as cycles = True
-def load_datasets(types, cycles, padding, folder):
+def load_datasets(types, folder):
     datasets = []
     print("loading datasets...")
-    #Need gait cycle preset if gait cycles being used for single datapoints
-    if cycles:
-        gait_cycles_data = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/4.5_Absolute_Data(midhip)', '4.5_Absolute_Data(midhip).csv',
-                                            joint_connections=Render.joint_connections_m_hip, cycles=True, padding=padding)
-
-        full_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_Combined_Data(normed)', '15.5_Combined_Data(normed).csv',
-                                                joint_connections=Render.joint_connections_m_hip, cycles=True,
-                                                  cycle_preset=copy.deepcopy(gait_cycles_data.cycle_indices), padding=padding)
         
     for i, t in enumerate(types):
         print("loading dataset {} of {}. ".format(i + 1, len(types)), t)
         #Type 1: Normal, full dataset
-        if t == 1 and cycles:  
+        if t == 1:  
             #15.5 COMBINED DATASET
             datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_Combined_Data(normed)', '15.5_Combined_Data(normed).csv',
-                                                    joint_connections=Render.joint_connections_m_hip, cycles=True,
-                                                      cycle_preset=copy.deepcopy(gait_cycles_data.cycle_indices), padding=padding))
+                                                    joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #7 co-ordinates on their own
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
-            #                                        joint_connections=Render.joint_connections_m_hip, cycles=True,
-            #                                          cycle_preset=copy.deepcopy(gait_cycles_data.cycle_indices), padding=padding))
+            #                                        joint_connections=Render.joint_connections_m_hip, cycles=True))
 
             #12.75 no head coordinates
             #headless_cycles = full_region.split_cycles(1)
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/12_75_no_head_Data__decimated', '12_75_no_head_Data__decimated.csv',
-            #                                        joint_connections=Render.joint_connections_no_head_m_hip, cycles=True,
-            #                                          cycle_preset=copy.deepcopy(gait_cycles_data.cycle_indices), padding=padding))
-            #
-            #datasets[-1].data_cycles = headless_cycles
+            #                                        joint_connections=Render.joint_connections_no_head_m_hip, cycles=True))
+
             
-        elif t == 1 and cycles == False:
+        elif t == 1:
             dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_Combined_Data(normed)', '15.5_Combined_Data(normed).csv',
-                                        joint_connections=Render.joint_connections_m_hip, cycles=False, padding=padding)
+                                        joint_connections=Render.joint_connections_m_hip, cycles=False)
             datasets.append(dataset)
         #Type 2: HCF dataset
-        elif t == 2 and cycles:
+        elif t == 2:
             #This MUST have cycles, there's no non-cycles option
             dataset = Dataset_Obj.HCFDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/13.5_HCF_Data(normed)',
-                                                    '13.5_HCF_Data(normed).csv', cycles=True, cycle_preset=copy.deepcopy(gait_cycles_data.cycle_indices))
+                                                    '13.5_HCF_Data(normed).csv', cycles=True)
             datasets.append(dataset)
         #Type 3: 2 region
         elif t == 3:
-            top_region, bottom_region = load_2_region_data(gait_cycles_data.cycle_indices, full_region, folder=folder, padding=padding)
+            top_region, bottom_region = load_2_region_data(folder)
             datasets.append(top_region)
             datasets.append(bottom_region)
         #Type 4: 5 region
         elif t == 4:
-            l_l, r_l, l_a, r_a, h = load_5_region_data(copy.deepcopy(gait_cycles_data.cycle_indices), full_region, folder=folder, padding=padding)
+            l_l, r_l, l_a, r_a, h = load_5_region_data(folder)
             datasets.append(l_l)
             datasets.append(r_l)
             datasets.append(l_a)
@@ -265,47 +258,39 @@ def load_datasets(types, cycles, padding, folder):
         #Type 5: Dataset with dummy datapoints
         elif t == 5:
             #Dummy dataset
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/0_Dummy_Data',
-                                                      '0_Dummy_Data.csv',
-                                                    joint_connections=Render.joint_connections_m_hip, cycles=True, padding=padding))
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/0_Dummy_Data_15.5',
+                                                      '0_Dummy_Data_15.5.csv',
+                                                    joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #15.5 COMBINED DATASET (original version of the dummy dataset)
             datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_Combined_Data(normed)', '15.5_Combined_Data(normed).csv',
-                                                    joint_connections=Render.joint_connections_m_hip, cycles=True, padding=padding))                        
+                                                    joint_connections=Render.joint_connections_m_hip, cycles=True))                        
 
     print("datasets loaded.")
     #Return requested datasets
     return datasets
 
-def process_datasets(datasets, dataset_size, dummy_size = 0):
+def process_datasets(datasets):
     print("Processing data...")
-    train_val_indices = []
-    test_indices = []
 
-    #Append indices based on the first dataset length
-    size_0 = random.sample(range(dataset_size), int(0.9 * dataset_size))
-    size_1 = random.sample(set(range(dataset_size)) - set(size_0), int(0.1 * dataset_size))
-    train_val_indices.append(size_0)
-    test_indices.append(size_1)
-    
-    #In the case of using dummy data the datasets aren't all the same length, modify accordingly.
-    if dummy_size != 0:
-        tmp_0 = random.sample(range(dummy_size), int(0.9 * dummy_size))
-        tmp_1 = random.sample(set(range(dummy_size)) - set(tmp_0), int(0.1 * dummy_size))
-        train_val_indices.append(tmp_0)
-        test_indices.append(tmp_1)
+    train_indice_list = []
+    test_indice_list = []
 
+    for dataset in datasets:
+        dataset_size = len(dataset)
+
+        #Append indices based on the first dataset length
+        train_indices = random.sample(range(dataset_size), int(0.8 * dataset_size))
+        test_indices = random.sample(set(range(dataset_size)) - set(train_indices), int(0.2 * dataset_size))
+        train_indice_list.append(train_indices)
+        test_indice_list.append(test_indices)
 
     #These regions will be the same for both datasets
     multi_input_train_val = []
     multi_input_test = []
     for i, dataset in enumerate(datasets):
-        if dummy_size != 0:
-            multi_input_train_val.append(dataset[train_val_indices[i]])
-            multi_input_test.append(dataset[test_indices[i]])
-        else:
-            multi_input_train_val.append(dataset[train_val_indices[0]])
-            multi_input_test.append(dataset[test_indices[0]])
+        multi_input_train_val.append(dataset[train_indice_list[i]])
+        multi_input_test.append(dataset[test_indice_list[i]])
     
     print("Dataset processing complete.")
 
@@ -323,91 +308,38 @@ def process_results(train_scores, val_scores, test_scores):
     mean, var = Utilities.mean_var(test_scores)
     print("mean, std and variance: {:.2f}%, {:.2f}% {:.5f}".format(mean, math.sqrt(var), var))
 
-def process_autoencoder():
-    print(f"Torch version: {torch.__version__}")
-    print(f"Cuda available: {torch.cuda.is_available()}")
-    print(f"Torch geometric version: {torch_geometric.__version__}")
+def process_autoencoder(folder, num_epochs, batch_size):
+    #load dataset
+    dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_Combined_Data(normed)', '15.5_Combined_Data(normed).csv',
+                                            joint_connections=Render.joint_connections_m_hip, cycles=True)             
 
-    #Upper and lower region dataset
-    lower_dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/WeightGait/16_Combined_Data_2Region_bottom/', '16_Combined_Data_2Region_bottom.csv',
-                                              joint_connections=Render.bottom_joint_connection).shuffle()
-    dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/WeightGait/15.5_Combined_Data(normed)/', '15.5_Combined_Data(normed).csv',
-                                       joint_connections=Render.joint_connections_m_hip).shuffle()
-    upper_dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/WeightGait/16_Combined_Data_2Region_top/', '16_Combined_Data_2Region_top.csv',
-                                             joint_connections=Render.top_joint_connections).shuffle()
+    name = "15.5_Combined_Data(normed)"
 
-    print(dataset[0])
-    print(upper_dataset[0])
-    print(lower_dataset[0])
-
-    #train_loader, val_loader, test_loader, whole = GT.create_dataloaders(dataset)
-
-    encoded_datasets = {'normal' : [dataset, "15.5_Combined_Data(normed)" ], 
-                        'upper' : [upper_dataset, "16_Combined_Data_2Region_top"],
-                        'lower' : [lower_dataset, "16_Combined_Data_2Region_bottom"]}
-    
-    skeleton_sizes = [17, 10, 6]
-
-    #torch.manual_seed(0)
-    num_epochs = 100
-    #Upper Region Dataset
-    
-    for index, (key, value) in enumerate(encoded_datasets.items()):
-        if index > -1:
-            vae = GAE.VariationalAutoencoder(dim_in=value[0].num_node_features, dim_h=128, latent_dims=3)
-            print("dim in: ", value[0].num_node_features)
-            optim = torch.optim.Adam(vae.parameters(), lr=1e-3, weight_decay=1e-5) # originally 5
-            vae.to(device)
-            vae.eval()
-            for epoch in range(num_epochs):
-                train_loader, _, test_loader, whole = GT.create_dataloaders(value[0], batch_size=8)
-                train_loss = GAE.train_epoch(vae,device,train_loader,optim)
-                #Get embedding of entire dataset and save it
-                val_loss = GAE.test_epoch(vae,device,whole, './Code/Datasets/Joint_Data/WeightGait/' + str(value[1]) + '/encoded/raw/encoded.csv', 
-                                        skeleton_size = skeleton_sizes[index])
-                print('\n EPOCH {}/{} \t train loss {:.3f} \t val loss {:.3f}'.format(epoch + 1, num_epochs,train_loss,val_loss))
+    vae = GAE.VariationalAutoencoder(dim_in=dataset.num_node_features, dim_h=128, latent_dims=3, batch_size=batch_size, cycle_size=dataset.max_cycle)
+    print("dim in: ", dataset.num_node_features)
+    optim = torch.optim.Adam(vae.parameters(), lr=1e-3, weight_decay=1e-5) # originally 5
+    vae.to(device)
+    vae.eval()
+    for epoch in range(num_epochs):
+        train_loader, _, test_loader, whole = GT.create_dataloaders(dataset, batch_size=8)
+        train_loss = GAE.train_epoch(vae,device,train_loader,optim)
+        #Get embedding of entire dataset and save it
+        val_loss = GAE.test_epoch(vae,device,whole, './Code/Datasets/Joint_Data/WeightGait/' + str(name) + '/encoded/raw/encoded.csv', 
+                                skeleton_size = 21)
+        print('\n EPOCH {}/{} \t train loss {:.3f} \t val loss {:.3f}'.format(epoch + 1, num_epochs,train_loss,val_loss))
 
 
-    print("Autoencoding completing: Merging top and bottom datasets...")
+    print("Autoencoding complete")
 
-    encoded_dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/WeightGait/15.5_Combined_Data(normed)/encoded/', 'encoded.csv',
-                                                joint_connections=Render.joint_connections_m_hip).shuffle()
-    encoded_upper = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/WeightGait/16_Combined_Data_2Region_top/encoded/', 'encoded.csv',
-                                              joint_connections=Render.top_joint_connections).shuffle()
-    encoded_lower = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/WeightGait/16_Combined_Data_2Region_bottom/encoded/', 'encoded.csv',
-                                              joint_connections=Render.bottom_joint_connection).shuffle()
-    
-    print("all encoded datasets loaded sucessfully. ")
-    
-    #Combine
-    #Read both in as csv, append together, resacve, load result and joint dataset
-    upper_array  = Utilities.load('./Code/Datasets/Joint_Data/WeightGait/16_Combined_Data_2Region_top/encoded/raw/encoded.csv', metadata=True, 
-                                  colnames = Utilities.colnames_top)
-    lower_array = Utilities.load('./Code/Datasets/Joint_Data/WeightGait/16_Combined_Data_2Region_bottom/encoded/raw/encoded.csv', metadata=True,
-                                 colnames = Utilities.colnames_bottom)
+    #Load autoencoded model (data will be 16 * 3 * 71)
 
-    concatenated_regions = []
-    for i, row in enumerate(upper_array):
-        print("row: ", type(row), len(row), len(lower_array[i]), type(lower_array[i]))
-        concat_row = list(row)
-        for j, low_arr in enumerate(lower_array[i]):
-            if j > 2:
-                concat_row.append(low_arr)
-        concatenated_regions.append(concat_row)
-        print("lens: ", len(row), len(lower_array[i]), len(concatenated_regions[i]))
-    
-    Utilities.save_dataset(concatenated_regions, './Code/Datasets/Joint_Data/WeightGait/18_encoded_concat_2region/raw/encoded_concat_2region.csv')
-    print("Concatenation sucessful...")
+    #Compress
 
-def run_model(dataset_types, cycles, model_type, hcf, batch_size, epochs, folder, multi):
-
-    #Padding only necessary if using ST-GCN for 2D temporal convolutions
-    padding = True
-    if model_type == "GAT":
-        padding = False
+def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, multi, leave_one_out):
 
     #Load the full dataset alongside HCF with gait cycles
-    datasets = load_datasets(dataset_types, cycles, padding, folder)
+    datasets = load_datasets(dataset_types, folder)
+    print("datasets here: ", datasets)
     #Concatenate data dimensions for ST-GCN
     data_dims = []
     for dataset in datasets:
@@ -415,26 +347,35 @@ def run_model(dataset_types, cycles, model_type, hcf, batch_size, epochs, folder
         data_dims.append(data_pair)
 
     num_datasets = len(datasets)
+
+    #Accounting for extra original dataset not used in dummy case for training but only for testing
     if 5 in dataset_types:
         num_datasets -= 1
 
+    print("number of datasets: ", num_datasets)
     
-    #Process datasets by manually shuffling to account for cycles
-    multi_input_train_val, multi_input_test = process_datasets(datasets, len(datasets[0]), dummy_size=len(datasets[1]))
+    #Split classes by just making the last person the test set and the rest training and validation.
+    if leave_one_out:
+        multi_input_train_val, multi_input_test = graph_utils.split_data_by_person(datasets)
+    else:
+        #Process datasets by manually shuffling to account for cycles
+        multi_input_train_val, multi_input_test = process_datasets(datasets)
+
+    dim_out = 3
 
     print("\nCreating {} model with {} datasets: ".format(model_type, len(datasets)))
     if model_type == "GAT":
         if multi:
-            model = gat.MultiInputGAT(dim_in=[d.num_node_features for d in datasets], dim_h=128, dim_out=3, hcf=hcf, n_inputs=num_datasets)
+            model = gat.MultiInputGAT(dim_in=[d.num_node_features for d in datasets], dim_h=64, dim_out=dim_out, hcf=hcf, n_inputs=num_datasets)
         else:
-            model = gat.GAT(dim_in=datasets[0].num_node_features, dim_h=128, dim_out=3)
+            model = gat.GAT(dim_in=datasets[0].num_node_features, dim_h=128, dim_out=dim_out)
     elif model_type == "ST-AGCN":
         if multi:
-            model = stgcn.MultiInputSTGACN(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=3, n_inputs=num_datasets,
+            model = stgcn.MultiInputSTGACN(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=dim_out, n_inputs=num_datasets,
                                         data_dims=data_dims, batch_size=batch_size, hcf=hcf,
                                         max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph)
         else:
-            model = stgcn.STGACN(dim_in=datasets[0].num_node_features, num_classes=3,
+            model = stgcn.STGACN(dim_in=datasets[0].num_node_features, num_classes=dim_out,
                                         batch_size=batch_size, max_cycle = datasets[0].max_cycle,
                                          num_nodes_per_graph = datasets[0].num_nodes_per_graph)
 
@@ -443,28 +384,26 @@ def run_model(dataset_types, cycles, model_type, hcf, batch_size, epochs, folder
         return
     model = model.to("cuda")
 
-    for tr in multi_input_train_val:
-        print("tr: ", tr)
-        for i, trr in enumerate(tr):
-            if i == 0:
-                print("trr:", trr)
-    for tv in multi_input_test:
-        print("tv: ", tv)
-        for i, tvv in enumerate(tv):
-            if i == 0:
-                print("tvv: ", tvv)
-
-
     #Run cross-validated training
-    train_scores, val_scores, test_scores = graph_utils.cross_valid(model, [multi_input_test[-1]], datasets=[multi_input_train_val[0]],
-                                                                     k_fold=3, batch=batch_size, epochs=epochs, type=model_type)
+    print("training data: ")
+    print(multi_input_train_val)
+    print(multi_input_test)
+
+    for batch in multi_input_test:
+        for b in batch:
+            print("batch: ", batch)
+
+    train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
+                                                                     k_fold=5, batch=batch_size, epochs=epochs, type=model_type)
 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    process_data("Chris")
-    #process_autoencoder()
+    #process_data("Elisa")
+    process_autoencoder("Elisa", 100, 8)
+
+
 
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
@@ -477,6 +416,9 @@ if __name__ == '__main__':
     #hcf: indicates presence of an HCF dataset
     #multi: indicates if the multi-stream variant of the chosen model should be used (multi variant 
     # models are compatible with both single and multiple datasets)
+    #Leave_one_out: indicates whether using normally split data or data split by person
 
-    run_model(dataset_types= [5], cycles = True, model_type = "ST-AGCN", hcf=False,
-               batch_size = 16, epochs = 100, folder="Chris", multi=True)
+    #run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
+    #        batch_size = 3, epochs = 80, folder="Elisa", multi=True, leave_one_out=False)
+
+

@@ -12,7 +12,7 @@ import copy
 
 class JointDataset(Dataset):
     def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip,
-                  cycles = False, cycle_preset = [], padding = False, meta = 5):
+                  cycles = False, meta = 5):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
@@ -23,10 +23,9 @@ class JointDataset(Dataset):
         self.joint_connections = joint_connections
         self.cycles = cycles
         self.num_cycles = 0
-        self.cycle_indices = copy.deepcopy(cycle_preset)
-        self.padding = padding
         self.num_nodes_per_graph = 0
         self.meta = meta
+        self.cycle_indices = []
         super(JointDataset, self).__init__(root, transform, pre_transform)
         
     @property
@@ -50,20 +49,7 @@ class JointDataset(Dataset):
 
     def download(self):
         pass
-
-    def process_data_from_preset(self, data):
-        gait_cycles = []
-        indice_count = 0
-        for i, cycle in enumerate(self.cycle_indices):
-            gait_cycle = []
-            for j in range(cycle):
-                gait_cycle.append(data[indice_count])
-                indice_count += 1
-
-            gait_cycles.append(gait_cycle)
-        
-        return gait_cycles
-                  
+               
 
     def process(self):
         self.data = pd.read_csv(self.raw_paths[0], header=None)
@@ -71,11 +57,8 @@ class JointDataset(Dataset):
         coo_matrix = get_COO_matrix(self.joint_connections)
 
         if self.cycles:
-            if len(self.cycle_indices) != 0:
-                self.data_cycles = self.process_data_from_preset(self.data.to_numpy())              
-            else:
-                self.data_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
-
+            self.data_cycles = HCF.split_by_instance(self.data.to_numpy())
+            print("here's the cycles: ", len(self.data_cycles))
 
             self.num_nodes_per_graph = len(self.data.columns) - self.meta - 1
 
@@ -87,31 +70,10 @@ class JointDataset(Dataset):
                 if len(d) > self.max_cycle:
                     self.max_cycle = len(d)
             
-            #Count number of each cycle with each person and get weights
 
-            self.padded_cycles = copy.deepcopy(self.data_cycles)
-            if self.padding:
-                #Pad all examples out to make every graph the same size
-                for i, cycle in enumerate(self.padded_cycles):
-                    if len(cycle) < self.max_cycle:
-                        diff = abs(int(self.max_cycle - len(cycle)))
-                        iter_tool = 0
-                        for j in range(diff):
-                            if iter_tool < len(cycle):
-                                self.padded_cycles[i].append(self.padded_cycles[i][iter_tool])
-                                iter_tool += 1
-                            else:
-                                iter_tool = 0
-                                self.padded_cycles[i].append(self.padded_cycles[i][iter_tool])
-                
-
-
-            #This deactivates padded cycles
-            #self.padded_cycles = copy.deepcopy(self.data_cycles)
-
-            self.data = pd.DataFrame(self.padded_cycles)
-            self.num_cycles = len(self.padded_cycles)
-            for index, row in enumerate(tqdm(self.padded_cycles, total=len(self.padded_cycles[0]))):
+            self.data = pd.DataFrame(self.data_cycles)
+            self.num_cycles = len(self.data_cycles)
+            for index, row in enumerate(tqdm(self.data_cycles, total=len(self.data_cycles[0]))):
                 
                 self.cycle_indices.append(len(self.data_cycles[index]))
                     
@@ -336,10 +298,10 @@ def data_to_graph(row, coo_matrix, meta = 5):
         gait_cycle = []
         y_arr = []
         for cycle_part in row:
-            refined_row = cycle_part[meta + 1 :]    
+            refined_row = cycle_part[meta + 1 :]   
+
             row_as_array = np.array(refined_row)     
             y = int(cycle_part[2])  
-            #print("cycle part: ", y, cycle_part[0], cycle_part[1])
             y_arr.append(y)
             if len(gait_cycle) <= 0:
                 gait_cycle = row_as_array

@@ -31,6 +31,30 @@ def accuracy(pred_y, y):
     return (pred_y == y).sum() / len(y)
 
 
+#Returns two arrays where the last person is split off from the rest
+def split_data_by_person(datasets):
+    split_datasets = []
+
+    for dataset in datasets:
+        #split by person
+        split_dataset = [[],[]]
+        last_person = dataset[-1][5]
+        print("last person in dataset is: ", last_person)
+        for row in dataset:
+            if row[5] != last_person:
+                split_dataset[0].append(row)
+            else:
+                split_dataset[1].append(row)
+
+        split_datasets.append(split_dataset)
+    
+    #Check it's right
+    for d in split_datasets:
+        print("sizes: ", len(d[0]), len(d[1]))
+    
+    return split_datasets
+        
+
 # define a cross validation function
 def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=None,k_fold=3, batch = 16, inputs_size = 1, epochs = 100, type = "GAT"):
     
@@ -93,8 +117,11 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
                 test_loaders.append(GeoLoader(test_set, batch_size=batch,sampler = test_sample, drop_last = True))
             else:
             #GATs
-                val_loaders.append(GeoLoader(val_set, batch_size=len(val_set)))
-                test_loaders.append(GeoLoader(test_set, batch_size=len(test_set)))
+                val_loaders.append(GeoLoader(val_set, batch_size=batch))
+                test_loaders.append(GeoLoader(test_set, batch_size=batch))
+
+                #for l in test_loaders[0]:
+                #    print("l: ", l)
 
             #Reset the generator so every dataset gets the same sampling 
             G.set_state(init)
@@ -116,7 +143,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(),
                                 lr=0.01,
-                                weight_decay=0.00005)
+                                weight_decay=0.001)
     epochs = epochs
     model.train()
 
@@ -140,6 +167,15 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
             ys_batch[ind].append(data.y)  
     
     for epoch in range(epochs + 1):
+        
+        #Reduce by 0.1 times at 10th and 60th epoch
+        if epoch == 20:
+            #print("reducing learing rate")
+            optimizer.param_groups[0]['lr'] = 0.01
+        elif epoch == 120:
+            #print("reducing learning rate again")
+            optimizer.param_groups[0]['lr'] = 0.001
+
         total_loss = 0
         acc = 0
         val_loss = 0
@@ -157,6 +193,13 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
 
             h, out = model(data_x, data_i, data_b, train=True)
             #First data batch with Y has to have the right outputs
+
+            #y_classes = [0,0,0]
+            #for d in data_y[0]:
+            #   y_classes[d.item()] += 1
+            
+            #print("ratio: ", y_classes)
+
             loss = criterion(out, data_y[0])
             total_loss += loss / len(loader[0])
             out = F.log_softmax(out, dim=1)
@@ -171,7 +214,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
         val_accs.append(val_acc)
 
         # Print metrics every 10 epochs
-        if (epoch % 10 == 0):
+        if (epoch % 20 == 0):
             print(f'Epoch {epoch:>3} | Train Loss: {total_loss:.2f} '
                 f'| Train Acc: {acc * 100:>5.2f}% '
                 f'| Val Loss: {val_loss:.2f} '
@@ -179,14 +222,14 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
 
     if test_loader != None:
         generator.set_state(init)
-        test_loss, test_acc = test(model, test_loader, generator, validation=True)
+        test_loss, test_acc = test(model, test_loader, generator, validation=False)
         print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
         test_accs.append(test_acc)
     #return model
     #print("returned lens: ", len(embeddings[0]), len(losses), len(accuracies), len(outputs), len(hs))
     return model, train_accs, val_accs, test_accs
 
-def test(model, loaders, generator, train = False, validation = False, x_b = None, i_b = None, b_b = None):
+def test(model, loaders, generator, validation, train = False, x_b = None, i_b = None, b_b = None):
     init = generator.get_state()
     criterion = torch.nn.CrossEntropyLoss()
     model.eval()
@@ -202,6 +245,7 @@ def test(model, loaders, generator, train = False, validation = False, x_b = Non
     for i, load in enumerate(loaders): 
         generator.set_state(init)
         for j, data in enumerate(load):
+            #print("j of ", j, data)
             data = data.to("cuda")
             xs_batch[i].append(data.x)
             indice_batch[i].append(data.edge_index)
@@ -223,10 +267,22 @@ def test(model, loaders, generator, train = False, validation = False, x_b = Non
             data_b = [batch_batch[i][index] for i in range(len(loaders))]
             data_y = [ys_batch[i][index] for i in range(len(loaders))]
 
+            y_classes = [0,0,0]
+            for d in data_y[0]:
+                y_classes[d.item()] += 1
+            
+            #if validation:
+            #    print("ratio: ", y_classes)
+            #else:
+            if validation == False: 
+                print("test ratio", y_classes)
+
             _, out = model(data_x, data_i, data_b, train)
             loss += criterion(out, data_y[0]) / len(loaders[0])            
             out = F.log_softmax(out, dim=1)
             acc += accuracy(out.argmax(dim=1), data_y[0]) / len(loaders[0])
+    #        print("accuracy: ", acc)
+    #print("\n\n")
 
     #if validation == False:
     #    print("test values: ", out, data_y[0])
