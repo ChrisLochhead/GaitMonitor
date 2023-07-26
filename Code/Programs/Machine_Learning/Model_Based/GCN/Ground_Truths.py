@@ -76,9 +76,9 @@ def create_dataloaders(dataset, train = 0.8, val = 0.9, test = 0.9, batch_size =
         val_dataset   = dataset[int(len(dataset)*train):int(len(dataset)*val)]
         test_dataset  = dataset[int(len(dataset)*test):]
 
-        #print(f'Training set   = {len(train_dataset)} graphs')
-        #print(f'Validation set = {len(val_dataset)} graphs')
-        #print(f'Test set       = {len(test_dataset)} graphs')
+        print(f'Training set   = {len(train_dataset)} graphs')
+        print(f'Validation set = {len(val_dataset)} graphs')
+        print(f'Test set       = {len(test_dataset)} graphs')
 
         # Create mini-batches
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True )

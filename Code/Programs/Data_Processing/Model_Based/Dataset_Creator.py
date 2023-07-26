@@ -8,6 +8,7 @@ import numpy as np
 import copy 
 
 from sklearn.preprocessing import normalize
+from sklearn.preprocessing import StandardScaler
 
 def average_coordinate(datapoint):
     #Aggregate the 9 values of every datapoint in the set, normalized
@@ -17,6 +18,31 @@ def average_coordinate(datapoint):
             aggregate[i] += (coord / len(datapoint[0]))
     
     return aggregate
+
+def normal_examples_only(data, joint_output):
+    normals = []
+    current_instance = 0
+    true_instance = 0
+    for row in data:
+        if row[3] == 0 and row[4] == 0 and row[2] < 3:
+            if row[0] != current_instance:
+                current_instance = row[0]
+                true_instance += 1
+            tmp = row
+            tmp[0] = true_instance
+            normals.append(tmp)
+    
+    Utilities.save_dataset(normals, joint_output)
+    return normals
+
+def create_n_size_dataset(data, joint_output, n):
+    new_dataset = []
+    for i, row in enumerate(data):
+        if row[5] in n:
+            print("discovered:", row[0], i, n)
+            new_dataset.append(copy.deepcopy(row))
+
+    Utilities.save_dataset(new_dataset, joint_output)
 
 
 def create_fused_dataset(data, joint_output, meta = 6):
@@ -46,6 +72,65 @@ def create_fused_dataset(data, joint_output, meta = 6):
     Utilities.save_dataset(fused_dataset, joint_output)
     return meta_data
 
+
+def new_normalize_values(data, joint_output, joint_size):
+    # create scaler
+    scaler = StandardScaler()
+    # fit scaler on data
+
+    print("data: ", len(data), len(data[0]))
+    meta_data = []
+    joint_info = []
+    for row in data:
+        meta_row = []
+        joint_row = []
+        for i, coord in enumerate(row):
+            if i <= 5:
+                meta_row.append(coord)
+            else:
+                joint_row.append(coord)
+
+        meta_data.append(meta_row)
+        joint_info.append(joint_row)
+    
+    print("lens: ", len(meta_data), len(meta_data[0]), len(joint_info), len(joint_info[0]))
+            
+    unravelled_joints = []
+    for row in joint_info:
+        unravelled_row = []
+        for coords in row:
+            for value in coords:
+                unravelled_row.append(value)
+        unravelled_joints.append(unravelled_row)
+
+    print("lens:", len(unravelled_joints), len(unravelled_joints[0]))
+
+    scaler.fit(unravelled_joints)
+
+    # apply transform
+    standardized = scaler.transform(unravelled_joints)
+
+    print("should be the same:", len(standardized), len(standardized[0]))
+
+
+    #Re-ravel
+    ravelled = []
+    for i, row in enumerate(standardized):
+        ravelled_row = meta_data[i]
+        full_coord = []
+        for j, coord in enumerate(row):
+            if j % joint_size == 0 and j != 0:
+                ravelled_row.append(copy.deepcopy(full_coord))
+                full_coord = [coord]
+            else:
+                full_coord.append(coord)
+        ravelled_row.append(copy.deepcopy(full_coord))
+        ravelled.append(ravelled_row)
+    
+    print("final ravel: ", len(ravelled), len(ravelled[0]))
+
+    Utilities.save_dataset(ravelled, joint_output)
+    return ravelled
 
 def normalize_values(data, joint_output, hcf = False, meta = 5):
     if hcf:

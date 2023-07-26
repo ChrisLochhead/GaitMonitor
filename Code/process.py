@@ -54,14 +54,20 @@ def process_data(folder = "Chris"):
                                                               "./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
     print("lens: ", len(abs_joint_data), len(image_data))
     
-    abs_norm_data = Creator.normalize_values(abs_joint_data, 
-                                             joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(normed)")
+    #abs_norm_data = Creator.normalize_values(abs_joint_data, 
+    #                                         joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(normed)")
+    
+    abs_joint_data = Creator.new_normalize_values(abs_joint_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(normed)", 3)
+
+    
+
     print("\nStage 3: ")
     #render_joints_series(image_data, abs_joint_data, size=10)
 
     #Normalize outliers
-    abs_joint_data = Creator.create_normalized_dataset(abs_joint_data, image_data, 
-                                                   joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/4_Absolute_Data(normalized)")
+    #SIMPLIFY
+    #abs_joint_data = Creator.create_normalized_dataset(abs_joint_data, image_data, 
+    #                                               joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/4_Absolute_Data(normalized)")
     print("\nStage 4:")
     #render_joints_series(image_data, abs_joint_data, size=10)
 
@@ -71,11 +77,11 @@ def process_data(folder = "Chris"):
     print("\nStage 4.5:")
     #render_joints_series(image_data, abs_joint_data, size=10)
     #Change format of pre-scale to list of arrays instead of list of lists
-    pre_scale = abs_joint_data
+    #pre_scale = abs_joint_data
 
     #Normalize size (use absolute dataset)
-    abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data,
-                                               joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
+    #abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data,
+    #                                           joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
 
     print("\nStage 5: ")
     #render_joints_series(image_data, abs_joint_data, size=10)
@@ -88,20 +94,21 @@ def process_data(folder = "Chris"):
     #render_joints_series("None", relative_joint_data, size=5, plot_3D=True, x_rot = -90, y_rot = 180)
 
     #Flip joints so all facing one direction
-    flipped_joint_data = Creator.create_flipped_joint_dataset(relative_joint_data, abs_joint_data, image_data,
-                                                               joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/7_Relative_Data(flipped)") 
+    #abs_joint_data = Creator.create_flipped_joint_dataset(relative_joint_data, abs_joint_data, image_data,
+    #                                                           joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/7_Relative_Data(flipped)") 
 
     print("\nStage 7:")
     #render_joints_series("None", flipped_joint_data, size=5, plot_3D=True, x_rot = -90, y_rot = 180)
 
     #Create velocity dataset
-    velocity_data = Creator.create_velocity_dataset(pre_scale, image_data, 
+    velocity_data = Creator.create_velocity_dataset(abs_joint_data, image_data, 
                                                     joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/8_Velocity_Data(velocity)")
     print("\nStage 8:")
     #render_velocity_series(abs_joint_data, velocity_data, image_data, size=20)
 
-    flipped_velocity_data = Creator.create_flipped_joint_dataset(velocity_data, abs_joint_data, image_data,
-                                                               joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/9_Velocity_Data(flipped)")  
+    #flipped_velocity_data = Creator.create_flipped_joint_dataset(velocity_data, abs_joint_data, image_data,
+    #                                                           joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/9_Velocity_Data(flipped)")  
+
     print("\nStage 9: ")
     #Create joint angles data
     joint_bones_data = Creator.create_bone_dataset(abs_joint_data, image_data, 
@@ -121,17 +128,17 @@ def process_data(folder = "Chris"):
     regions_data = Creator.create_decimated_dataset(abs_joint_data,
                                                 "./Code/Datasets/Joint_Data/" + str(folder) + "/12_75_no_head_Data_",
                                                     image_data)
-    print("\nStage 11:", pre_scale[0])
+    #print("\nStage 11:", pre_scale[0])
     #Create HCF dataset
-    hcf_data = Creator.create_hcf_dataset(pre_scale, abs_joint_data, relative_joint_data, velocity_data, image_data, 
-                               joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_HCF_Data")
+    #hcf_data = Creator.create_hcf_dataset(pre_scale, abs_joint_data, relative_joint_data, velocity_data, image_data, 
+    #                           joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_HCF_Data")
     
-    hcf_data_normed = Creator.normalize_values(hcf_data, 
-                                             joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13.5_HCF_Data(normed)", hcf=True)
+    #hcf_data_normed = Creator.normalize_values(hcf_data, 
+    #                                         joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13.5_HCF_Data(normed)", hcf=True)
     
     print("\nStage 12:")
     #Create ground truth comparison set
-    print("data going into gait cycle extractor: ", pre_scale[0])
+    #print("data going into gait cycle extractor: ", pre_scale[0])
     #ground_truths = Creator.create_ground_truth_dataset(pre_scale, abs_joint_data, relative_joint_data, velocity_data, hcf_data, image_data,
     #                                                    joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/14_Ground_Truth_Data")
     
@@ -140,10 +147,13 @@ def process_data(folder = "Chris"):
     combined_data = Creator.combine_datasets(relative_joint_data, velocity_data, joint_bones_data, image_data,
                                              joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/15_Combined_Data")
     
-    combined_norm_data = Creator.normalize_values(combined_data, 
-                                             joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_Combined_Data(normed)")
-
-    fake_data = Creator.create_dummy_dataset(combined_norm_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_15.5")
+    #combined_norm_data = Creator.normalize_values(combined_data, 
+    #                                         joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_Combined_Data(normed)")
+    
+    #combined_norm_data = Creator.new_normalize_values(combined_data, 
+    #                                         "./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_Combined_Data(normed)", 9)   
+    combined_norm_data = combined_data
+    #fake_data = Creator.create_dummy_dataset(combined_norm_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_15.5")
     
     print("\nStage 14:")
     #Create regions data of combined data
@@ -155,15 +165,15 @@ def process_data(folder = "Chris"):
                                                       image_data)
     
     fused_data = Creator.create_fused_dataset(combined_norm_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/18_Combined_Data_Fused")
-    #Append dummy info to all important datasets
-    #fake_top_data = Creator.create_dummy_dataset(top_region_dataset, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/  0_Dummy_Data_16_top")
-    #fake_bottom_data = Creator.create_dummy_dataset(top_region_dataset, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_16_bottom")
 
-    #fake_h_data = Creator.create_dummy_dataset(regions_data[0], output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_17_h")
-    #fake_ra_data = Creator.create_dummy_dataset(regions_data[1], output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_17_ra")
-    #fake_la_data = Creator.create_dummy_dataset(regions_data[2], output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_17_la")
-    #fake_rl_data = Creator.create_dummy_dataset(regions_data[3], output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_17_rl")
-    #fake_ll_data = Creator.create_dummy_dataset(regions_data[4], output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_17_ll")
+    precise_data = Creator.normal_examples_only(combined_norm_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/19_Normal_Only" )
+    
+    if folder == "WeightGait":
+        full_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/15_Combined_Data/raw/15_Combined_Data.csv",
+                                                              "./Code/Datasets/" + str(folder) + "/15_Combined_Data/", cols=Utilities.colnames_midhip, ignore_depth=False)
+        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_2_People", [0,1])
+        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_3_People", [0,1,2])
+        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_4_People", [0,1,2,3])
 
 #########################################################################################################################
 
@@ -175,16 +185,7 @@ def load_2_region_data(folder = "Chris"):
     bottom_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/16_Combined_Data_2Region_bottom',
                                         '16_Combined_Data_2Region_bottom.csv',
                                         joint_connections=Render.joint_connections_m_hip, cycles=True)
-    
-    #Dummy data version
-    #top_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/0_Dummy_Data_16_top',
-    #                                    '0_Dummy_Data_16_top.csv',
-    #                                    joint_connections=Render.joint_connections_m_hip, cycles=True)
-    
-    #bottom_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/0_Dummy_Data_16_bottom',
-    #                                    '0_Dummy_Data_16_bottom.csv',
-    #                                    joint_connections=Render.joint_connections_m_hip, cycles=True)
-        
+           
     return top_region, bottom_region
 
 def load_5_region_data(folder = "Chris"):
@@ -219,17 +220,21 @@ def load_datasets(types, folder):
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_Combined_Data(normed)', '15.5_Combined_Data(normed).csv',
-                                                    joint_connections=Render.joint_connections_m_hip, cycles=True))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
+            #                                        joint_connections=Render.joint_connections_m_hip, cycles=True))
+            
+            #20 multi person DATASET
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_3_People', '20_3_People.csv',
+                                                   joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #7 co-ordinates on their own
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
             #                                        joint_connections=Render.joint_connections_m_hip, cycles=True))
 
-            #12.75 no head coordinates
-            #headless_cycles = full_region.split_cycles(1)
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/12_75_no_head_Data__decimated', '12_75_no_head_Data__decimated.csv',
+            #19 simplified dataset
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/19_Normal_Only', '19_Normal_Only.csv',
             #                                        joint_connections=Render.joint_connections_no_head_m_hip, cycles=True))
+            
 
             
         elif t == 1:
@@ -270,6 +275,38 @@ def load_datasets(types, folder):
     #Return requested datasets
     return datasets
 
+def get_balanced_samples(dataset, train = 0.9, test = 0.1):
+    print(len(dataset))
+    class_size = int(len(dataset) / 3)
+    print("class size: ", class_size)
+
+    train_indices = []
+    test_indices = []
+
+    train_class_size = int(class_size * 0.9)
+    to_fill = [train_class_size, train_class_size, train_class_size]
+    print("fill sizes: ", to_fill)
+    for i, cycle in enumerate(dataset):
+        #print("cycle: ", cycle.y.item())
+        if to_fill[cycle.y.item()] > 0:
+            to_fill[cycle.y.item()] -= 1
+            train_indices.append(i)
+    
+    for i in range(len(dataset)):
+        if i not in train_indices:
+            test_indices.append(i)
+
+    print("to fill should be empty: ", to_fill)
+    print("train indices: ", len(dataset), len(train_indices))
+    print("len test: ", len(test_indices))
+
+    print("indices: ", train_indices)
+    print("test: ", test_indices)
+
+    print("done")
+    return train_indices, test_indices
+
+
 def process_datasets(datasets):
     print("Processing data...")
 
@@ -280,8 +317,12 @@ def process_datasets(datasets):
         dataset_size = len(dataset)
 
         #Append indices based on the first dataset length
-        train_indices = random.sample(range(dataset_size), int(0.8 * dataset_size))
-        test_indices = random.sample(set(range(dataset_size)) - set(train_indices), int(0.2 * dataset_size))
+        train_indices = random.sample(range(dataset_size), int(0.9 * dataset_size))
+        print("original indices:", len(train_indices), train_indices )
+        test_indices = random.sample(set(range(dataset_size)) - set(train_indices), int(0.1 * dataset_size))
+        print("original test indices:", len(test_indices), test_indices )
+        train_indices, test_indices = get_balanced_samples(datasets[0])
+        #done = 5/0
         train_indice_list.append(train_indices)
         test_indice_list.append(test_indices)
 
@@ -315,14 +356,16 @@ def process_autoencoder(folder, num_epochs, batch_size):
 
     name = "15.5_Combined_Data(normed)"
 
-    vae = GAE.VariationalAutoencoder(dim_in=dataset.num_node_features, dim_h=128, latent_dims=3, batch_size=batch_size, cycle_size=dataset.max_cycle)
-    print("dim in: ", dataset.num_node_features)
+    vae = GAE.VariationalAutoencoder(dim_in=dataset.num_nodes_per_graph, dim_h=128, latent_dims=3, batch_size=batch_size, cycle_size=dataset.max_cycle)
     optim = torch.optim.Adam(vae.parameters(), lr=1e-3, weight_decay=1e-5) # originally 5
     vae.to(device)
     vae.eval()
     for epoch in range(num_epochs):
-        train_loader, _, test_loader, whole = GT.create_dataloaders(dataset, batch_size=8)
-        train_loss = GAE.train_epoch(vae,device,train_loader,optim)
+        _, _, _, whole = GT.create_dataloaders(dataset, batch_size=batch_size)
+        train_val_data, test_data = process_datasets([dataset])
+        train_loader, val_loader, test_loader = graph_utils.cross_valid(None, test_data, datasets=train_val_data, make_loaders=True, batch=batch_size)
+
+        train_loss = GAE.train_epoch(vae,device,train_loader[0],optim)
         #Get embedding of entire dataset and save it
         val_loss = GAE.test_epoch(vae,device,whole, './Code/Datasets/Joint_Data/WeightGait/' + str(name) + '/encoded/raw/encoded.csv', 
                                 skeleton_size = 21)
@@ -335,7 +378,7 @@ def process_autoencoder(folder, num_epochs, batch_size):
 
     #Compress
 
-def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, multi, leave_one_out):
+def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_one_out):
 
     #Load the full dataset alongside HCF with gait cycles
     datasets = load_datasets(dataset_types, folder)
@@ -361,37 +404,20 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, multi,
         #Process datasets by manually shuffling to account for cycles
         multi_input_train_val, multi_input_test = process_datasets(datasets)
 
-    dim_out = 3
+    dim_out = 9
 
     print("\nCreating {} model with {} datasets: ".format(model_type, len(datasets)))
     if model_type == "GAT":
-        if multi:
-            model = gat.MultiInputGAT(dim_in=[d.num_node_features for d in datasets], dim_h=64, dim_out=dim_out, hcf=hcf, n_inputs=num_datasets)
-        else:
-            model = gat.GAT(dim_in=datasets[0].num_node_features, dim_h=128, dim_out=dim_out)
+        model = gat.MultiInputGAT(dim_in=[d.num_node_features for d in datasets], dim_h=64, dim_out=dim_out, hcf=hcf, n_inputs=num_datasets)
     elif model_type == "ST-AGCN":
-        if multi:
-            model = stgcn.MultiInputSTGACN(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=dim_out, n_inputs=num_datasets,
-                                        data_dims=data_dims, batch_size=batch_size, hcf=hcf,
-                                        max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph)
-        else:
-            model = stgcn.STGACN(dim_in=datasets[0].num_node_features, num_classes=dim_out,
-                                        batch_size=batch_size, max_cycle = datasets[0].max_cycle,
-                                         num_nodes_per_graph = datasets[0].num_nodes_per_graph)
-
+        print("going in: ", datasets[0].num_node_features)
+        model = stgcn.MultiInputSTGACN(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=dim_out, n_inputs=num_datasets,
+                                    data_dims=data_dims, batch_size=batch_size, hcf=hcf,
+                                    max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph)
     else:
         print("Invalid model type.")
         return
     model = model.to("cuda")
-
-    #Run cross-validated training
-    print("training data: ")
-    print(multi_input_train_val)
-    print(multi_input_test)
-
-    for batch in multi_input_test:
-        for b in batch:
-            print("batch: ", batch)
 
     train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
                                                                      k_fold=5, batch=batch_size, epochs=epochs, type=model_type)
@@ -400,10 +426,8 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, multi,
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    #process_data("Elisa")
-    process_autoencoder("Elisa", 100, 8)
-
-
+    #process_data("WeightGait")
+    #process_autoencoder("Elisa", 100, 8)
 
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
@@ -418,7 +442,7 @@ if __name__ == '__main__':
     # models are compatible with both single and multiple datasets)
     #Leave_one_out: indicates whether using normally split data or data split by person
 
-    #run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-    #        batch_size = 3, epochs = 80, folder="Elisa", multi=True, leave_one_out=False)
+    run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
+           batch_size = 16, epochs = 200, folder="WeightGait", leave_one_out=False)
 
 

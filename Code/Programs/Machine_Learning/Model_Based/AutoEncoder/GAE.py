@@ -17,10 +17,11 @@ class VariationalEncoder(nn.Module):
         self.dim_out = latent_dims
         self.batch_size = batch_size
         self.cycle_size = cycle_size
+        print("values: ", self.dim_in, self.batch_size, self.cycle_size)
 
-        self.block1 = STAGCN.STGCNBlock(128, 64, 2, self.batch_size, self.cycle_size)
-        self.block2 = STAGCN.STGCNBlock(64, 32, 2, self.batch_size, self.cycle_size)
-        self.block3 = STAGCN.STGCNBlock(32, 16, 2, self.batch_size, self.cycle_size)
+        
+        input = self.dim_in * self.batch_size * self.cycle_size
+
 
         self.linear = nn.Linear(16, 16)
 
@@ -59,9 +60,9 @@ class Decoder(nn.Module):
 
         self.linear = nn.Linear(16, 16)
 
-        self.block1 = STAGCN.STGCNBlock(64, 128, 2, self.batch_size, self.cycle_size)
-        self.block2 = STAGCN.STGCNBlock(32, 64, 2, self.batch_size, self.cycle_size)
-        self.block3 = STAGCN.STGCNBlock(16, 32, 2, self.batch_size, self.cycle_size)
+        self.block1 = STAGCN.STGCNBlock(64, 128, 2, self.batch_size, self.cycle_size, encoder_block=True)
+        self.block2 = STAGCN.STGCNBlock(32, 64, 2, self.batch_size, self.cycle_size, encoder_block=True)
+        self.block3 = STAGCN.STGCNBlock(16, 32, 2, self.batch_size, self.cycle_size, encoder_block=True)
 
         
     def forward(self, x, edge_index, batch):
@@ -132,7 +133,8 @@ def train_epoch(vae, device, dataloader, optimizer):
     # Iterate the dataloader (we do not need the label values, this is unsupervised learning)
     for i, x in enumerate(dataloader): 
         # Move tensor to the proper device
-        #print("x data: ", x)
+        print("x data: ", x)
+
         x = x.to(device)
         x_hat = vae(x.x, x.edge_index, x.batch)
         # Evaluate loss

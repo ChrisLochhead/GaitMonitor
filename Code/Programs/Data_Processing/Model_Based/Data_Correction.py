@@ -12,8 +12,21 @@ from Programs.Data_Processing.Model_Based.Utilities import load, load_images, ge
 from Programs.Data_Processing.Model_Based.Demo import *   
 from Programs.Data_Processing.Model_Based.Render import * 
 
+from sklearn.preprocessing import StandardScaler
 #normalization function
 #[x′ i, y′ i ] = [ imgwidth 2 ∗ xi − xmin xmax − xmin , imgheight 2 ∗ yi − ymin ymax − ymin ]
+
+def normalize_data(data):
+
+    # create scaler
+    scaler = StandardScaler()
+    # fit scaler on data
+    scaler.fit(data)
+    # apply transform
+    standardized = scaler.transform(data)
+    # inverse transform
+    inverse = scaler.inverse_transform(standardized)
+
 def normalize_joint_scales(joints, images, meta = 5):
     norm_joints = []
     #Photo dimensions in pixels

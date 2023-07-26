@@ -56,7 +56,7 @@ def split_data_by_person(datasets):
         
 
 # define a cross validation function
-def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=None,k_fold=3, batch = 16, inputs_size = 1, epochs = 100, type = "GAT"):
+def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=None,k_fold=3, batch = 16, inputs_size = 1, epochs = 100, type = "GAT", make_loaders = False):
     
     train_score = []
     val_score = []
@@ -122,7 +122,8 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
 
                 #for l in test_loaders[0]:
                 #    print("l: ", l)
-
+            if make_loaders:
+                return train_loaders, val_loaders, test_loaders
             #Reset the generator so every dataset gets the same sampling 
             G.set_state(init)
 
@@ -142,7 +143,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
     init = generator.get_state()
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(),
-                                lr=0.01,
+                                lr=0.1,
                                 weight_decay=0.001)
     epochs = epochs
     model.train()
@@ -191,6 +192,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
             data_b = [batch_batch[i][index] for i in range(len(loader))]
             data_y =  [ys_batch[i][index] for i in range(len(loader))]
 
+            #print("data: ", len(data_x), data_x[0].shape)
             h, out = model(data_x, data_i, data_b, train=True)
             #First data batch with Y has to have the right outputs
 
@@ -214,7 +216,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
         val_accs.append(val_acc)
 
         # Print metrics every 10 epochs
-        if (epoch % 20 == 0):
+        if (epoch % 5 == 0):
             print(f'Epoch {epoch:>3} | Train Loss: {total_loss:.2f} '
                 f'| Train Acc: {acc * 100:>5.2f}% '
                 f'| Val Loss: {val_loss:.2f} '
@@ -277,9 +279,13 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
             if validation == False: 
                 print("test ratio", y_classes)
 
+
             _, out = model(data_x, data_i, data_b, train)
             loss += criterion(out, data_y[0]) / len(loaders[0])            
             out = F.log_softmax(out, dim=1)
+            if validation == False:
+                print("guesses: ", out.argmax(dim=1))
+                print("actuall: ", data_y[0])
             acc += accuracy(out.argmax(dim=1), data_y[0]) / len(loaders[0])
     #        print("accuracy: ", acc)
     #print("\n\n")
