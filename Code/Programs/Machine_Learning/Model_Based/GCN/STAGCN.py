@@ -11,23 +11,24 @@ class STGCNBlock(torch.nn.Module):
     def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size):
         super(STGCNBlock, self).__init__()
         #Layers
+        #self.b0 
         self.temporal_conv1 = torch.nn.Conv1d(in_channels, dim_h, kernel_size=temporal_kernel_size, padding='same').to("cuda")
         self.spatial_conv = GATv2Conv(dim_h, dim_h, heads=1).to("cuda")
-        self.b1 = BatchNorm1d(dim_h).to("cuda")
+        self.b1 = BatchNorm1d(dim_h, momentum=0.01).to("cuda")
         self.temporal_conv2 = torch.nn.Conv1d(dim_h, dim_h, kernel_size=temporal_kernel_size, padding='same').to("cuda")
         self.relu = ReLU()
-        self.dropout = torch.nn.Dropout(0.5)
+        self.dropout = torch.nn.Dropout(0.65)
 
         #Shape Info
         self.batch_size = batch_size
         self.cycle_size = cycle_size
 
-    def forward(self, x, edge_index):
+    def forward(self, x, edge_index, train):
         x = self.relu(self.temporal_conv1(x))
         #Convert to 2D representation for GAT layer (Batch * Cycle, Channel)
         x = x.view(x.shape[2] * x.shape[0], x.shape[1])
         x = self.relu(self.spatial_conv(x, edge_index))
-        x = self.b1(x)
+        #x = self.b1(x)
         #Convert to 3D representation for Temporal layer (Batch, Channel, Cycle)
         x = x.view(self.batch_size, x.shape[1], self.cycle_size)
         x = self.relu(self.temporal_conv2(x))
@@ -83,7 +84,7 @@ class MultiInputSTGACN(torch.nn.Module):
             self.len_steams -= 1
 
         linear_input = self.stgcn_filters[-1] * self.cycle_size * self.len_steams
-        print("Linear input info: ", self.stgcn_filters, dim_8th, len(self.streams), self.num_inputs, self.cycle_size, self.len_steams)
+        #print("Linear input info: ", self.stgcn_filters, dim_8th, len(self.streams), self.num_inputs, self.cycle_size, self.len_steams)
 
         #If HCF data is being used, append the length of it's final layer 
         #to the linear input. If there is only one stream and self.hcf is true,
@@ -97,9 +98,9 @@ class MultiInputSTGACN(torch.nn.Module):
         print("Final: ", linear_input)
 
         self.combination_layer = torch.nn.Sequential(
-        Linear(linear_input, 128), ReLU(), BatchNorm1d(128), torch.nn.Dropout(0.5),
-        Linear(128, 64), ReLU(), BatchNorm1d(64), torch.nn.Dropout(0.5),
-        Linear(64, num_classes)
+        Linear(linear_input, 1024), ReLU(), BatchNorm1d(1024), torch.nn.Dropout(0.65),
+        Linear(1024, 512), ReLU(), BatchNorm1d(512), torch.nn.Dropout(0.65),
+        Linear(512, num_classes)
         )
 
 
@@ -130,7 +131,7 @@ class MultiInputSTGACN(torch.nn.Module):
 
                 #In the case of ST-GCN this is a list object
                 for j, layer in enumerate(stream):
-                    h = layer(h, edge_indices[i])
+                    h = layer(h, edge_indices[i], train)
 
                     #Add the last layer of each stream to a list. reshaping it to 2D first
                     #so it's compatible with HCF layers
@@ -146,57 +147,4 @@ class MultiInputSTGACN(torch.nn.Module):
         #h = h.view(h.shape[0], h.shape[1] * h.shape[2])
         h = self.combination_layer(h)
     
-        return F.sigmoid(h), h
-
-    
-#Spatio-temporal Attention Graph Convolutional Network: This version is the base version, it only takes a single input stream
-#which must be graph-based data.
-class STGACN(torch.nn.Module):
-    def __init__(self, dim_in, num_classes, batch_size, stgcn_size = 2, stgcn_filters = [32, 64], max_cycle = 20, num_nodes_per_graph = 18):
-        super(STGACN, self).__init__()
-
-        self.dim_in = dim_in
-        self.size_stgcn = stgcn_size
-        self.stgcn_filters = stgcn_filters
-        self.batch_size = batch_size
-        self.cycle_size = max_cycle * num_nodes_per_graph
-
-        #Build the ST-GCN network stream: For this base version it's two ST-GCN blocks.
-        self.st_stream = []
-        self.st_stream.append(STGCNBlock(dim_in, self.stgcn_filters[0], 5, self.batch_size, self.cycle_size))
-        for i in range(self.size_stgcn):
-            if i > 0:
-                self.st_stream.append(STGCNBlock(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size))
-
-        #Build The Linear stream to compress it to the output classes
-        self.linear_stream = torch.nn.Sequential(
-            Linear(self.cycle_size * self.stgcn_filters[-1], 128),
-            ReLU(),
-            BatchNorm1d(128),
-            Linear(128, 64),
-            ReLU(),
-            BatchNorm1d(64),
-            Linear(64, num_classes)
-        )
-
-    def forward(self, data, edge_indices, batches, train):
-        for i, x in enumerate(data):
-            #Pass the batch to the GPU
-            data[i] = data[i].to("cuda")
-            edge_indices[i] = edge_indices[i].to("cuda")
-            batches[i] = batches[i].to("cuda")
-  
-            h = data[i]
-            #Reshape the incoming data for temporal convolutions
-            #[batch, channel, num nodes per cycle]
-            h = h.view(self.batch_size, self.dim_in, self.cycle_size)
-            #Go through the ST-GCN stream 
-            for layer in self.st_stream:
-                h = layer(h, edge_indices[i])
-
-            #Reshape the data to work on linear layers and pass through the linear stream
-            h = h.view(h.shape[0], h.shape[1] * h.shape[2])
-            h = self.linear_stream(h)
-
-
         return F.sigmoid(h), h
