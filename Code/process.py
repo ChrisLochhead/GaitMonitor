@@ -153,7 +153,7 @@ def process_data(folder = "Chris"):
     #combined_norm_data = Creator.new_normalize_values(combined_data, 
     #                                         "./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_Combined_Data(normed)", 9)   
     combined_norm_data = combined_data
-    #fake_data = Creator.create_dummy_dataset(combined_norm_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_15.5")
+    fake_data = Creator.create_dummy_dataset(combined_norm_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/0_Dummy_Data_15.5")
     
     print("\nStage 14:")
     #Create regions data of combined data
@@ -220,12 +220,12 @@ def load_datasets(types, folder):
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
-            #                                        joint_connections=Render.joint_connections_m_hip, cycles=True))
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
+                                                    joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #20 multi person DATASET
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_3_People', '20_3_People.csv',
-                                                   joint_connections=Render.joint_connections_m_hip, cycles=True))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_3_People', '20_3_People.csv',
+            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #7 co-ordinates on their own
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
@@ -235,7 +235,9 @@ def load_datasets(types, folder):
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/19_Normal_Only', '19_Normal_Only.csv',
             #                                        joint_connections=Render.joint_connections_no_head_m_hip, cycles=True))
             
-
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/0_Dummy_Data_15.5',
+            #                                          '0_Dummy_Data_15.5.csv',
+             #                                       joint_connections=Render.joint_connections_m_hip, cycles=True))
             
         elif t == 1:
             dataset = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_Combined_Data(normed)', '15.5_Combined_Data(normed).csv',
@@ -268,7 +270,7 @@ def load_datasets(types, folder):
                                                     joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #15.5 COMBINED DATASET (original version of the dummy dataset)
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_Combined_Data(normed)', '15.5_Combined_Data(normed).csv',
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
                                                     joint_connections=Render.joint_connections_m_hip, cycles=True))                        
 
     print("datasets loaded.")
@@ -317,11 +319,11 @@ def process_datasets(datasets):
         dataset_size = len(dataset)
 
         #Append indices based on the first dataset length
-        train_indices = random.sample(range(dataset_size), int(0.9 * dataset_size))
+        train_indices = random.sample(range(dataset_size), int(0.7 * dataset_size))
         print("original indices:", len(train_indices), train_indices )
-        test_indices = random.sample(set(range(dataset_size)) - set(train_indices), int(0.1 * dataset_size))
+        test_indices = random.sample(set(range(dataset_size)) - set(train_indices), int(0.3 * dataset_size))
         print("original test indices:", len(test_indices), test_indices )
-        train_indices, test_indices = get_balanced_samples(datasets[0])
+        #train_indices, test_indices = get_balanced_samples(datasets[0])
         #done = 5/0
         train_indice_list.append(train_indices)
         test_indice_list.append(test_indices)
@@ -404,7 +406,7 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
         #Process datasets by manually shuffling to account for cycles
         multi_input_train_val, multi_input_test = process_datasets(datasets)
 
-    dim_out = 9
+    dim_out = 3
 
     print("\nCreating {} model with {} datasets: ".format(model_type, len(datasets)))
     if model_type == "GAT":
@@ -420,13 +422,13 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     model = model.to("cuda")
 
     train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                     k_fold=5, batch=batch_size, epochs=epochs, type=model_type)
+                                                                     k_fold=3, batch=batch_size, epochs=epochs, type=model_type)
 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    #process_data("WeightGait")
+    #process_data("Chris")
     #process_autoencoder("Elisa", 100, 8)
 
     #Run the model:
@@ -443,6 +445,6 @@ if __name__ == '__main__':
     #Leave_one_out: indicates whether using normally split data or data split by person
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 16, epochs = 200, folder="WeightGait", leave_one_out=False)
+           batch_size = 8, epochs = 100, folder="Chris", leave_one_out=False)
 
 

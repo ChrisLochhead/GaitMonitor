@@ -767,7 +767,7 @@ def create_dummy_dataset(data, output_name):
                 current_sequence = []
 
                 #If we have enough examples of this class now
-                if examples_of_class >= 19:
+                if examples_of_class >= 9:
                     #Move to the next class
                     current_class += 1
                     examples_of_class = 0

@@ -87,7 +87,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         test_loaders = []
 
         #Set up so identical seed is used
-        torch.manual_seed(13)
+        #torch.manual_seed(13)
         G = torch.Generator()
 
         train_sample = RandomSampler(folded_train[0][fold], generator=G)
@@ -216,7 +216,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
         val_accs.append(val_acc)
 
         # Print metrics every 10 epochs
-        if (epoch % 5 == 0):
+        if (epoch % 10 == 0):
             print(f'Epoch {epoch:>3} | Train Loss: {total_loss:.2f} '
                 f'| Train Acc: {acc * 100:>5.2f}% '
                 f'| Val Loss: {val_loss:.2f} '

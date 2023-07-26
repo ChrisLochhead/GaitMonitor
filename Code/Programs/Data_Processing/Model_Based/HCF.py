@@ -49,7 +49,17 @@ def split_by_instance(joint_data, pad = True):
     
     gait_cycles.append(copy.deepcopy(current_cycle))
 
-    return gait_cycles
+    #Divide cycles into 3 for more examples
+    #small_cycles = []
+    #for cycle in gait_cycles:
+    #    new_cycle_length = int(len(cycle) / 3)
+    #    print("new cycle : ", len(cycle), new_cycle_length)
+    #    small_cycles.append(cycle[0:new_cycle_length])
+    #    small_cycles.append(cycle[new_cycle_length:int(new_cycle_length * 2)])
+    #    small_cycles.append(cycle[int(new_cycle_length * 2):int(new_cycle_length * 3)])       
+    #    print("size now: ", len(small_cycles))
+
+    return gait_cycles#small_cycles
 
 def get_knee_chart_polynomial(data):
     trends = []
