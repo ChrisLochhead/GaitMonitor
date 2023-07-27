@@ -11,33 +11,41 @@ class STGCNBlock(torch.nn.Module):
     def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size):
         super(STGCNBlock, self).__init__()
         #Layers
-        #self.b0 
-        self.temporal_conv1 = torch.nn.Conv1d(in_channels, dim_h, kernel_size=temporal_kernel_size, padding='same').to("cuda")
-        self.spatial_conv = GATv2Conv(dim_h, dim_h, heads=1).to("cuda")
-        self.b1 = BatchNorm1d(dim_h, momentum=0.01).to("cuda")
-        self.temporal_conv2 = torch.nn.Conv1d(dim_h, dim_h, kernel_size=temporal_kernel_size, padding='same').to("cuda")
+        self.b0 = BatchNorm1d(in_channels).to("cuda")
+        #self.temporal_conv1 = torch.nn.Conv1d(in_channels, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to("cuda")
+        self.spatial_conv = GATv2Conv(in_channels, dim_h, heads=1).to("cuda")
+        self.b1 = BatchNorm1d(dim_h).to("cuda")
+        self.temporal_conv2 = torch.nn.Conv1d(dim_h, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to("cuda")
         self.relu = ReLU()
-        self.dropout = torch.nn.Dropout(0.65)
-
+        self.dropout = torch.nn.Dropout(0.5)
+        self.skip_connection = torch.nn.Conv1d(in_channels, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to("cuda")
         #Shape Info
         self.batch_size = batch_size
         self.cycle_size = cycle_size
 
     def forward(self, x, edge_index, train):
-        x = self.relu(self.temporal_conv1(x))
+
+        x = self.b0(x)
+        residual = x
+        residual = self.skip_connection(residual)
+        #x = self.relu(self.temporal_conv1(x))
         #Convert to 2D representation for GAT layer (Batch * Cycle, Channel)
         x = x.view(x.shape[2] * x.shape[0], x.shape[1])
-        x = self.relu(self.spatial_conv(x, edge_index))
-        #x = self.b1(x)
+        x = self.relu(self.b1(self.spatial_conv(x, edge_index)))
+
+
         #Convert to 3D representation for Temporal layer (Batch, Channel, Cycle)
-        x = x.view(self.batch_size, x.shape[1], self.cycle_size)
-        x = self.relu(self.temporal_conv2(x))
-        x = self.b1(x)
         x = self.dropout(x)
+        x = x.view(self.batch_size, x.shape[1], self.cycle_size)
+        x = self.relu(self.b1(self.temporal_conv2(x)))
+
+        #print("shapes: ", residual.shape, x.shape)
+        x = residual + x
+
         return x
 
 class MultiInputSTGACN(torch.nn.Module):
-    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 2, stgcn_filters = [64, 32], 
+    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 3, stgcn_filters = [16, 32, 64], 
                  max_cycle = 20, num_nodes_per_graph = 18):
         super(MultiInputSTGACN, self).__init__()
 
@@ -130,11 +138,9 @@ class MultiInputSTGACN(torch.nn.Module):
                 #batch, channel, num nodes per cycle, num features
                 #print("h shape: ", h.shape, self.batch_size, self.cycle_size, self.dim_in, i)
                 h = h.view(self.batch_size, self.dim_in[i], self.cycle_size)
-
                 #In the case of ST-GCN this is a list object
                 for j, layer in enumerate(stream):
                     h = layer(h, edge_indices[i], train)
-
                     #Add the last layer of each stream to a list. reshaping it to 2D first
                     #so it's compatible with HCF layers
                     if j == len(stream) - 1:

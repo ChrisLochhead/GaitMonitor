@@ -422,13 +422,13 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     model = model.to("cuda")
 
     train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                     k_fold=3, batch=batch_size, epochs=epochs, type=model_type)
+                                                                     k_fold=5, batch=batch_size, epochs=epochs, type=model_type)
 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    #process_data("Chris")
+    #process_data("WeightGait")
     #process_autoencoder("Elisa", 100, 8)
 
     #Run the model:
@@ -445,6 +445,15 @@ if __name__ == '__main__':
     #Leave_one_out: indicates whether using normally split data or data split by person
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 8, epochs = 100, folder="Chris", leave_one_out=False)
+           batch_size = 16, epochs = 100, folder="WeightGait", leave_one_out=False)
 
+    #Full datset can overfit at 130 - 180 epochs at 8 batch size
 
+    #Things to try:
+    # try with 2, 3, 4 see where valid stops cause it can get 75% on Chris now
+    # try 1,2,3,4 with multiple datasets (need to implement code for that)
+    #try 1000 epochs 
+    #Find where it just stops working on valid, need bigger network probably (4 layers, 128,128,256,256 is what paper used
+    # Try splitting data into 4 again
+    # Test on telling people apart as the class
+    # Test small dataset with noise for verification that it's good

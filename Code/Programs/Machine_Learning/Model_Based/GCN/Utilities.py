@@ -142,9 +142,10 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
 def train(model, loader, val_loader, test_loader, generator, epochs):
     init = generator.get_state()
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(),
-                                lr=0.1,
+    optimizer = torch.optim.SGD(model.parameters(),
+                                lr=0.001,
                                 weight_decay=0.001)
+    
     epochs = epochs
     model.train()
 
@@ -166,7 +167,8 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
             indice_batch[ind].append(data.edge_index)
             batch_batch[ind].append(data.batch)
             ys_batch[ind].append(data.y)  
-    
+
+    epoch_loss_avg = [0,0]
     for epoch in range(epochs + 1):
         
         #Reduce by 0.1 times at 10th and 60th epoch
@@ -202,36 +204,44 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
             
             #print("ratio: ", y_classes)
 
-            loss = criterion(out, data_y[0])
-            total_loss += loss / len(loader[0])
-            out = F.log_softmax(out, dim=1)
+            #print("Lens: ", len(out), len(data_y[0]), out.shape, data_y[0].shape)         
+            loss = criterion(out, data_y[0]) / len(loader[0])
+            total_loss += loss# / len(loader[0])
+            out = F.softmax(out, dim=1)
             acc += accuracy(out.argmax(dim=1), data_y[0]) / len(loader[0])
             train_accs.append(acc)
             loss.backward()
             optimizer.step()
 
+
         # Validation
         generator.set_state(init)
-        val_loss, val_acc = test(model, val_loader, generator, train = True, validation=True)
+        val_loss, val_acc = test(model, val_loader, generator, train = True, validation=True, optimizer = optimizer)
         val_accs.append(val_acc)
 
+        epoch_loss_avg[0] += total_loss / 10
+        epoch_loss_avg[1] += val_loss / 10
         # Print metrics every 10 epochs
         if (epoch % 10 == 0):
             print(f'Epoch {epoch:>3} | Train Loss: {total_loss:.2f} '
                 f'| Train Acc: {acc * 100:>5.2f}% '
                 f'| Val Loss: {val_loss:.2f} '
-                f'| Val Acc: {val_acc * 100:.2f}%')
+                f'| Val Acc: {val_acc * 100:.2f}%'
+                f'| Avg Train: {epoch_loss_avg[0]:.2f}'
+                f'| Avg Val: {epoch_loss_avg[1]:.2f}')
 
-    if test_loader != None:
-        generator.set_state(init)
-        test_loss, test_acc = test(model, test_loader, generator, validation=False)
-        print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
-        test_accs.append(test_acc)
+            epoch_loss_avg = [0,0]
+
+            if test_loader != None:
+                generator.set_state(init)
+                test_loss, test_acc = test(model, test_loader, generator, validation=False)
+                print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
+                test_accs.append(test_acc)
     #return model
     #print("returned lens: ", len(embeddings[0]), len(losses), len(accuracies), len(outputs), len(hs))
     return model, train_accs, val_accs, test_accs
 
-def test(model, loaders, generator, validation, train = False, x_b = None, i_b = None, b_b = None):
+def test(model, loaders, generator, validation, train = False, x_b = None, i_b = None, b_b = None, optimizer = None):
     init = generator.get_state()
     criterion = torch.nn.CrossEntropyLoss()
     model.eval()
@@ -262,6 +272,7 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
     #Second pass: process the data 
     generator.set_state(init)
     with torch.no_grad():
+        total_loss = 0
         for index, data in enumerate(loaders[0]):
 
             data_x = [xs_batch[i][index] for i in range(len(loaders))]
@@ -276,21 +287,18 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
             #if validation:
             #    print("ratio: ", y_classes)
             #else:
-            if validation == False: 
-                print("test ratio", y_classes)
+            #if validation == False: 
+            #    print("test ratio", y_classes)
 
 
             _, out = model(data_x, data_i, data_b, train)
-            loss += criterion(out, data_y[0]) / len(loaders[0])            
+            loss = criterion(out, data_y[0]) / len(loaders[0]) 
+            total_loss += loss
+       
             out = F.log_softmax(out, dim=1)
-            if validation == False:
-                print("guesses: ", out.argmax(dim=1))
-                print("actuall: ", data_y[0])
+            #if validation == False:
+            #    print("guesses: ", out.argmax(dim=1))
+            #    print("actuall: ", data_y[0])
             acc += accuracy(out.argmax(dim=1), data_y[0]) / len(loaders[0])
-    #        print("accuracy: ", acc)
-    #print("\n\n")
 
-    #if validation == False:
-    #    print("test values: ", out, data_y[0])
-
-    return loss, acc
+    return total_loss, acc
