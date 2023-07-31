@@ -22,13 +22,12 @@ def split_by_instance(joint_data, pad = True):
 
     gait_cycles = []
     current_cycle = []
-    current_instance = 0
+    current_instance = joint_data[0][0]
     for row in joint_data:
-
         if row[0] == current_instance:
             current_cycle.append(row)
         else:
-            current_instance += 1
+            current_instance = row[0]
             if len(current_cycle) < std_inst_length:
                 zero_row = copy.deepcopy(current_cycle[-1])
                 for i, c in enumerate(zero_row):

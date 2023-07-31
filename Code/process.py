@@ -171,10 +171,16 @@ def process_data(folder = "Chris"):
     if folder == "WeightGait":
         full_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/15_Combined_Data/raw/15_Combined_Data.csv",
                                                               "./Code/Datasets/" + str(folder) + "/15_Combined_Data/", cols=Utilities.colnames_midhip, ignore_depth=False)
+        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_1_People", [1])
         two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_2_People", [0,1])
         two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_3_People", [0,1,2])
-        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_4_People", [0,1,2,3])
-
+        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_4_People", [0,3,5,6])
+        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_Cade", [2])
+        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_Elisa", [4])
+        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_Longfei", [5])
+        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_Pheobe", [6])
+        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_SeanC", [7])
+        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_SeanG", [8])
 #########################################################################################################################
 
 def load_2_region_data(folder = "Chris"):
@@ -220,12 +226,12 @@ def load_datasets(types, folder):
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
-                                                    joint_connections=Render.joint_connections_m_hip, cycles=True))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
+            #                                        joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #20 multi person DATASET
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_3_People', '20_3_People.csv',
-            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True))
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_4_people', '20_4_people.csv',
+                                                   joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #7 co-ordinates on their own
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
@@ -448,9 +454,21 @@ if __name__ == '__main__':
            batch_size = 16, epochs = 100, folder="WeightGait", leave_one_out=False)
 
     #Full datset can overfit at 130 - 180 epochs at 8 batch size
+    #Full dataset at 16 overfits at <100 epochs
 
     #Things to try:
-    # try with 2, 3, 4 see where valid stops cause it can get 75% on Chris now
+    # try with 2, 3, 4 see where valid stops cause it can get 75% on Chris now, this is 88% validation on 100 epochs and 16 batch size
+    #Full dataset one person only (person 0) : 61%
+    #Bob = random (32%)
+    #Cade = worse than random (25%)
+    #Elisa = random (35%)
+    #Longfei = decent (55%)
+    #Pheobe = decent (62%)
+    #Sean C = less than decent (40%)
+    #Sean G = random (37%, 52%, 65%, 50%) 40 epochs: (62%, 50%)
+    #Two people (0, 1) = random
+
+
     # try 1,2,3,4 with multiple datasets (need to implement code for that)
     #try 1000 epochs 
     #Find where it just stops working on valid, need bigger network probably (4 layers, 128,128,256,256 is what paper used
