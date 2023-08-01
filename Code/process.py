@@ -226,12 +226,12 @@ def load_datasets(types, folder):
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
-            #                                        joint_connections=Render.joint_connections_m_hip, cycles=True))
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
+                                                    joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #20 multi person DATASET
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_4_people', '20_4_people.csv',
-                                                   joint_connections=Render.joint_connections_m_hip, cycles=True))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_4_people', '20_4_people.csv',
+            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #7 co-ordinates on their own
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
@@ -451,7 +451,7 @@ if __name__ == '__main__':
     #Leave_one_out: indicates whether using normally split data or data split by person
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 16, epochs = 100, folder="WeightGait", leave_one_out=False)
+           batch_size = 32, epochs = 300, folder="WeightGait", leave_one_out=False)
 
     #Full datset can overfit at 130 - 180 epochs at 8 batch size
     #Full dataset at 16 overfits at <100 epochs
@@ -467,7 +467,7 @@ if __name__ == '__main__':
     #Sean C = less than decent (40%)
     #Sean G = random (37%, 52%, 65%, 50%) 40 epochs: (62%, 50%)
     #Two people (0, 1) = random
-
+    #4 best people gives 57% tiny variance
 
     # try 1,2,3,4 with multiple datasets (need to implement code for that)
     #try 1000 epochs 
@@ -475,3 +475,9 @@ if __name__ == '__main__':
     # Try splitting data into 4 again
     # Test on telling people apart as the class
     # Test small dataset with noise for verification that it's good
+
+
+    #BOBS SUGGESTIONS
+    #linearly interpolate between all data in a sequence to produce more frames and smoother transitions to deal with missing frames
+    #reassess all data manually to find problem instances
+    #disallow crossover within x frames for better gait splitting

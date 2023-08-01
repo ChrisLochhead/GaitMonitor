@@ -197,3 +197,265 @@ def get_feet_height(gait_cycles, images):
         feet_heights.append(copy.deepcopy(average_feet_height))
 
     return feet_heights
+
+
+def alternate_get_gait_cycles(joint_data, images):
+    instances = []
+    instance = []
+    current_instance = 0
+    #First separate the joints into individual instances
+    for joints in joint_data:
+        #Append joints as normal
+        if joints[0] == current_instance:
+            instance.append(joints)
+        else:
+            instances.append(copy.deepcopy(instance))
+            instance = []
+            instance.append(joints)
+            current_instance = joints[0]
+    #Add the last instance hanging off missed by the loop
+    instances.append(copy.deepcopy(instance))
+
+    gait_cycles = []
+    buffer = 5
+    threshold = 50
+    for i, instance in enumerate(instances):
+        instance_cycle_count = 0
+        gait_cycle = []
+        started = False
+        crossover = 0
+        buffer = 5
+        for frame in instance:
+            #Always add the first frame to the new gait cycle
+            if started == False:
+                gait_cycle.append(frame)
+                started = True
+            else:
+                #If detected a cross over event outside of the buffer
+                if np.abs(frame[-2][0] -  frame[-1][0]) <= threshold and buffer == 0:
+                    #Count the crossover and add the frame to the cycle
+                    crossover += 1
+                    gait_cycle.append(frame)
+                    #If there's been two, this is a full gait cycle, add to the cycles and reset everything
+                    if crossover == 2:
+                        crossover = 0
+                        gait_cycles.append(copy.deepcopy(gait_cycle))
+                        instance_cycle_count += 1
+                        gait_cycle = []
+                        buffer = 7
+                else:
+                    #No crossover detected, just business as usual
+                    gait_cycle.append(frame)
+            
+            #Make sure it doesn't detect crossovers over and over by mistakes in the skeleton generation algorithm.
+            if buffer > 0:
+                buffer -= 1
+
+        print("instance: ", i, instance_cycle_count, "of : ", len(instances))
+            
+    return gait_cycles
+
+
+
+
+
+
+
+#This will only work with relative data
+def get_gait_cycles(joint_data, images):
+
+    instances = []
+    instance = []
+    current_instance = 0
+    #First separate the joints into individual instances
+    for joints in joint_data:
+        #Append joints as normal
+        if joints[0] == current_instance:
+            instance.append(joints)
+        else:
+            instances.append(copy.deepcopy(instance))
+            instance = []
+            instance.append(joints)
+            current_instance = joints[0]
+    #Add the last instance hanging off missed by the loop
+    instances.append(copy.deepcopy(instance))
+
+    t = 0
+    for d in instances:
+        t += len(d)
+
+    gait_cycles = []
+    gait_cycle = []
+
+    #For each instance
+    inst_count = 0
+    for i, inst in enumerate(instances):
+
+        #if i > 0:
+        #    if len(gait_cycle) > 0:
+        #        crossovers = 0
+        #        if len(gait_cycles) > 0:
+        #            for g in gait_cycle:
+        ##                gait_cycles[-1].append(g)
+        #        else:
+        #            gait_cycles.append(copy.deepcopy(gait_cycle))                    
+        #        gait_cycle = []
+
+
+        found_initial_direction = False
+        direction = -1
+        crossovers = 0
+
+        row_18_previous = -1
+
+        for j, row in enumerate(inst):
+
+            #Only register initial direction if they aren't equal
+            if found_initial_direction == False:
+                if row[-2][1] > row[-1][1]:
+                    direction = 0
+                    found_initial_direction = True
+                elif row[-2][1] < row[-1][1]:
+                    direction = 1
+                    found_initial_direction = True
+
+            #Check for legs mixing up in frame, only need to check one leg
+            #print("gap: ", abs(row_18_previous - row[18][1]), row_18_previous, row[18][1])
+            if abs(row_18_previous - row[-2][1]) > 50 and found_initial_direction:
+                gait_cycle.append(row)
+                #print("detected leg switch", j)
+                row_18_previous = row[-2][1]
+                #Render.render_joints(images[j], row, delay=True, use_depth=False)
+                continue
+
+            row_18_previous = row[-2][1]
+            #Check if the direction matches the current movement and append as appropriate
+            if row[-2][1] > row[-1][1] and direction == 0:
+                gait_cycle.append(row)
+            elif row[-2][1] < row[-1][1] and direction == 1:
+                gait_cycle.append(row)
+            elif row[-2][1] > row[-1][1] and direction == 1:
+                crossovers += 1
+                #print("crossover detected a ", row[18][1], row[19][1], direction )
+                gait_cycle.append(row)
+                direction = 0
+            elif row[-2][1] < row[-1][1] and direction == 0:
+                crossovers += 1
+                #print("crossover detected b ", row[18][1], row[19][1], direction)
+                gait_cycle.append(row)
+                direction = 1
+            else:
+                #There is either no cross over or the rows are totally equal, in which case just add as usual
+                gait_cycle.append(row)
+
+
+            #row 16 is right leg at crossover point
+            #print("crossover count: {} and current instance length: {}, direction: {}, row 18: {}, row 19: {} ".format(crossovers, len(gait_cycle), direction, row[18], row[19]))
+            #Render.render_joints(images[j], row, delay=True, use_depth=False)
+
+            #Check the number of crossovers 
+            #If there has been 2 this is one full gait cycle, append it to the gait cycles and reset the 
+            #current gait cycle.
+            if crossovers > 1 and len(gait_cycle) > 5 or len(gait_cycle) > 19:
+                crossovers = 0
+                gait_cycles.append(copy.deepcopy(gait_cycle))
+                gait_cycle = []
+
+
+            if len(gait_cycle) > 19:
+                crossovers = 0
+                gait_cycles.append(copy.deepcopy(gait_cycle))
+                gait_cycle = [] 
+
+            #Check if we are at the end of the instance and adjust the last cycle accordingly so we dont end up with length 1 gait cycles.
+            if j == len(inst):
+                #If the current gait cycle isn't at least 5 frames, just append it on to the latest one
+                if len(gait_cycle) < 5:
+                    for g in gait_cycle:
+                        gait_cycles[-1].append(g)
+                    gait_cycles = []
+                else:
+                #Otherwise just add this one and reset it before the next instance starts.
+                    gait_cycles.append(gait_cycle)
+                    gait_cycle = []
+
+    #Append final gait cycle missed by loop
+    if len(gait_cycle) > 0:
+        gait_cycles.append(gait_cycle)
+
+    #Illustrate results
+    col = (0,0,255)
+    image_iter = 0
+    for cycle in gait_cycles:
+        #Switch the cycle every new gait cycle
+        if col == (0,0,255):
+            col = (255,0,0)
+        else:
+            col = (0,0,255)
+
+        for i, row in enumerate(cycle):
+            #Render every frame
+            #if len(cycle) > 21:
+            #    print("frame ", i, " of ", len(cycle))
+            #    print("row: ", row)
+            #    Render.render_joints(images[image_iter], row, delay=True, use_depth=False, colour=col)
+            image_iter += 1
+
+    return gait_cycles
+
+
+def sample_gait_cycles(data_cycles):
+    # Find the length of the biggest sublist
+    cycles = [[],[],[]]
+    print("len gait cycles: ", len(data_cycles))
+    for cycle in data_cycles:
+        cycles[cycle[0][2]].append(cycle)
+
+    print("lens: ", len(cycles[0]),len(cycles[1]),len(cycles[2]))
+    min_length = min(len(sublist) for sublist in cycles)
+
+    for i, cycle in enumerate(cycles):
+        cycles[i] = cycles[i][0:min_length]
+
+    print("lens 2: ", len(cycles[0]),len(cycles[1]),len(cycles[2]))   
+    
+    #Agglomerate into one list:
+    gait_cycles = []
+    for i, lst in enumerate(cycles):
+        for j, cycles in enumerate(lst):
+            gait_cycles.append(cycles)
+    
+
+    return gait_cycles
+
+def normalize_gait_cycle_lengths(data_cycles):
+    max_len = -1
+    min_len = 100000
+    for cycle in data_cycles:
+        if len(cycle) > max_len:
+            max_len = len(cycle)
+        if len(cycle) < min_len:
+            min_len = len(cycle)
+          
+    for i, c in enumerate(data_cycles):
+        if len(data_cycles[i]) < max_len:
+            diff = int(max_len - len(data_cycles[i]))
+            #Append metadata
+            dummy_frame = data_cycles[i][0]
+            #Find all coords and set them to 0 for dummy frame, leaving meta data free
+            for j, d in enumerate(dummy_frame):
+                if j > 5:
+                    for k, coord in enumerate(d):
+                        dummy_frame[j][k] = 0
+
+                    
+            for j in range(diff):
+                data_cycles[i].append(dummy_frame)
+            
+            #print("finished frame: ", data_cycles[i])
+            #print("types: ", type(data_cycles[i][0]), type(data_cycles[i][-1]))
+            #done = 5/0
+
+    return data_cycles
+
+            
