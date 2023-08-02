@@ -457,5 +457,3 @@ def normalize_gait_cycle_lengths(data_cycles):
             #done = 5/0
 
     return data_cycles
-
-            

@@ -812,3 +812,48 @@ def create_dummy_dataset(data, output_name):
     #Save as csv
     Utilities.save_dataset(fake_examples, output_name)
     return fake_examples
+
+
+def interpolate_gait_cycle(data_cycles, joint_output, step = 5):
+    inter_cycles = []
+    for cycle in data_cycles:
+        inter_cycle = []
+        print("original cycle length: ", len(cycle))
+        for i, frame in enumerate(cycle):
+            #Add the frame first
+            inter_cycle.append(frame)
+
+            #Ignore the last frame for interpolation
+            if i < len(cycle) - 1:
+                inter_frames = interpolate_coords(frame, cycle[i + 1], step)
+                #Unwrap and add to full cycle 
+                for j in range(step):
+                    inter_cycle.append(inter_frames[j])
+
+        print("new cycle should be ", step, " times longer: ", len(inter_cycle))
+        inter_cycles.append(inter_cycle)
+    
+    print("cycle length should be same: ", len(inter_cycles), len(data_cycles))
+    return inter_cycles
+
+
+def interpolate_coords(start_frame, end_frame, step):
+    start_frame = np.array(start_frame)
+    end_frame = np.array(end_frame)
+
+    # Calculate the step size for interpolation
+    inter_frames = []
+    for i in range(1, step + 1):
+        inter_frame = list(start_frame[0:6])
+        for j, coord in enumerate(start_frame):
+            if j > 5:
+                step_size = (end_frame[j] - coord) / (step + 1)
+
+                # Perform interpolation and create the new lists
+                interpolated_coord = coord + i * step_size
+                inter_frame.append(interpolated_coord.tolist())
+    inter_frames.append(inter_frame)
+        
+    return inter_frames
+
+            

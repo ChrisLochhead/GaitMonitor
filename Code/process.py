@@ -480,4 +480,3 @@ if __name__ == '__main__':
     #BOBS SUGGESTIONS
     #linearly interpolate between all data in a sequence to produce more frames and smoother transitions to deal with missing frames
     #reassess all data manually to find problem instances
-    #disallow crossover within x frames for better gait splitting
