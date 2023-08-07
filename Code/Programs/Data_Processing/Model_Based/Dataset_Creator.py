@@ -816,9 +816,9 @@ def create_dummy_dataset(data, output_name):
 
 def interpolate_gait_cycle(data_cycles, joint_output, step = 5):
     inter_cycles = []
-    for cycle in data_cycles:
+    for a, cycle in enumerate(data_cycles):
         inter_cycle = []
-        print("original cycle length: ", len(cycle))
+        #print("original cycle length: ", len(cycle))
         for i, frame in enumerate(cycle):
             #Add the frame first
             inter_cycle.append(frame)
@@ -829,8 +829,17 @@ def interpolate_gait_cycle(data_cycles, joint_output, step = 5):
                 #Unwrap and add to full cycle 
                 for j in range(step):
                     inter_cycle.append(inter_frames[j])
+                    #print("inter frames: ", inter_frames[j])
+                    #print("normal frame: ", frame)
+                    #print("types: ", type(inter_frames[0][6]), type(frame[6]))
+                    #print("actual: ", inter_frames[0][6], frame[6])
+                    #stop = 5/0
 
-        print("new cycle should be ", step, " times longer: ", len(inter_cycle))
+        #print("new cycle should be ", step, " times longer: ", len(inter_cycle))
+           # if i > 1:
+           #     for c in inter_cycle:
+           #         print("here: ", type(c), c)
+                #stop = 5/0
         inter_cycles.append(inter_cycle)
     
     print("cycle length should be same: ", len(inter_cycles), len(data_cycles))
@@ -838,21 +847,25 @@ def interpolate_gait_cycle(data_cycles, joint_output, step = 5):
 
 
 def interpolate_coords(start_frame, end_frame, step):
-    start_frame = np.array(start_frame)
-    end_frame = np.array(end_frame)
+    #start_frame = np.array(start_frame)
+    #end_frame = np.array(end_frame)
 
     # Calculate the step size for interpolation
     inter_frames = []
     for i in range(1, step + 1):
-        inter_frame = list(start_frame[0:6])
+        inter_frame = copy.deepcopy(start_frame)
         for j, coord in enumerate(start_frame):
             if j > 5:
-                step_size = (end_frame[j] - coord) / (step + 1)
-
+                step_size = (np.array(end_frame[j]) - np.array(coord)) / (step + 1)
                 # Perform interpolation and create the new lists
                 interpolated_coord = coord + i * step_size
-                inter_frame.append(interpolated_coord.tolist())
-    inter_frames.append(inter_frame)
+                #print("interpolated coord 1: ", type(interpolated_coord), interpolated_coord)   
+                listed = list(interpolated_coord)
+                #print("\ninterpolated coord 2: ", type(listed), listed)
+                inter_frame[j] = listed
+        inter_frames.append(inter_frame)
+
+
         
     return inter_frames
 

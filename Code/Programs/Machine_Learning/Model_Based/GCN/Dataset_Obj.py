@@ -8,6 +8,7 @@ from tqdm import tqdm
 from torchvision import transforms
 import Programs.Data_Processing.Model_Based.Render as Render
 import Programs.Data_Processing.Model_Based.HCF as HCF
+import Programs.Data_Processing.Model_Based.Dataset_Creator as Creator
 import copy
 
 class JointDataset(Dataset):
@@ -61,11 +62,18 @@ class JointDataset(Dataset):
             #self.data_cycles = HCF.split_by_instance(self.data.to_numpy())
             #Several cycles per instance
             self.data_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
-            print(type(self.data_cycles))
+            print("length a: ", len(self.data_cycles))
+            #stop = 5/0
             #self.data_cycles = HCF.alternate_get_gait_cycles(self.data.to_numpy(), None)
             self.data_cycles = HCF.sample_gait_cycles(self.data_cycles)
+            print("length b", len(self.data_cycles))
             self.data_cycles = HCF.normalize_gait_cycle_lengths(self.data_cycles)
+            print("length c", len(self.data_cycles))
+            self.data_cycles = Creator.interpolate_gait_cycle(self.data_cycles, None)
+
             print("here's the cycles: ", len(self.data_cycles))
+            #for c in self.data_cycles:
+            #    print("len should be the same: ", len(c))
             print(type(self.data_cycles))
             #done = 5/0 
 
@@ -308,14 +316,19 @@ def data_to_graph(row, coo_matrix, meta = 5):
         y_arr = []
         for cycle_part in row:
             refined_row = cycle_part[meta + 1 :]   
+            row_as_array = np.array(refined_row)  
 
-            row_as_array = np.array(refined_row)     
             y = int(cycle_part[2])  
             y_arr.append(y)
             if len(gait_cycle) <= 0:
                 gait_cycle = row_as_array
             else:   
+                #print("len gait: ", len(gait_cycle), len(gait_cycle[0]), len(row_as_array), len(row_as_array[0]))
+                #print("gait 1: ", gait_cycle, type(gait_cycle), type(gait_cycle[0]), type(gait_cycle[0][0]))
+                #print("gait 2: ", row_as_array, type(row_as_array), type(row_as_array[0]), type(row_as_array[0][0]))
+
                 gait_cycle = np.concatenate((gait_cycle, row_as_array), axis=0)
+                #stop = 5/0 
 
         #Verify gait cycle is calculated correctly:
         #Pass entire cycle as single graph

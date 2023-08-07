@@ -422,8 +422,8 @@ def sample_gait_cycles(data_cycles):
     #Agglomerate into one list:
     gait_cycles = []
     for i, lst in enumerate(cycles):
-        for j, cycles in enumerate(lst):
-            gait_cycles.append(cycles)
+        for j, cycle in enumerate(lst):
+            gait_cycles.append(cycle)
     
 
     return gait_cycles

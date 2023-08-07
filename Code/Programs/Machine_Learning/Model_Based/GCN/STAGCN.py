@@ -45,7 +45,7 @@ class STGCNBlock(torch.nn.Module):
         return x
 
 class MultiInputSTGACN(torch.nn.Module):
-    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 3, stgcn_filters = [16, 32, 64], 
+    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 4, stgcn_filters = [16, 16, 32, 64], 
                  max_cycle = 20, num_nodes_per_graph = 18):
         super(MultiInputSTGACN, self).__init__()
 
@@ -108,8 +108,8 @@ class MultiInputSTGACN(torch.nn.Module):
         #self.max_pooling = torch.nn.MaxPool1d(5)
 
         self.combination_layer = torch.nn.Sequential(
-        Linear(int(linear_input/1), 1024), ReLU(), BatchNorm1d(1024), torch.nn.Dropout(0.65),
-        Linear(1024, 512), ReLU(), BatchNorm1d(512), torch.nn.Dropout(0.65),
+        Linear(int(linear_input/1), 1024), ReLU(), BatchNorm1d(1024), torch.nn.Dropout(0.8),
+        Linear(1024, 512), ReLU(), BatchNorm1d(512), torch.nn.Dropout(0.8),
         Linear(512, num_classes)
         )
 
@@ -158,4 +158,4 @@ class MultiInputSTGACN(torch.nn.Module):
         #print("shape after pooling: ", h.shape)
         h = self.combination_layer(h)
     
-        return F.sigmoid(h), h
+        return F.sigmoid(h)#, h

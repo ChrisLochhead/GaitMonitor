@@ -66,8 +66,8 @@ def process_data(folder = "Chris"):
 
     #Normalize outliers
     #SIMPLIFY
-    #abs_joint_data = Creator.create_normalized_dataset(abs_joint_data, image_data, 
-    #                                               joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/4_Absolute_Data(normalized)")
+    abs_joint_data = Creator.create_normalized_dataset(abs_joint_data, image_data, 
+                                                   joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/4_Absolute_Data(normalized)")
     print("\nStage 4:")
     #render_joints_series(image_data, abs_joint_data, size=10)
 
@@ -80,8 +80,8 @@ def process_data(folder = "Chris"):
     #pre_scale = abs_joint_data
 
     #Normalize size (use absolute dataset)
-    #abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data,
-    #                                           joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
+    abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data,
+                                               joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
 
     print("\nStage 5: ")
     #render_joints_series(image_data, abs_joint_data, size=10)
@@ -94,8 +94,8 @@ def process_data(folder = "Chris"):
     #render_joints_series("None", relative_joint_data, size=5, plot_3D=True, x_rot = -90, y_rot = 180)
 
     #Flip joints so all facing one direction
-    #abs_joint_data = Creator.create_flipped_joint_dataset(relative_joint_data, abs_joint_data, image_data,
-    #                                                           joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/7_Relative_Data(flipped)") 
+    relative_joint_data = Creator.create_flipped_joint_dataset(relative_joint_data, abs_joint_data, image_data,
+                                                               joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/7_Relative_Data(flipped)") 
 
     print("\nStage 7:")
     #render_joints_series("None", flipped_joint_data, size=5, plot_3D=True, x_rot = -90, y_rot = 180)
@@ -106,8 +106,8 @@ def process_data(folder = "Chris"):
     print("\nStage 8:")
     #render_velocity_series(abs_joint_data, velocity_data, image_data, size=20)
 
-    #flipped_velocity_data = Creator.create_flipped_joint_dataset(velocity_data, abs_joint_data, image_data,
-    #                                                           joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/9_Velocity_Data(flipped)")  
+    velocity_data = Creator.create_flipped_joint_dataset(velocity_data, abs_joint_data, image_data,
+                                                               joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/9_Velocity_Data(flipped)")  
 
     print("\nStage 9: ")
     #Create joint angles data
@@ -226,16 +226,16 @@ def load_datasets(types, folder):
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
-                                                    joint_connections=Render.joint_connections_m_hip, cycles=True))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
+            #                                        joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #20 multi person DATASET
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_4_people', '20_4_people.csv',
             #                                       joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #7 co-ordinates on their own
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
-            #                                        joint_connections=Render.joint_connections_m_hip, cycles=True))
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
+                                                    joint_connections=Render.joint_connections_m_hip, cycles=True))
 
             #19 simplified dataset
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/19_Normal_Only', '19_Normal_Only.csv',
@@ -428,13 +428,13 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     model = model.to("cuda")
 
     train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                     k_fold=5, batch=batch_size, epochs=epochs, type=model_type)
+                                                                     k_fold=4, batch=batch_size, epochs=epochs, type=model_type)
 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    #process_data("WeightGait")
+    #process_data("Chris")
     #process_autoencoder("Elisa", 100, 8)
 
     #Run the model:
@@ -451,13 +451,15 @@ if __name__ == '__main__':
     #Leave_one_out: indicates whether using normally split data or data split by person
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 32, epochs = 300, folder="WeightGait", leave_one_out=False)
+           batch_size = 16, epochs = 150, folder="WeightGait", leave_one_out=False)
 
     #Full datset can overfit at 130 - 180 epochs at 8 batch size
     #Full dataset at 16 overfits at <100 epochs
 
     #Things to try:
-    # try with 2, 3, 4 see where valid stops cause it can get 75% on Chris now, this is 88% validation on 100 epochs and 16 batch size
+    # 78% batch 8 epochs 150 4 fold with just Chris
+
+
     #Full dataset one person only (person 0) : 61%
     #Bob = random (32%)
     #Cade = worse than random (25%)
@@ -470,13 +472,9 @@ if __name__ == '__main__':
     #4 best people gives 57% tiny variance
 
     # try 1,2,3,4 with multiple datasets (need to implement code for that)
-    #try 1000 epochs 
     #Find where it just stops working on valid, need bigger network probably (4 layers, 128,128,256,256 is what paper used
-    # Try splitting data into 4 again
     # Test on telling people apart as the class
-    # Test small dataset with noise for verification that it's good
 
 
     #BOBS SUGGESTIONS
-    #linearly interpolate between all data in a sequence to produce more frames and smoother transitions to deal with missing frames
     #reassess all data manually to find problem instances
