@@ -439,8 +439,12 @@ def make_intrinsics(intrinsics_file = "Code/depth_intrinsics.csv"):
         '''
         Avoid having to read a bagfile to get the camera intrinsics
         '''
-        with open(intrinsics_file, newline='') as csvfile:
-            data_struct = list(csv.reader(csvfile))
+        #with open(intrinsics_file, newline='') as csvfile:
+        #    data_struct = list(csv.reader(csvfile))
+
+        data_struct = [['212',	'120',	'107.02976989746094',
+          '61.70092010498047',	'154.89523315429688',	'154.63319396972656',	
+          'distortion.inverse_brown_conrady',	'[0.0, 0.0, 0.0, 0.0, 0.0]']]
 
         data = data_struct[0]
         for i, d in enumerate(data):

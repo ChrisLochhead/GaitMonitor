@@ -1,5 +1,5 @@
 #import init_directories
-from Programs.Data_Processing.Model_Based.Demo import *
+#from Programs.Data_Processing.Model_Based.Demo import *
 #from Programs.Data_Processing.Model_Based.Utilities import load, load_images, save_dataset
 import Programs.Data_Processing.Model_Based.Dataset_Creator as Creator
 import Programs.Machine_Learning.Model_Based.AutoEncoder.GAE as GAE
@@ -7,7 +7,7 @@ import Programs.Machine_Learning.Model_Based.GCN.Dataset_Obj as Dataset_Obj
 import Programs.Machine_Learning.Model_Based.GCN.Ground_Truths as GT
 import Programs.Data_Processing.Model_Based.Render as Render
 import torch
-import torch_geometric
+#import torch_geometric
 import random
 import Programs.Machine_Learning.Model_Based.GCN.GAT as gat
 import Programs.Machine_Learning.Model_Based.GCN.STAGCN as stgcn
