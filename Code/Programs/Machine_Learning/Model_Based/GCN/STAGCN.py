@@ -45,7 +45,7 @@ class STGCNBlock(torch.nn.Module):
         return x
 
 class MultiInputSTGACN(torch.nn.Module):
-    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 4, stgcn_filters = [16, 16, 32, 64], 
+    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 2, stgcn_filters = [8, 16], 
                  max_cycle = 20, num_nodes_per_graph = 18):
         super(MultiInputSTGACN, self).__init__()
 
