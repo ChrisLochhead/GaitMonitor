@@ -13,7 +13,7 @@ import copy
 
 class JointDataset(Dataset):
     def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip,
-                  cycles = False, meta = 5):
+                  cycles = False, meta = 5, person = None):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
@@ -27,6 +27,7 @@ class JointDataset(Dataset):
         self.num_nodes_per_graph = 0
         self.meta = meta
         self.cycle_indices = []
+        self.person = person
         super(JointDataset, self).__init__(root, transform, pre_transform)
         
     @property
@@ -61,21 +62,13 @@ class JointDataset(Dataset):
             #Full cycles per instance
             #self.data_cycles = HCF.split_by_instance(self.data.to_numpy())
             #Several cycles per instance
-            self.data_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
-            print("length a: ", len(self.data_cycles))
-            #stop = 5/0
+            self.data_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None, person = self.person)
             #self.data_cycles = HCF.alternate_get_gait_cycles(self.data.to_numpy(), None)
             self.data_cycles = HCF.sample_gait_cycles(self.data_cycles)
-            print("length b", len(self.data_cycles))
             self.data_cycles = HCF.normalize_gait_cycle_lengths(self.data_cycles)
-            print("length c", len(self.data_cycles))
             self.data_cycles = Creator.interpolate_gait_cycle(self.data_cycles, None)
 
             print("here's the cycles: ", len(self.data_cycles))
-            #for c in self.data_cycles:
-            #    print("len should be the same: ", len(c))
-            print(type(self.data_cycles))
-            #done = 5/0 
 
             self.num_nodes_per_graph = len(self.data.columns) - self.meta - 1
 
@@ -151,87 +144,7 @@ class JointDataset(Dataset):
                                  f'data_{idx}.pt'))    
 
         return data
-    
-    '''def split_cycles(self, split_type = 2):
-        if split_type == 2:
-            top_cycles = []
-            bottom_cycles = []
-            for cycle in (self.data_cycles):
-                top_cycle = []
-                bottom_cycle = []
-                for row in cycle:
-                    top_cycle_row = list(row[0:6])
-                    bottom_cycle_row = list(row[0:6])
-                    for i, coord in enumerate(row):
-                        if i > 5 and i < 17:
-                            top_cycle_row.append(coord)
-                            #bottom_cycle_row.append([0,0,0])
-                        elif i >= 17:
-                            bottom_cycle_row.append(coord)
-                            #top_cycle_row.append([0,0,0])
-                    
-                    #print("len of cycles: ", len(top_cycle_row), len(bottom_cycle_row))
-                    top_cycle.append(top_cycle_row)
-                    bottom_cycle.append(bottom_cycle_row)
-                
-                top_cycles.append(top_cycle)
-                bottom_cycles.append(bottom_cycle)
 
-            return top_cycles, bottom_cycles
-        
-        elif split_type == 1:
-            headless_cycles = []
-            for cycle in (self.data_cycles):
-                headless_cycle = []
-                for row in cycle:
-                    cycle_row = list(row[0:6])
-
-                    for i, coord in enumerate(row):
-                        if i > 10:
-                            cycle_row.append(coord)
-
-                    
-                    headless_cycle.append(cycle_row)
-                
-                headless_cycles.append(headless_cycle)
-
-            return headless_cycles
-
-        #Order should be returned: l_leg, r_leg, l_arm, r_arm, head
-        elif split_type == 5:
-            limb_cycles = [[],[],[],[],[]]
-            for cycle in (self.data_cycles):
-                single_cycle = [[],[],[],[],[]]
-                for row in cycle:
-                    row_cycle = [[],[],[],[],[]]
-                    for i, c in enumerate(single_cycle):
-                        row_cycle[i]  = list(row[0:6])
-                    
-                    for i, coord in enumerate(row):
-                        #Head coords 
-                        if i > 2 and i < 8:
-                            row_cycle[4].append(coord)
-                        #Left hand
-                        elif i == 8 or i == 10 or i == 12:
-                            row_cycle[2].append(coord)
-                        #Right hand
-                        elif i == 9 or i == 11 or i == 13:
-                            row_cycle[3].append(coord)
-                        #Left foot
-                        elif i == 14 or i == 16 or i == 18:
-                            row_cycle[0].append(coord)
-                        #Right foot
-                        elif i == 15 or i == 17 or i == 19:
-                            row_cycle[1].append(coord)
-                    
-                    for i, c in enumerate(row_cycle):
-                        single_cycle[i].append(c)
-
-                for i, c in enumerate(single_cycle):
-                    limb_cycles[i].append(c)
-
-            return [c for c in limb_cycles]
-'''
     def modify_COO_matrix(self, gait_cycle_length, connections, current_matrix):
         #Get number of joints per graph:
         #17 connections is mid-hip appended full graph

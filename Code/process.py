@@ -1,5 +1,5 @@
 #import init_directories
-#from Programs.Data_Processing.Model_Based.Demo import *
+from Programs.Data_Processing.Model_Based.Demo import *
 #from Programs.Data_Processing.Model_Based.Utilities import load, load_images, save_dataset
 import Programs.Data_Processing.Model_Based.Dataset_Creator as Creator
 import Programs.Machine_Learning.Model_Based.AutoEncoder.GAE as GAE
@@ -235,7 +235,7 @@ def load_datasets(types, folder):
             
             #7 co-ordinates on their own
             datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
-                                                    joint_connections=Render.joint_connections_m_hip, cycles=True))
+                                                    joint_connections=Render.joint_connections_m_hip, cycles=True, person = 3))
 
             #19 simplified dataset
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/19_Normal_Only', '19_Normal_Only.csv',
@@ -434,7 +434,7 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    #process_data("Chris")
+    #process_data("WeightGait")
     #process_autoencoder("Elisa", 100, 8)
 
     #Run the model:

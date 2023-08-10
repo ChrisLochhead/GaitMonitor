@@ -256,13 +256,8 @@ def alternate_get_gait_cycles(joint_data, images):
     return gait_cycles
 
 
-
-
-
-
-
 #This will only work with relative data
-def get_gait_cycles(joint_data, images):
+def get_gait_cycles(joint_data, images, person = None):
 
     instances = []
     instance = []
@@ -273,7 +268,13 @@ def get_gait_cycles(joint_data, images):
         if joints[0] == current_instance:
             instance.append(joints)
         else:
-            instances.append(copy.deepcopy(instance))
+            #Only add certain persons examples
+            if person != None:
+                if instance[0][5] == person:
+                    instances.append(copy.deepcopy(instance))
+            else:
+                instances.append(copy.deepcopy(instance))
+
             instance = []
             instance.append(joints)
             current_instance = joints[0]
