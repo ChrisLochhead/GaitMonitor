@@ -386,7 +386,7 @@ def process_autoencoder(folder, num_epochs, batch_size):
 
     #Compress
 
-def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_one_out, person):
+def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_one_out, person, label):
 
     #Load the full dataset alongside HCF with gait cycles
     datasets = load_datasets(dataset_types, folder, person)
@@ -449,9 +449,11 @@ if __name__ == '__main__':
     #multi: indicates if the multi-stream variant of the chosen model should be used (multi variant 
     # models are compatible with both single and multiple datasets)
     #Leave_one_out: indicates whether using normally split data or data split by person
+    #Person: full dataset only, denotes which person to extract otherwise 0 or none.
+    #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 16, epochs = 150, folder="weightgait", leave_one_out=False, person = 3)
+           batch_size = 16, epochs = 100, folder="weightgait", leave_one_out=False, person = 3, label = 5 )
 
     #Full datset can overfit at 130 - 180 epochs at 8 batch size
     #Full dataset at 16 overfits at <100 epochs
@@ -474,7 +476,3 @@ if __name__ == '__main__':
     # try 1,2,3,4 with multiple datasets (need to implement code for that)
     #Find where it just stops working on valid, need bigger network probably (4 layers, 128,128,256,256 is what paper used
     # Test on telling people apart as the class
-
-
-    #BOBS SUGGESTIONS
-    #reassess all data manually to find problem instances

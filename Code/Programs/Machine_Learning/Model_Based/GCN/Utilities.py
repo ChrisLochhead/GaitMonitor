@@ -143,7 +143,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
     init = generator.get_state()
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(),
-                                lr=0.001,
+                                lr=0.1,
                                 weight_decay=0.001)
     
     epochs = epochs
@@ -171,11 +171,11 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
     for epoch in range(epochs + 1):
         
         #Reduce by 0.1 times at 10th and 60th epoch
-        if epoch == 20:
-            #print("reducing learing rate")
+        if epoch == 60:
+            print("reducing learing rate")
             optimizer.param_groups[0]['lr'] = 0.01
         elif epoch == 120:
-            #print("reducing learning rate again")
+            print("reducing learning rate again")
             optimizer.param_groups[0]['lr'] = 0.001
 
         total_loss = 0
@@ -203,8 +203,10 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
             
             #print("ratio: ", y_classes)
 
-            #print("Lens: ", len(out), len(data_y[0]), out.shape, data_y[0].shape)         
+            #print("Lens: ", len(out), len(data_y[0]), out.shape, data_y[0].shape)  
+            #out = modify_loss(out, data_y[0])      
             loss = criterion(out, data_y[0]) / len(loader[0])
+
             total_loss = total_loss + loss
             out = F.softmax(out, dim=1)
             acc =  acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loader[0])
@@ -292,11 +294,33 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
             out = model(data_x, data_i, data_b, train)
             loss = criterion(out, data_y[0]) / len(loaders[0]) 
             total_loss = total_loss + loss
-       
             out = F.log_softmax(out, dim=1)
+            if validation == False:
+                print("out: ", out, out.argmax(dim=1))
+
             if validation == False:
                 print("guesses: ", out.argmax(dim=1))
                 print("actuall: ", data_y[0])
+
             acc = acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loaders[0])
 
     return total_loss, acc
+
+
+def modify_loss(out, actual):
+    predictions = out.argmax(dim=1)
+    new_out = []
+    for i, row in enumerate(out):
+        new_row = row.tolist()
+        if actual[i] != predictions[i]:
+            #If 0 and 2 gettting mixed up, doesn't matter
+            if actual[i] == 0 and predictions[i] == 2 or actual[i] == 2 and predictions[i] == 0:
+                tmp = 0
+            else:
+                #print("calling?", predictions[i], actual[i])
+                #Make incorrect prediction WAY wronger
+                new_row[actual[i].item()] *= 1.7
+
+        new_out.append(new_row)
+
+    return torch.tensor(new_out, requires_grad=True).to("cuda")
