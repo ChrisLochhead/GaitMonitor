@@ -56,13 +56,25 @@ class JointDataset(Dataset):
     def process(self):
         self.data = pd.read_csv(self.raw_paths[0], header=None)
         self.data = convert_to_literals(self.data)
+
+        if self.person != None:
+            self.data = self.data[self.data.iloc[:, 5] == self.person]
+
+            instances = []
+            for index, row in self.data.iterrows():
+                if row[0] not in instances:
+                    instances.append(row[0])
+            
+            print("instances: ", len(instances), instances)
+
         coo_matrix = get_COO_matrix(self.joint_connections)
 
         if self.cycles:
             #Full cycles per instance
             #self.data_cycles = HCF.split_by_instance(self.data.to_numpy())
             #Several cycles per instance
-            self.data_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None, person = self.person)
+            print("data length: ", len(self.data))
+            self.data_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
             #self.data_cycles = HCF.alternate_get_gait_cycles(self.data.to_numpy(), None)
             self.data_cycles = HCF.sample_gait_cycles(self.data_cycles)
             self.data_cycles = HCF.normalize_gait_cycle_lengths(self.data_cycles)

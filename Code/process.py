@@ -217,7 +217,7 @@ def load_5_region_data(folder = "Chris"):
 
 #Types are 1 = normal, 2 = HCF, 3 = 2 region, 4 = 5 region, 5 = Dummy. Pass types as an array of type numbers, always put hcf (2) at the END if including. If including HCF, you MUST include
 #as cycles = True
-def load_datasets(types, folder):
+def load_datasets(types, folder, person = None):
     datasets = []
     print("loading datasets...")
         
@@ -235,7 +235,7 @@ def load_datasets(types, folder):
             
             #7 co-ordinates on their own
             datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
-                                                    joint_connections=Render.joint_connections_m_hip, cycles=True, person = 3))
+                                                    joint_connections=Render.joint_connections_m_hip, cycles=True, person = person))
 
             #19 simplified dataset
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/19_Normal_Only', '19_Normal_Only.csv',
@@ -386,10 +386,10 @@ def process_autoencoder(folder, num_epochs, batch_size):
 
     #Compress
 
-def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_one_out):
+def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_one_out, person):
 
     #Load the full dataset alongside HCF with gait cycles
-    datasets = load_datasets(dataset_types, folder)
+    datasets = load_datasets(dataset_types, folder, person)
     print("datasets here: ", datasets)
     #Concatenate data dimensions for ST-GCN
     data_dims = []
@@ -451,7 +451,7 @@ if __name__ == '__main__':
     #Leave_one_out: indicates whether using normally split data or data split by person
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 16, epochs = 150, folder="WeightGait", leave_one_out=False)
+           batch_size = 16, epochs = 150, folder="weightgait", leave_one_out=False, person = 3)
 
     #Full datset can overfit at 130 - 180 epochs at 8 batch size
     #Full dataset at 16 overfits at <100 epochs
