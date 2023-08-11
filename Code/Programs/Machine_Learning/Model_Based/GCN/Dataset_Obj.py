@@ -13,7 +13,7 @@ import copy
 
 class JointDataset(Dataset):
     def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip,
-                  cycles = False, meta = 5, person = None):
+                  cycles = False, meta = 5, person = None, preset_cycle = None):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
@@ -28,6 +28,7 @@ class JointDataset(Dataset):
         self.meta = meta
         self.cycle_indices = []
         self.person = person
+        self.preset_cycle = preset_cycle
         super(JointDataset, self).__init__(root, transform, pre_transform)
         
     @property
@@ -52,6 +53,24 @@ class JointDataset(Dataset):
     def download(self):
         pass
                
+    
+    def set_gait_cycles(self, data):
+        new_cycles = []
+        data_iter = 0
+        print("len data in set should be 1960: ", len(data))
+        for i, cycle in enumerate(self.preset_cycle):
+            new_cycle = []
+            for j, frame in enumerate(cycle):
+                print("data iter: ", data_iter, len(self.preset_cycle), len(cycle))
+                new_cycle.append(data[data_iter])
+                data_iter += 1
+            new_cycles.append(new_cycle)
+        
+        print("final lens: ", len(new_cycles), len(self.preset_cycle))
+        return new_cycles
+
+
+
 
     def process(self):
         self.data = pd.read_csv(self.raw_paths[0], header=None)
@@ -74,9 +93,21 @@ class JointDataset(Dataset):
             #self.data_cycles = HCF.split_by_instance(self.data.to_numpy())
             #Several cycles per instance
             print("data length: ", len(self.data))
-            self.data_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
+            if self.preset_cycle == None:
+                self.base_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
+                counter = 0
+                for cycle in self.base_cycles:
+                    print("cycle: ", len(cycle))
+                    for frame in cycle:
+                        counter +=1
+
+                print("counter? ", counter, len(self.base_cycles))
+
+            else:
+                self.base_cycles = self.set_gait_cycles(self.data.to_numpy())
+
             #self.data_cycles = HCF.alternate_get_gait_cycles(self.data.to_numpy(), None)
-            self.data_cycles = HCF.sample_gait_cycles(self.data_cycles)
+            self.data_cycles = HCF.sample_gait_cycles(copy.deepcopy(self.base_cycles))
             self.data_cycles = HCF.normalize_gait_cycle_lengths(self.data_cycles)
             self.data_cycles = Creator.interpolate_gait_cycle(self.data_cycles, None)
 

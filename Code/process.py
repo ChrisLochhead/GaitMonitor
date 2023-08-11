@@ -233,10 +233,16 @@ def load_datasets(types, folder, person = None):
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_4_people', '20_4_people.csv',
             #                                       joint_connections=Render.joint_connections_m_hip, cycles=True))
             
-            #7 co-ordinates on their own
+            #7 3s co-ords
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
             #                                        joint_connections=Render.joint_connections_m_hip, cycles=True, person = person))
 
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/9_Velocity_Data(flipped)', '9_Velocity_Data(flipped).csv',
+            #                                        joint_connections=Render.joint_connections_m_hip, cycles=True, person = person, preset_cycle = datasets[0].base_cycles))
+            
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/10_Bones_Data(integrated)', '10_Bones_Data(integrated).csv',
+            #                                        joint_connections=Render.joint_connections_m_hip, cycles=True, person = person, preset_cycle = datasets[0].base_cycles))
+            
             #19 simplified dataset
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/19_Normal_Only', '19_Normal_Only.csv',
             #                                        joint_connections=Render.joint_connections_no_head_m_hip, cycles=True))
