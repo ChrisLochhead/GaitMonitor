@@ -5,16 +5,22 @@ import datetime
 import torch
 
 #Local files
-from Programs.Data_Recording import Capture as capture
-from Programs.Data_Processing.Model_Based.Utilities import numericalSort
+#from Programs.Data_Recording import Capture as capture
+#2from Programs.Data_Processing.Model_Free.Utilities import numericalSort
 import re
 
 #Torch
 import torch
 
 #MaskCNN only works on the PC version of this app, the Jetson Nano doesn't support python 3.7
-if sys.version_info[:3] > (3, 7, 0):
-    import maskcnn
+#if sys.version_info[:3] > (3, 7, 0):
+#    import Programs.Machine_Learning.Model_Free.Mask_RCNN.samples.maskcnn as maskcnn
+
+def numericalSort(value):
+    numbers = re.compile(r'(\d+)')
+    parts = numbers.split(value)
+    parts[1::2] = map(int, parts[1::2])
+    return parts
 
 #Colour tags for console
 class c_colours:
@@ -36,7 +42,8 @@ def reorder_folders(path):
             print("Dir: ",i,  dir)
             print("renaming: ", os.path.join(subdir, dir))
             os.rename(os.path.join(subdir, dir), os.path.join(subdir, str("Instance_" + str(i) + ".0")))
-        break
+        
+
 
 def clear_console():
     command = 'clear'
@@ -44,13 +51,13 @@ def clear_console():
         command = 'cls'
     os.system(command)
    
-def run_camera(path="./Images/Instances/", v=0):
+#def run_camera(path="./Images/Instances/", v=0):
     #try:
-    camera = capture.Camera()
+    #camera = capture.Camera()
 
-    out_condition = camera.run(path="./Images/", verbose=v)
+    #out_condition = camera.run(path="./Images/", verbose=v)
 
-    return out_condition
+ #   return out_condition
     #except:
     #    main("No camera detected, returning to main menu")
     
@@ -78,7 +85,8 @@ def on_press(key):
 
             elif current_menu == 2:
                 if selected_function == 0:
-                    capture_paused = run_camera(v=0)
+                    pass
+                    #capture_paused = run_camera(v=0)
 
                 if capture_paused:
                     restart_time = reset_capture_timer()
@@ -87,13 +95,14 @@ def on_press(key):
         if key.char == '2':
             if current_menu == 2:
                 if selected_function == 0:
-                    capture_paused = run_camera(v=1)
+                    pass
+                    #capture_paused = run_camera(v=1)
                     if capture_paused:
                         restart_time = reset_capture_timer()
                 main()
             elif current_menu == 0:
                 print("reordering folders")
-                reorder_folders("./Images")
+                reorder_folders("./Code/Datasets/WeightGait/Full_Dataset/Wanok")
         if key.char == '3':
             if current_menu == 2:
                 main()
@@ -167,8 +176,8 @@ def main(error_message = None, init = False, repeat_loop = True):
                 if restart_time < datetime.datetime.now():
                     restart_time = None
                     main_loop = False
-                    out_condition = run_camera(v=1)
-                    capture_paused = out_condition
+                    #out_condition = run_camera(v=1)
+                    #capture_paused = out_condition
 
                     #Reset delay
                     if capture_paused:

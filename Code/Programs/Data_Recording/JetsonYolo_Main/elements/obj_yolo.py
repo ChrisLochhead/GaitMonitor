@@ -1,8 +1,8 @@
 import torch
 import cv2
 import numpy as np
-from experimental import attempt_load
-from general import non_max_suppression
+from Programs.Data_Recording.JetsonYolo_Main.models.experimental import attempt_load
+from Programs.Data_Recording.JetsonYolo_Main.utils.general import non_max_suppression
 #from models.yolo import Detect, Model
 import time
 

@@ -21,9 +21,9 @@ import torch
 import torchvision
 import yaml
 
-from google_utils import gsutil_getsize
-from metrics import fitness
-from torch_utils import init_torch_seeds
+from Programs.Data_Recording.JetsonYolo_Main.utils.google_utils import gsutil_getsize
+from Programs.Data_Recording.JetsonYolo_Main.utils.metrics import fitness
+from Programs.Data_Recording.JetsonYolo_Main.utils.torch_utils import init_torch_seeds
 
 # Settings
 torch.set_printoptions(linewidth=320, precision=5, profile='long')

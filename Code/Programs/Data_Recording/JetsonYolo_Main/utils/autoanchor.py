@@ -5,8 +5,7 @@ import torch
 import yaml
 from tqdm import tqdm
 
-#from utils.general import colorstr
-from general import colorstr
+from Programs.Data_Recording.JetsonYolo_Main.utils.general import colorstr
 
 def check_anchor_order(m):
     # Check anchor order against stride order for YOLOv5 Detect() module m, and correct if necessary

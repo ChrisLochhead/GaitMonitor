@@ -14,9 +14,9 @@ import matplotlib
 import shutil
 
 #Local files
-import JetsonYolo
+import Programs.Data_Recording.JetsonYolo_Main.models.JetsonYolo as JetsonYolo
+from Programs.Data_Processing.Model_Free.Utilities import numericalSort
 import torch
-from Utilities import numericalSort
 
 #Torch and SKlearn
 from torchvision.transforms import ToTensor, Lambda

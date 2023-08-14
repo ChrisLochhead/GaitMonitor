@@ -3,15 +3,10 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from Programs.Data_Recording.JetsonYolo_Main.models.common import Conv, DWConv
+from Programs.Data_Recording.JetsonYolo_Main.utils.google_utils import attempt_download
+import Programs.Data_Recording.JetsonYolo_Main.models.yolo as yolo
 
-#from hallwayprograms.human_detector.JetsonYolo_Main.models.common import Conv, DWConv
-#from hallwayprograms.human_detector.JetsonYolo_Main.utils.google_utils import attempt_download
-from common import Conv, DWConv
-from google_utils import attempt_download
-#from yolo import Detect, Model
-import yolo
-#from models.common import Conv, DWConv
-#from utils.google_utils import attempt_download
 
 
 class CrossConv(nn.Module):

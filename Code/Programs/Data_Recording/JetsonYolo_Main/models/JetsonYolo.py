@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
-#from hallwayprograms.human_detector.JetsonYolo_Main.elements.yolo import OBJ_DETECTION
-from obj_yolo import OBJ_DETECTION
+from Programs.Data_Recording.JetsonYolo_Main.elements.obj_yolo import OBJ_DETECTION
 
 Object_classes =['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
                 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',

@@ -13,12 +13,12 @@ import matplotlib
 from scipy import stats
 
 #Local files
-import JetsonYolo
+import Programs.Data_Recording.JetsonYolo_Main.models.JetsonYolo as JetsonYolo
 #import ImageProcessor
 #import GEI
 import torch
-import LocalResnet
-import Ensemble
+import Programs.Machine_Learning.Model_Free.Resnet.Ensemble as Ensemble
+import Programs.Machine_Learning.Model_Free.Resnet.LocalResnet as LocalResnet
 
 #Torch and SKlearn
 from torchvision.transforms import ToTensor, Lambda
@@ -29,7 +29,8 @@ from statsmodels.stats.contingency_tables import mcnemar
 
 #Only works on the PC version of this app, Jetson doesn't support python 3.7
 if sys.version_info[:3] > (3, 7, 0):
-    import maskcnn
+    import Programs.Machine_Learning.Model_Free.Mask_RCNN.samples.maskcnn as maskcnn
+    
 #For printing matplotlib charts from command prompt
 matplotlib.use('TkAgg')
 

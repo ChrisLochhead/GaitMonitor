@@ -21,9 +21,8 @@ import matplotlib.pyplot as plt
 import os
 import numpy as np
 import cv2
-import LocalResnet
-#Local files
-import Utilities
+import Programs.Machine_Learning.Model_Free.Resnet.LocalResnet as LocalResnet
+import Programs.Data_Processing.Model_Free.Utilities as Utilities
 
 #SKLearn
 import skimage.io as sk

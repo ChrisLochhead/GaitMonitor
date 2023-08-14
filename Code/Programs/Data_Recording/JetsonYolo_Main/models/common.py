@@ -12,10 +12,11 @@ import torch.nn as nn
 from PIL import Image
 from torch.cuda import amp
 
-from datasets import letterbox
-from general import non_max_suppression, make_divisible, scale_coords, increment_path, xyxy2xywh, save_one_box
-from plots import colors, plot_one_box
-from torch_utils import time_synchronized
+from Programs.Data_Recording.JetsonYolo_Main.utils.datasets import letterbox
+from Programs.Data_Recording.JetsonYolo_Main.utils.general import non_max_suppression, make_divisible, scale_coords, increment_path, xyxy2xywh, save_one_box
+from Programs.Data_Recording.JetsonYolo_Main.utils.plots import colors, plot_one_box
+from Programs.Data_Recording.JetsonYolo_Main.utils.torch_utils import time_synchronized
+
 
 #from utils.datasets import letterbox
 #from utils.general import non_max_suppression, make_divisible, scale_coords, increment_path, xyxy2xywh, save_one_box

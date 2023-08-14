@@ -15,8 +15,8 @@ import pandas as pd
 import torch
 import yaml
 from PIL import Image, ImageDraw, ImageFont
-from general import xywh2xyxy, xyxy2xywh
-from metrics import fitness
+from Programs.Data_Recording.JetsonYolo_Main.utils.general import xywh2xyxy, xyxy2xywh
+from Programs.Data_Recording.JetsonYolo_Main.utils.metrics import fitness
 
 # Settings
 matplotlib.rc('font', **{'size': 11})

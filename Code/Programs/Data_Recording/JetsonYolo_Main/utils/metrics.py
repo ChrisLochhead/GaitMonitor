@@ -5,7 +5,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import general
+import Programs.Data_Recording.JetsonYolo_Main.utils.general as general
 
 def fitness(x):
     # Model fitness as a weighted combination of metrics

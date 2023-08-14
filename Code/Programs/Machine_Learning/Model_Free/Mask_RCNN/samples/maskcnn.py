@@ -7,8 +7,8 @@ import skimage.io
 import matplotlib
 import matplotlib.pyplot as plt
 import cv2
-#from Utilities import numericalSort, make_directory
-import Utilities
+import Programs.Data_Processing.Model_Free.Utilities as Utilities
+
 # Root directory of the project
 #C:\Users\Chris\Desktop\PhDProject\PhDSummerProject\Programs\mask_network\Mask_RCNN
 ROOT_DIR = os.path.abspath("../") + "/PhDSummerProject/Programs/mask_network/Mask_RCNN"
@@ -18,12 +18,14 @@ warnings.filterwarnings("ignore")
 
 # Import Mask RCNN
 sys.path.append(ROOT_DIR)  # To find local version of the library
-from mrcnn import utils
-import mrcnn.model as modellib
-from mrcnn import visualize
+import Programs.Machine_Learning.Model_Free.Mask_RCNN.mrcnn.utils as utils
+import Programs.Machine_Learning.Model_Free.Mask_RCNN.mrcnn.model as modellib
+from Programs.Machine_Learning.Model_Free.Mask_RCNN.mrcnn import visualize
+
 # Import COCO config
 sys.path.append(os.path.join(ROOT_DIR, "samples/coco/"))  # To find local version
-import coco
+import Programs.Machine_Learning.Model_Free.Mask_RCNN.samples.coco as coco
+
 
 ########## Silhouette functions #################
 #################################################

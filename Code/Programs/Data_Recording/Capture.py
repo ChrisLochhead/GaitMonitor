@@ -5,12 +5,13 @@ import os
 import time
 import cv2
 import numpy as np
-import JetsonYolo
+import Programs.Data_Recording.JetsonYolo_Main.models.JetsonYolo as JetsonYolo
 from PIL import Image
 from pynput.keyboard import Key, Listener, KeyCode
 import os
 import copy
-import File_Decimation
+import Programs.Data_Processing.Model_Free.File_Decimation as File_Decimation
+#import File_Decimation
 import datetime
 import csv
 

@@ -25,7 +25,7 @@ import cv2
 import random
 
 #Local files
-import Utilities #from Utilities import numericalSort
+import Programs.Data_Processing.Model_Free.Utilities as Utilities
 
 #SKLearn
 import skimage.io as sk

@@ -20,8 +20,8 @@ def process_data(folder = "Chris"):
 ############################################# PIPELINE ##################################################################
 
     #Extract joints from images
-    #run_images("./Code/Datasets/" + str(folder) + "/Full_Dataset", out_folder="./Code/Datasets/Joint_Data/" + str(folder) + "/", exclude_2D=False, 
-    #           start_point=0)
+    run_images("./Code/Datasets/" + str(folder) + "/Full_Dataset", out_folder="./Code/Datasets/Joint_Data/" + str(folder) + "/", exclude_2D=False, 
+               start_point=0)
 
     
     #Sort class labels (for 0ffice Images_chris this is 20-0, 20-1, 20-2)
@@ -35,10 +35,10 @@ def process_data(folder = "Chris"):
     #                     size = 20, delay=True, use_depth=True)
 
     #Remove empty frames
-    #abs_joint_data, image_data = Creator.process_empty_frames(joint_file="./Code/Datasets/Joint_Data/" + str(folder) + "/Absolute_Data.csv",
-    #                                             image_file="./Code/Datasets/" + str(folder) + "/Full_Dataset/",
-    #                                             joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/2_Absolute_Data(empty frames removed)",
-    #                                             image_output="./Code/Datasets/" + str(folder) + "/2_Empty Frames Removed/")
+    abs_joint_data, image_data = Creator.process_empty_frames(joint_file="./Code/Datasets/Joint_Data/" + str(folder) + "/Absolute_Data.csv",
+                                                 image_file="./Code/Datasets/" + str(folder) + "/Full_Dataset/",
+                                                 joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/2_Absolute_Data(empty frames removed)",
+                                                 image_output="./Code/Datasets/" + str(folder) + "/2_Empty Frames Removed/")
 
     #Display first 2 instances of results
     print("\nStage 2: ")
@@ -46,9 +46,9 @@ def process_data(folder = "Chris"):
     #render_joints_series(image_data, abs_joint_data, size=15, plot_3D=True)
     
     #Trim start and end frames where joints get confused by image borders
-    #abs_joint_data, image_data =Creator.process_trimmed_frames(abs_joint_data, image_data,
-    #                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)",
-    #                                                    image_output="./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", trim = 5)
+    abs_joint_data, image_data =Creator.process_trimmed_frames(abs_joint_data, image_data,
+                                                        joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)",
+                                                        image_output="./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", trim = 5)
 
     abs_joint_data, image_data = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)/raw/3_Absolute_Data(trimmed instances).csv",
                                                               "./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
@@ -440,7 +440,7 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    #process_data("Chris")
+    process_data("WeightGait")
     #process_autoencoder("Elisa", 100, 8)
 
     #Run the model:
@@ -458,8 +458,8 @@ if __name__ == '__main__':
     #Person: full dataset only, denotes which person to extract otherwise 0 or none.
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
-    run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 16, epochs = 80, folder="Chris", leave_one_out=False, person = None, label = 5 )
+    #run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
+    #       batch_size = 16, epochs = 80, folder="Chris", leave_one_out=False, person = None, label = 5 )
 
 
     #64% on single dataset, 16 batch, 300 epoch, 1.5% punishment weightgait version of Chris

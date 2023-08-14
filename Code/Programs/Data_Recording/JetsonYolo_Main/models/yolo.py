@@ -13,11 +13,11 @@ from pathlib import Path
 sys.path.append(Path(__file__).parent.parent.absolute().__str__())  # to run '$ python *.py' files in subdirectories
 logger = logging.getLogger(__name__)
 
-from common import *
-from experimental import *
-from autoanchor import check_anchor_order
-from general import make_divisible, check_file, set_logging
-from torch_utils import time_synchronized, fuse_conv_and_bn, model_info, scale_img, initialize_weights, \
+from Programs.Data_Recording.JetsonYolo_Main.models.common import *
+from Programs.Data_Recording.JetsonYolo_Main.models.experimental import *
+from Programs.Data_Recording.JetsonYolo_Main.utils.autoanchor import check_anchor_order
+from Programs.Data_Recording.JetsonYolo_Main.utils.general import make_divisible, check_file, set_logging
+from Programs.Data_Recording.JetsonYolo_Main.utils.torch_utils import time_synchronized, fuse_conv_and_bn, model_info, scale_img, initialize_weights, \
     select_device, copy_attr
 
 #from models.common import *
