@@ -171,10 +171,10 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
     for epoch in range(epochs + 1):
         
         #Reduce by 0.1 times at 10th and 60th epoch
-        if epoch == 80:
+        if epoch == 40:
             print("reducing learing rate")
             optimizer.param_groups[0]['lr'] = 0.01
-        elif epoch == 140:
+        elif epoch == 80:
             print("reducing learning rate again")
             optimizer.param_groups[0]['lr'] = 0.001
 
@@ -205,7 +205,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
 
             #print("Lens: ", len(out), len(data_y[0]), out.shape, data_y[0].shape)  
 
-            out = modify_loss(out, data_y[0])    
+            #out = modify_loss(out, data_y[0])    
               
             loss = criterion(out, data_y[0]) / len(loader[0])
 

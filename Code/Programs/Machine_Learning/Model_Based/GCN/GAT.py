@@ -140,4 +140,4 @@ class MultiInputGAT(torch.nn.Module):
         #h = F.dropout(h, p=0.1, training=train)
         h = self.lin3(h)
 
-        return F.sigmoid(h), h
+        return h

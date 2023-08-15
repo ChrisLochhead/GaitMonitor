@@ -111,7 +111,7 @@ class JointDataset(Dataset):
             self.data_cycles = HCF.normalize_gait_cycle_lengths(self.data_cycles)
             self.data_cycles = Creator.interpolate_gait_cycle(self.data_cycles, None)
 
-            print("here's the cycles: ", len(self.data_cycles))
+            print("here's the cycles: ", len(self.data_cycles), len(self.data_cycles[0]))
 
             self.num_nodes_per_graph = len(self.data.columns) - self.meta - 1
 

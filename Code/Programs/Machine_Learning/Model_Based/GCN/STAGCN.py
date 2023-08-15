@@ -1,24 +1,26 @@
 import torch
 from torch.nn import Linear
 import torch.nn.functional as F
-from torch_geometric.nn import global_add_pool,  GATv2Conv
+from torch_geometric.nn import global_add_pool,  GATv2Conv, ChebConv
 from torch.nn import Linear, BatchNorm1d, ReLU
 from Programs.Machine_Learning.Model_Based.GCN.Dataset_Obj import *
 
 #Basic ST-GCN Block. These can only be stacked in lists not Torch.NN.Sequentials 
 #because forward takes multiple inputs which causes problem even in custom sequential implementations.
 class STGCNBlock(torch.nn.Module):
-    def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size):
+    def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, spatial_size):
         super(STGCNBlock, self).__init__()
         #Layers
         self.b0 = BatchNorm1d(in_channels).to("cuda")
         #self.temporal_conv1 = torch.nn.Conv1d(in_channels, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to("cuda")
         self.spatial_conv = GATv2Conv(in_channels, dim_h, heads=1).to("cuda")
+        #self.spatial_conv = ChebConv(in_channels, dim_h, 1).to("cuda")
         self.b1 = BatchNorm1d(dim_h).to("cuda")
         self.temporal_conv2 = torch.nn.Conv1d(dim_h, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to("cuda")
         self.relu = ReLU()
         self.dropout = torch.nn.Dropout(0.5)
         self.skip_connection = torch.nn.Conv1d(in_channels, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to("cuda")
+
         #Shape Info
         self.batch_size = batch_size
         self.cycle_size = cycle_size
@@ -37,8 +39,11 @@ class STGCNBlock(torch.nn.Module):
         #Convert to 3D representation for Temporal layer (Batch, Channel, Cycle)
         x = self.dropout(x)
         x = x.view(self.batch_size, x.shape[1], self.cycle_size)
+        x = x.view(x.shape[1], x.shape[0], self.cycle_size)
+        x = torch.transpose(x, 0, 1)
         x = self.relu(self.b1(self.temporal_conv2(x)))
-
+        x = x.view(x.shape[1], x.shape[0], self.cycle_size)
+        x = torch.transpose(x, 0, 1)
         #print("shapes: ", residual.shape, x.shape)
         x = residual + x
 
@@ -46,7 +51,7 @@ class STGCNBlock(torch.nn.Module):
 
 class MultiInputSTGACN(torch.nn.Module):
     def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 3, stgcn_filters = [16, 32, 32], 
-                 max_cycle = 20, num_nodes_per_graph = 18):
+                 max_cycle = 49, num_nodes_per_graph = 18):
         super(MultiInputSTGACN, self).__init__()
 
         dim_half = int(dim_h/2)
@@ -80,9 +85,9 @@ class MultiInputSTGACN(torch.nn.Module):
             else:
             #Every other possible input will be processed via an ST-GCN block which needs to be appended in a list instead of a sequential.
                 i_stream = []
-                i_stream.append(STGCNBlock(self.dim_in[0], self.stgcn_filters[0], 5, self.batch_size, self.cycle_size))
+                i_stream.append(STGCNBlock(self.dim_in[0], self.stgcn_filters[0], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph))
                 for i in range(1, self.size_stgcn):
-                    i_stream.append(STGCNBlock(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size))
+                    i_stream.append(STGCNBlock(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph))
 
                 self.streams.append(i_stream)
         

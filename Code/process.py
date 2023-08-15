@@ -221,18 +221,18 @@ def load_datasets(types, folder, person = None):
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_Combined_Noise', '15.5_Combined_Noise.csv',
-                                                    joint_connections=Render.joint_connections_m_hip, cycles=True))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
+            #                                        joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #20 multi person DATASET
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_4_people', '20_4_people.csv',
             #                                       joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #7 3s co-ords
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
-            #                                        joint_connections=Render.joint_connections_m_hip, cycles=True, person = person))
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
+                                                    joint_connections=Render.joint_connections_m_hip, cycles=True, person = person))
 
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/9_Velocity_Data(flipped)', '9_Velocity_Data(flipped).csv',
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/8_Velocity_Data(velocity)', '8_Velocity_Data(velocity).csv',
             #                                        joint_connections=Render.joint_connections_m_hip, cycles=True, person = person, preset_cycle = datasets[0].base_cycles))
             
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/10_Bones_Data(integrated)', '10_Bones_Data(integrated).csv',
@@ -263,17 +263,7 @@ def load_datasets(types, folder, person = None):
             datasets.append(r_l)
             datasets.append(l_a)
             datasets.append(r_a)
-            datasets.append(h)
-        #Type 5: Dataset with dummy datapoints
-        elif t == 5:
-            #Dummy dataset
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/0_Dummy_Data_15.5',
-                                                      '0_Dummy_Data_15.5.csv',
-                                                    joint_connections=Render.joint_connections_m_hip, cycles=True))
-            
-            #15.5 COMBINED DATASET (original version of the dummy dataset)
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
-                                                    joint_connections=Render.joint_connections_m_hip, cycles=True))                        
+            datasets.append(h)     
 
     print("datasets loaded.")
     #Return requested datasets
@@ -424,13 +414,13 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     model = model.to("cuda")
 
     train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                     k_fold=5, batch=batch_size, epochs=epochs, type=model_type)
+                                                                     k_fold=10, batch=batch_size, epochs=epochs, type=model_type)
 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    process_data("Chris")
+    #process_data("Weightgait")
     #process_autoencoder("Elisa", 100, 8)
 
     #Run the model:
@@ -449,42 +439,4 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 16, epochs = 150, folder="Chris", leave_one_out=False, person = None, label = 5 )
-
-
-
-    #FULL DATASET (16 people)
-    #No Loss, 32 batch, 80 epochs
-
-    #64% on single dataset, 16 batch, 300 epoch, 1.5% punishment weightgait version of Chris
-    #by *10 its down to 56%
-    #by *5 its 62.5%
-    #2.5% = 75% (0), 81.25 (7.65), 76.56% (2.71), 85.94% (2.71), 84.38% (6.99)
-    #92.19 (5.18)%, 79.69(2.71) ,89.06% (6.81), 76.56% (9.24%), 73.44%, (9.24)%  on single dataset, 16 batch, 80 epoch, 1.5% punishment weightgait version of Chris w 9D
-    #76.56 (2%)%, 70.31 (5.18%)%, 68.75% (6.25), 87.50% (0), 81.25% (7.65%) on single dataset, 16 batch, 300 epoch, 0% punishment weightgait version of Chris w 9D
-    #totals: with punishment = 82.18% (6.636)
-    #        without         = 76.8% (4.216)
-    #        with 2.5%       = 80.626% (4.012)
-
-    #Full dataset one person only (person 0) : 61%
-    #Bob = random (32%)
-    #Cade = worse than random (25%)
-    #Elisa = random (35%)
-    #Longfei = decent (55%)
-    #Pheobe = decent (62%)
-    #Sean C = less than decent (40%)
-    #Sean G = random (37%, 52%, 65%, 50%) 40 epochs: (62%, 50%)
-    #Two people (0, 1) = random
-    #4 best people gives 57% tiny variance
-
-    # try 1,2,3,4 with multiple datasets (need to implement code for that)
-    #Find where it just stops working on valid, need bigger network probably (4 layers, 128,128,256,256 is what paper used
-    # Test on telling people apart as the class
-
-    #TODO
-    #Reprocess weight gait using best dataset and highest weights
-    #Fix 2 and 5 region with new gait cycles
-    #Fix for HCF too
-    #Make 2 and 3s version to compare with fused data
-    #Try weightgait with 9D data instead of 3D
-
+           batch_size = 16, epochs = 100, folder="Chris", leave_one_out=False, person = None, label = 5 )
