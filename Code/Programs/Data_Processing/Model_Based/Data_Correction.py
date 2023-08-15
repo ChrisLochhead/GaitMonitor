@@ -134,6 +134,7 @@ def remove_empty_frames(joint_data, image_data, meta_data = 5):
     cleaned_joints = []
     cleaned_images = []
     for i, row in enumerate(tqdm(joint_data)):
+        print("Image: ", i, "of ", len(joint_data), len(image_data))
         empty_coords = 0
         for j, coord in enumerate(row):
             if j > meta_data:
@@ -206,7 +207,7 @@ def correct_joints_data(image_file, joint_file, save = False, pixels = True):
             cv2.imwrite(directory + "/" + file_no + ".jpg", image_data[i])
 
     #Fix head coordinates on what's left
-    normalize_head_coords(joint_data, image_data)
+    #normalize_head_coords(joint_data, image_data)
 
     print("finished length of joints: ", len(finished_joint_data))
     #Finally finish joints

@@ -171,10 +171,10 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
     for epoch in range(epochs + 1):
         
         #Reduce by 0.1 times at 10th and 60th epoch
-        if epoch == 20:
+        if epoch == 80:
             print("reducing learing rate")
             optimizer.param_groups[0]['lr'] = 0.01
-        elif epoch == 60:
+        elif epoch == 140:
             print("reducing learning rate again")
             optimizer.param_groups[0]['lr'] = 0.001
 
@@ -323,7 +323,7 @@ def modify_loss(out, actual):
                 #print("calling?", predictions[i], actual[i])
                 #Make incorrect prediction WAY wronger
                 #new_row[predictions[i].item()] *= 1.0
-                new_out[i][predictions[i].item()] *= 5.0
+                new_out[i][predictions[i].item()] *= 1.5
 
         #new_out.append(new_row)
 

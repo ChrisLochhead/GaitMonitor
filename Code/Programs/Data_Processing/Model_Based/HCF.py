@@ -13,7 +13,7 @@ def split_by_instance(joint_data, pad = True):
         if row[1] > max_instance_length:
             max_instance_length = row[1]
 
-    print("max length: ", max_instance_length)
+    #print("max length: ", max_instance_length)
 
     #set padded sequences to 40 unless there's examples that are bigger, otherwise set it to that.
     std_inst_length = 40
@@ -143,7 +143,7 @@ def get_time_LofG(gait_cycles, velocity_joints, images):
         frames_not_moving = 0
         for j, joints in enumerate(frame):
             #Calculate relative velocities between hips and feet
-            print("values: ", image_iter, len(velocity_joints[image_iter]))
+            #print("values: ", image_iter, len(velocity_joints[image_iter]))
             left_velocity = abs(velocity_joints[image_iter][21][0]) + abs(velocity_joints[image_iter][21][1])+ abs(velocity_joints[image_iter][21][2])\
                 + abs(velocity_joints[image_iter][17][0])+ abs(velocity_joints[image_iter][17][1]+ abs(velocity_joints[image_iter][17][2]))
             right_velocity = abs(velocity_joints[image_iter][22][0]) + abs(velocity_joints[image_iter][22][1])+ abs(velocity_joints[image_iter][22][2])\

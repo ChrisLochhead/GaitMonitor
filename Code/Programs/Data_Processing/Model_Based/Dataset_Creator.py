@@ -72,6 +72,14 @@ def create_fused_dataset(data, joint_output, meta = 6):
     Utilities.save_dataset(fused_dataset, joint_output)
     return meta_data
 
+def normalize_hcf(data, joint_output):
+    # create scaler
+    scaler = StandardScaler()
+    # fit scaler on data
+    scaler.fit(data)
+    # apply transform
+    standardized = scaler.transform(data)
+    return standardized
 
 def new_normalize_values(data, joint_output, joint_size):
     # create scaler
@@ -196,7 +204,7 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joints_output, meta
     rel_data, images = Utilities.process_data_input(rel_data, images)
     vel_data, _ = Utilities.process_data_input(vel_data, None)
     angle_data, _ = Utilities.process_data_input(angle_data, None)
-
+    print("combine lens: ", len(rel_data), len(vel_data), len(angle_data), len(rel_data[0]), len(vel_data[0]), len(angle_data[0]))
     combined_dataset = []
     for i, row in enumerate(tqdm(rel_data)):
         #Metadata is the same as usual
@@ -204,6 +212,7 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joints_output, meta
         for j, joint in enumerate(row):
             if j > meta:
                 #print("row before: ", combined_row[0:5])
+                #print("lens: ", len(joint), len(vel_data[i][j]), len(angle_data[i][j]))
                 combined_row.append([joint[0], joint[1], joint[2],
                                      vel_data[i][j][0], vel_data[i][j][1], vel_data[i][j][2], 
                                      angle_data[i][j][0], angle_data[i][j][1], angle_data[i][j][2] ])
@@ -363,6 +372,7 @@ def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output, meta 
     rel_sequence_data = Utilities.generate_relative_sequence_data(sequence_data, rel_data)
 
     flipped_data = [] 
+    print("size before flip: ", len(rel_sequence_data))
     for i, seq in enumerate(tqdm(rel_sequence_data)):
 
         #Get first and last head positions (absolute values)
@@ -370,25 +380,28 @@ def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output, meta 
         last = sequence_data[i][-1]
 
         #This is going from right to left: the ones we want to flip
-        if first[meta+1][1] > last[meta+1][1]:
-            for joints in seq:
-                #Append with metadata
-                flipped_joints = joints[0:meta + 1]
-                for j, joint in enumerate(joints):
-                    #Flip X value on each individual co-ordinate
-                    if j > meta:
-                        flipped_joints.append([joint[0], -joint[1], joint[2]])
-                #Append flipped joints instance to the list
-                flipped_data.append(flipped_joints)
+        #if first[meta+1][1] > last[meta+1][1]:
+        for joints in seq:
+            #Append original data
+            flipped_data.append(joints)
+            #Append with metadata
+            flipped_joints = joints[0:meta + 1]
+            for j, joint in enumerate(joints):
+                #Flip X value on each individual co-ordinate
+                if j > meta:
+                    flipped_joints.append([joint[0], -joint[1], joint[2]])
+            #Append flipped joints instance to the list
+            flipped_data.append(flipped_joints)
 
-        else:
+        #else:
         #Just add the data sequentially for the joints already going from left to right.
-            for joints in seq:
-                flipped_data.append(joints)
+        #    for joints in seq:
+        #        flipped_data.append(joints)
 
     
     #Illustrate results
     print("illustrating results: ")
+    print("size after flip: ", len(flipped_data))
     for k, joints in enumerate(flipped_data):
         if k > 20 and k < 50:
             pass
@@ -408,11 +421,11 @@ def create_velocity_dataset(joint_data, image_data, joint_output):
     velocity_dataset = []
     for i, joints in enumerate(tqdm(joint_data)):
         if i+1 < len(joint_data) and i > 0:
-            velocity_dataset.append(Utilities.plot_velocity_vectors(image_data[i], joint_data[i - 1], joints, joint_data[i + 1]))
+            velocity_dataset.append(Utilities.plot_velocity_vectors(None, joint_data[i - 1], joints, joint_data[i + 1]))
         elif i+1 < len(joint_data) and i <= 0:
-            velocity_dataset.append(Utilities.plot_velocity_vectors(image_data[i], [0], joints, joint_data[i + 1]))
+            velocity_dataset.append(Utilities.plot_velocity_vectors(None, [0], joints, joint_data[i + 1]))
         elif i+1 >= len(joint_data) and i > 0:
-            velocity_dataset.append(Utilities.plot_velocity_vectors(image_data[i], joint_data[i - 1], joints, [0]))
+            velocity_dataset.append(Utilities.plot_velocity_vectors(None, joint_data[i - 1], joints, [0]))
     
     Utilities.save_dataset(velocity_dataset, joint_output)
     print("Velocity dataset completed.")
@@ -669,14 +682,13 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
     pre_gait_cycles = hcf.split_by_instance(pre_scale, pad=False)
     gait_cycles = hcf.split_by_instance(abs_joint_data, pad=False)
     rel_gait_cycles = hcf.split_by_instance(rel_joint_data, pad=False)
-    print("cycles: ")
 
     #trend = hcf.get_knee_chart_polynomial(knee_data_cycles)
     knee_data_cycles = Utilities.build_knee_joint_data(pre_gait_cycles, images)
     knee_data_coeffs = Render.chart_knee_data(knee_data_cycles, False)
 
 
-    print("number of total gait cycles: ", len(gait_cycles))
+    #print("number of total gait cycles: ", len(gait_cycles))
     #Then for every gait cycle create a new instance with the following features: 
     #Cadences returns a scalar for every gait cycle returning the number of steps 
     #cadences = get_cadence(gait_cycles, images)
@@ -767,7 +779,7 @@ def create_dummy_dataset(data, output_name):
                 current_sequence = []
 
                 #If we have enough examples of this class now
-                if examples_of_class >= 9:
+                if examples_of_class >= 19:
                     #Move to the next class
                     current_class += 1
                     examples_of_class = 0
@@ -786,7 +798,7 @@ def create_dummy_dataset(data, output_name):
     fake_examples = []
     instance_counter = 0
     for i, example in enumerate(class_examples):
-        for j in range(10):
+        for j in range(2):
             for frame_block in example:
                 for frame in frame_block:
                     print("frame: ", len(frame), len(example[2]), len(example), len(class_examples))
