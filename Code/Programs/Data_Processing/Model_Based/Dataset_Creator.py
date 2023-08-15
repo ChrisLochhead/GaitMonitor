@@ -79,6 +79,7 @@ def normalize_hcf(data, joint_output):
     scaler.fit(data)
     # apply transform
     standardized = scaler.transform(data)
+    Utilities.save_dataset(standardized, joint_output)
     return standardized
 
 def new_normalize_values(data, joint_output, joint_size):
@@ -672,17 +673,33 @@ def transform_gait_cycle_data(cycles, data):
     
     return gait_cycles
 
+def set_gait_cycles(data, preset_cycle):
+    new_cycles = []
+    data_iter = 0
+    print("len data in set should be 1960: ", len(data))
+    for i, cycle in enumerate(preset_cycle):
+        new_cycle = []
+        for j, frame in enumerate(cycle):
+            #print("data iter: ", data_iter, len(preset_cycle), len(cycle))
+            new_cycle.append(data[data_iter])
+            data_iter += 1
+        new_cycles.append(new_cycle)
+    
+    print("final lens: ", len(new_cycles), len(preset_cycle))
+    return new_cycles
+    
 def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, images, joints_output, meta = 5):
     abs_joint_data, images = Utilities.process_data_input(abs_joints, images)
     pre_scale, _ = Utilities.process_data_input(pre_abs_joints, None)
     rel_joint_data, _ =  Utilities.process_data_input(rel_joints, None)
     abs_veljoint_data, _ =  Utilities.process_data_input(abs_veljoints, None)
 
-    print("Building HCF Dataset...")
-    pre_gait_cycles = hcf.split_by_instance(pre_scale, pad=False)
-    gait_cycles = hcf.split_by_instance(abs_joint_data, pad=False)
-    rel_gait_cycles = hcf.split_by_instance(rel_joint_data, pad=False)
+    print("Building HCF Dataset...", len(abs_joint_data), len(rel_joint_data), len(pre_abs_joints))
+    pre_gait_cycles = hcf.get_gait_cycles(pre_abs_joints, None)
+    gait_cycles = set_gait_cycles(abs_joint_data, pre_gait_cycles)
+    rel_gait_cycles = set_gait_cycles(rel_joint_data, pre_gait_cycles)
 
+    print("gait cycle lens: ", len(pre_gait_cycles), len(gait_cycles), len(rel_gait_cycles))
     #trend = hcf.get_knee_chart_polynomial(knee_data_cycles)
     knee_data_cycles = Utilities.build_knee_joint_data(pre_gait_cycles, images)
     knee_data_coeffs = Render.chart_knee_data(knee_data_cycles, False)
@@ -742,6 +759,7 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
    #              "Time_LOG_0", "Time_LOG_1", "Time_No_Movement", "Speed", "Stride_Gap", "Stride_Length", "Max_Gap", 'l_co 1',
    #              'l_co 2', 'l_co 3', 'l_co 4', 'l_co 5', 'l_co 6', 'l_co 7', 'r_co 1', 'r_co 2', 'r_co 3', 'r_co 4', 'r_co 5', 'r_co 6', 'r_co 7']
     if joints_output != None:
+        print("len hcf: ", len(gait_cycles_dataset))
         Utilities.save_dataset(gait_cycles_dataset, joints_output, Utilities.hcf_colnames)
     print("HCF dataset completed.")
     return gait_cycles_dataset

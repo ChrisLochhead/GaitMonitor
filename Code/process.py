@@ -125,19 +125,30 @@ def process_data(folder = "Chris"):
                                                     image_data)
     #print("\nStage 11:", pre_scale[0])
     #Create HCF dataset
-    hcf_data = Creator.create_hcf_dataset(pre_scale, abs_joint_data, relative_joint_data, velocity_data, image_data, 
+    print("\nStage 13:")
+    #Combine datasets (relative, velocity, joint angles, regions)
+
+    #Individually add noise 
+    abs_joint_data = Creator.create_dummy_dataset(abs_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_ABS_Noise")
+
+    relative_joint_data = Creator.create_dummy_dataset(relative_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_REL_Noise")
+
+    velocity_data = Creator.create_dummy_dataset(velocity_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_VEL_Noise")
+
+    joint_bones_data = Creator.create_dummy_dataset(joint_bones_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_BONE_Noise")
+
+    combined_data = Creator.combine_datasets(relative_joint_data, velocity_data, joint_bones_data, image_data,
+                                             joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/15_Combined_Data")
+    
+    #combined_data = Creator.create_dummy_dataset(combined_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_Combined_Noise")
+
+
+    hcf_data = Creator.create_hcf_dataset(abs_joint_data, abs_joint_data, relative_joint_data, velocity_data, image_data, 
                                joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_HCF_Data")
     
     hcf_data_normed = Creator.normalize_hcf(hcf_data, 
                                              joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13.5_HCF_Data(normed)")
     
-    print("\nStage 13:")
-    #Combine datasets (relative, velocity, joint angles, regions)
-    combined_data = Creator.combine_datasets(relative_joint_data, velocity_data, joint_bones_data, image_data,
-                                             joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/15_Combined_Data")
-    
-    combined_data = Creator.create_dummy_dataset(combined_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_Combined_Noise")
-
     
     print("\nStage 14:")
     #Create regions data of combined data
@@ -419,7 +430,7 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    #process_data("Chris")
+    process_data("Chris")
     #process_autoencoder("Elisa", 100, 8)
 
     #Run the model:
