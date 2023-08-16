@@ -178,35 +178,35 @@ def process_data(folder = "Chris"):
         two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_SeanG", [8])
 #########################################################################################################################
 
-def load_2_region_data(folder = "Chris"):
+def load_2_region_data(folder, base):
     top_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/16_Combined_Data_2Region_top',
                                         '16_Combined_Data_2Region_top.csv',
-                                        joint_connections=Render.joint_connections_m_hip, cycles=True)
+                                        joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=base)
     
     bottom_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/16_Combined_Data_2Region_bottom',
                                         '16_Combined_Data_2Region_bottom.csv',
-                                        joint_connections=Render.joint_connections_m_hip, cycles=True)
+                                        joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=base)
            
     return top_region, bottom_region
 
-def load_5_region_data(folder = "Chris"):
+def load_5_region_data(folder, base):
     left_leg = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/17_Combined_Data_5Regionl_leg',
                                               '17_Combined_Data_5Regionl_leg.csv',
-                                              joint_connections=Render.limb_connections, cycles=True)
+                                              joint_connections=Render.limb_connections, cycles=True, preset_cycle=base)
     
     right_leg = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/17_Combined_Data_5Regionr_leg',
                                            '17_Combined_Data_5Regionr_leg.csv',
-                                            joint_connections=Render.limb_connections, cycles=True)
+                                            joint_connections=Render.limb_connections, cycles=True, preset_cycle=base)
     left_arm = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/17_Combined_Data_5Regionl_arm',
                                               '17_Combined_Data_5Regionl_arm.csv',
-                                              joint_connections=Render.limb_connections, cycles=True)
+                                              joint_connections=Render.limb_connections, cycles=True, preset_cycle=base)
     
     right_arm = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/17_Combined_Data_5Regionr_arm',
                                            '17_Combined_Data_5Regionr_arm.csv',
-                                            joint_connections=Render.limb_connections, cycles=True)   
+                                            joint_connections=Render.limb_connections, cycles=True, preset_cycle=base)   
     head_data = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/17_Combined_Data_5Regionhead',
                                               '17_Combined_Data_5Regionhead.csv',
-                                              joint_connections=Render.head_joint_connections, cycles=True)
+                                              joint_connections=Render.head_joint_connections, cycles=True, preset_cycle=base)
 
     return left_leg, right_leg, left_arm, right_arm, head_data
 
@@ -218,19 +218,21 @@ def load_datasets(types, folder, person = None):
         
     for i, t in enumerate(types):
         print("loading dataset {} of {}. ".format(i + 1, len(types)), t)
+        base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_ABS_Noise', '15.5_ABS_Noise.csv',
+                                                joint_connections=Render.joint_connections_m_hip, cycles=True)
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
-            #                                        joint_connections=Render.joint_connections_m_hip, cycles=True))
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
+                                                    joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #20 multi person DATASET
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_4_people', '20_4_people.csv',
             #                                       joint_connections=Render.joint_connections_m_hip, cycles=True))
             
             #7 3s co-ords
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
-                                                    joint_connections=Render.joint_connections_m_hip, cycles=True, person = person))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
+            #                                        joint_connections=Render.joint_connections_m_hip, cycles=True, person = person))
 
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/8_Velocity_Data(velocity)', '8_Velocity_Data(velocity).csv',
             #                                        joint_connections=Render.joint_connections_m_hip, cycles=True, person = person, preset_cycle = datasets[0].base_cycles))
@@ -253,12 +255,12 @@ def load_datasets(types, folder, person = None):
             datasets.append(dataset)
         #Type 3: 2 region
         elif t == 3:
-            top_region, bottom_region = load_2_region_data(folder)
+            top_region, bottom_region = load_2_region_data(folder, base_cycle.base_cycles)
             datasets.append(top_region)
             datasets.append(bottom_region)
         #Type 4: 5 region
         elif t == 4:
-            l_l, r_l, l_a, r_a, h = load_5_region_data(folder)
+            l_l, r_l, l_a, r_a, h = load_5_region_data(folder, base_cycle.base_cycles)
             datasets.append(l_l)
             datasets.append(r_l)
             datasets.append(l_a)
@@ -311,9 +313,9 @@ def process_datasets(datasets):
         dataset_size = len(dataset)
 
         #Append indices based on the first dataset length
-        train_indices = random.sample(range(dataset_size), int(0.7 * dataset_size))
+        train_indices = random.sample(range(dataset_size), int(0.9 * dataset_size))
         print("original indices:", len(train_indices), train_indices )
-        test_indices = random.sample(set(range(dataset_size)) - set(train_indices), int(0.3 * dataset_size))
+        test_indices = random.sample(set(range(dataset_size)) - set(train_indices), int(0.1 * dataset_size))
         print("original test indices:", len(test_indices), test_indices )
         #train_indices, test_indices = get_balanced_samples(datasets[0])
         #done = 5/0
@@ -420,7 +422,7 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    #process_data("Weightgait")
+    process_data("Chris")
     #process_autoencoder("Elisa", 100, 8)
 
     #Run the model:
@@ -438,5 +440,5 @@ if __name__ == '__main__':
     #Person: full dataset only, denotes which person to extract otherwise 0 or none.
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
-    run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
+    run_model(dataset_types= [4], model_type = "ST-AGCN", hcf=False,
            batch_size = 16, epochs = 100, folder="Chris", leave_one_out=False, person = None, label = 5 )
