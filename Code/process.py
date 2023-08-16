@@ -25,12 +25,6 @@ def process_data(folder = "Chris"):
     #Extract joints from images
     #run_images("./Code/Datasets/" + str(folder) + "/Full_Dataset", out_folder="./Code/Datasets/Joint_Data/" + str(folder) + "/", exclude_2D=False, 
     #          start_point=0)
-
-    
-    #Sort class labels (for 0ffice Images_chris this is 20-0, 20-1, 20-2)
-    #abs_joint_data = Creator.assign_class_labels(num_switches=20, num_classes=2, 
-    #                                joint_file="./Code/Datasets/Joint_Data/WeightGait/Absolute_Data.csv",
-    #                                joint_output="./Code/Datasets/Joint_Data/WeightGait/1_Absolute_Data(classes applied).csv")
     
     #Display first 2 instances of results 
     #print("\nStage 1: ")
@@ -56,10 +50,6 @@ def process_data(folder = "Chris"):
     abs_joint_data, image_data = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)/raw/3_Absolute_Data(trimmed instances).csv",
                                                               "./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
     print("lens: ", len(abs_joint_data), len(image_data))
-    
-    #abs_norm_data = Creator.normalize_values(abs_joint_data, 
-    #                                         joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(normed)")
-    
     abs_joint_data = Creator.new_normalize_values(abs_joint_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(normed)", 3)
 
     
@@ -68,12 +58,10 @@ def process_data(folder = "Chris"):
     #render_joints_series(image_data, abs_joint_data, size=10)
 
     #Normalize outliers
-    #SIMPLIFY
     abs_joint_data = Creator.create_normalized_dataset(abs_joint_data, image_data, 
                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/4_Absolute_Data(normalized)")
     print("\nStage 4:")
     #render_joints_series(image_data, abs_joint_data, size=10)
-
     abs_joint_data = Creator.append_midhip(abs_joint_data, image_data, 
                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/4.5_Absolute_Data(midhip)")
      
@@ -83,8 +71,8 @@ def process_data(folder = "Chris"):
     pre_scale = abs_joint_data
 
     #Normalize size (use absolute dataset)
-    #abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data,
-    #                                           joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
+    abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data,
+                                               joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
 
     print("\nStage 5: ")
     #render_joints_series(image_data, abs_joint_data, size=10)
@@ -425,7 +413,7 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    #process_data("Chris")
+    process_data("WeightGait")
     #process_autoencoder("Elisa", 100, 8)
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
@@ -442,5 +430,14 @@ if __name__ == '__main__':
     #Person: full dataset only, denotes which person to extract otherwise 0 or none.
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
-    run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
+    run_model(dataset_types= [1, 2], model_type = "ST-AGCN", hcf=True,
            batch_size = 64, epochs = 100, folder="WeightGait", leave_one_out=False, person = None, label = 5 )
+
+    #Next steps RESET THE DATA IT HAS BEEN SCALED!!!!!!!!!
+    #Run 3
+    #Run 4
+    #Run 1,3
+    #Run 1,4
+    #Run 1,3,4
+    #Run best of all with 2
+    #Do all the same again with the big network and see if there's a difference.

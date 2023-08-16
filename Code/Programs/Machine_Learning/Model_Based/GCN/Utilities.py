@@ -83,7 +83,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
             folded_val[d_ind].append(copy.deepcopy(val_data))
 
     for fold in range(k_fold):
-
+        print("Fold: ", fold)
         train_loaders = []
         val_loaders = []
         test_loaders = []
@@ -174,10 +174,10 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
         
         #Reduce by 0.1 times at 10th and 60th epoch
         if epoch == 40:
-            print("reducing learing rate")
+            #print("reducing learing rate")
             optimizer.param_groups[0]['lr'] = 0.01
         elif epoch == 80:
-            print("reducing learning rate again")
+            #print("reducing learning rate again")
             optimizer.param_groups[0]['lr'] = 0.001
 
         total_loss = 0
@@ -236,9 +236,9 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
             if val_loss < 0.9:
                 optimizer.param_groups[0]['lr'] = 0.01
             if val_loss < 0.85:
-                optimizer.param_groups[0]['lr'] = 0.01
+                optimizer.param_groups[0]['lr'] = 0.001
             if val_loss < 0.75:
-                print("going to test")
+                #print("going to test")
                 break
             
 
@@ -308,12 +308,12 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
             loss = criterion(out, data_y[0]) / len(loaders[0]) 
             total_loss = total_loss + loss
             out = F.softmax(out, dim=1)
-            if validation == False:
-                print("out: ", out, out.argmax(dim=1))
+            #if validation == False:
+            #    print("out: ", out, out.argmax(dim=1))
 
-            if validation == False:
-                print("guesses: ", out.argmax(dim=1))
-                print("actuall: ", data_y[0])
+            #if validation == False:
+            #    print("guesses: ", out.argmax(dim=1))
+            #    print("actuall: ", data_y[0])
 
             acc = acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loaders[0])
 
