@@ -1,5 +1,7 @@
 import Programs.Machine_Learning.Model_Based.GCN.Render as Render
 import torch
+torch.manual_seed(42)
+
 from torch_geometric.loader import DataLoader as GeoLoader
 from torch.utils.data import RandomSampler
 import Programs.Machine_Learning.Model_Based.GCN.GAT as gat
@@ -140,7 +142,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
     return train_score, val_score, test_score
 
 def train(model, loader, val_loader, test_loader, generator, epochs):
-    init = generator.get_state()
+    #init = generator.get_state()
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(),
                                 lr=0.1,
@@ -160,7 +162,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
     ys_batch = [[] for l in range(len(loader))]
 
     for ind, load in enumerate(loader): 
-        generator.set_state(init)
+        #generator.set_state(init)
         for j, data in enumerate(load):
             data = data.to("cuda")
             xs_batch[ind].append(data.x)
@@ -183,7 +185,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
         val_loss = 0
         val_acc = 0
         #Second pass: process the data 
-        generator.set_state(init)
+        #generator.set_state(init)
         for index, data in enumerate(loader[0]):
 
             optimizer.zero_grad()
@@ -220,23 +222,31 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
             del data, data_x, data_i, data_b, data_y, out
 
         # Validation
-        generator.set_state(init)
+        #generator.set_state(init)
         val_loss, val_acc = test(model, val_loader, generator, train = True, validation=True, optimizer = optimizer)
         val_accs.append(val_acc)
 
         # Print metrics every 10 epochs
-        if (epoch % 10 == 0):
+        if (epoch % 5 == 0):
             print(f'Epoch {epoch:>3} | Train Loss: {total_loss:.2f} '
                 f'| Train Acc: {acc * 100:>5.2f}% '
                 f'| Val Loss: {val_loss:.2f} '
                 f'| Val Acc: {val_acc * 100:.2f}%')
+            
+            if val_loss < 0.9:
+                optimizer.param_groups[0]['lr'] = 0.01
+            if val_loss < 0.85:
+                optimizer.param_groups[0]['lr'] = 0.01
+            if val_loss < 0.75:
+                print("going to test")
+                break
             
 
         #Tidy up to save memory
         del total_loss, acc, val_loss, val_acc 
 
     if test_loader != None:
-        generator.set_state(init)
+        #generator.set_state(init)
         test_loss, test_acc = test(model, test_loader, generator, validation=False)
         print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
         test_accs.append(test_acc)

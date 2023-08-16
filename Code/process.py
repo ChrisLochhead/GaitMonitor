@@ -7,8 +7,11 @@ import Programs.Machine_Learning.Model_Based.GCN.Dataset_Obj as Dataset_Obj
 import Programs.Machine_Learning.Model_Based.GCN.Ground_Truths as GT
 import Programs.Data_Processing.Model_Based.Render as Render
 import torch
+torch.manual_seed(42)
+
 #import torch_geometric
 import random
+random.seed(42)
 import Programs.Machine_Learning.Model_Based.GCN.GAT as gat
 import Programs.Machine_Learning.Model_Based.GCN.STAGCN as stgcn
 import Programs.Machine_Learning.Model_Based.GCN.Utilities as graph_utils
@@ -422,9 +425,8 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    process_data("Chris")
+    #process_data("Chris")
     #process_autoencoder("Elisa", 100, 8)
-
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
     #   1: normal full body 9D dataset
@@ -440,5 +442,5 @@ if __name__ == '__main__':
     #Person: full dataset only, denotes which person to extract otherwise 0 or none.
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
-    run_model(dataset_types= [4], model_type = "ST-AGCN", hcf=False,
-           batch_size = 16, epochs = 100, folder="Chris", leave_one_out=False, person = None, label = 5 )
+    run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
+           batch_size = 64, epochs = 100, folder="WeightGait", leave_one_out=False, person = None, label = 5 )

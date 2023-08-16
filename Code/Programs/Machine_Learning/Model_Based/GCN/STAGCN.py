@@ -1,4 +1,6 @@
 import torch
+torch.manual_seed(42)
+
 from torch.nn import Linear
 import torch.nn.functional as F
 from torch_geometric.nn import global_add_pool,  GATv2Conv, ChebConv
@@ -18,7 +20,7 @@ class STGCNBlock(torch.nn.Module):
         self.b1 = BatchNorm1d(dim_h).to("cuda")
         self.temporal_conv2 = torch.nn.Conv1d(dim_h, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to("cuda")
         self.relu = ReLU()
-        self.dropout = torch.nn.Dropout(0.5)
+        self.dropout = torch.nn.Dropout(0.2)
         self.skip_connection = torch.nn.Conv1d(in_channels, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to("cuda")
 
         #Shape Info
@@ -37,16 +39,19 @@ class STGCNBlock(torch.nn.Module):
 
 
         #Convert to 3D representation for Temporal layer (Batch, Channel, Cycle)
-        x = self.dropout(x)
+        #x = self.dropout(x)
         x = x.view(self.batch_size, x.shape[1], self.cycle_size)
-        x = x.view(x.shape[1], x.shape[0], self.cycle_size)
+        #x = x.view(x.shape[1], x.shape[0], self.cycle_size)
+        x = torch.permute(x, (1, 0, 2))
         x = torch.transpose(x, 0, 1)
         x = self.relu(self.b1(self.temporal_conv2(x)))
-        x = x.view(x.shape[1], x.shape[0], self.cycle_size)
+        x = torch.permute(x, (1, 0, 2))
+        #x = x.view(x.shape[1], x.shape[0], self.cycle_size)
         x = torch.transpose(x, 0, 1)
         #print("shapes: ", residual.shape, x.shape)
+        #residual = self.dropout(residual)
         x = residual + x
-
+        x = self.dropout(x)
         return x
 
 class MultiInputSTGACN(torch.nn.Module):
@@ -113,8 +118,8 @@ class MultiInputSTGACN(torch.nn.Module):
         #self.max_pooling = torch.nn.MaxPool1d(5)
 
         self.combination_layer = torch.nn.Sequential(
-        Linear(int(linear_input/1), 1024), ReLU(), BatchNorm1d(1024), torch.nn.Dropout(0.8),
-        Linear(1024, 512), ReLU(), BatchNorm1d(512), torch.nn.Dropout(0.8),
+        Linear(int(linear_input/1), 1024), ReLU(), BatchNorm1d(1024), torch.nn.Dropout(0.35),
+        Linear(1024, 512), ReLU(), BatchNorm1d(512), torch.nn.Dropout(0.35),
         Linear(512, num_classes)
         )
 

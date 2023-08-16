@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+torch.manual_seed(42)
 import pandas as pd
 from torch_geometric.data import Data
 from torch_geometric.data import Dataset
