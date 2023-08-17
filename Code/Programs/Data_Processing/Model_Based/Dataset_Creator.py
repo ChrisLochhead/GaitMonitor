@@ -200,6 +200,18 @@ def normalize_values(data, joint_output, hcf = False, meta = 5):
         Utilities.save_dataset(final, joint_output)
     return final
 
+def avg_coord(data):
+    total_coord = data[0]
+    for i, d in enumerate(data):
+        if i > 0:
+            for j, coord in enumerate(d):
+                total_coord[j] += coord
+    
+    for i, coord in enumerate(total_coord):
+        total_coord[i] /= len(data)
+
+    return total_coord
+
 def combine_datasets(rel_data, vel_data, angle_data, images, joints_output, meta = 5):
     print("Combining datasets...")
     rel_data, images = Utilities.process_data_input(rel_data, images)
@@ -212,11 +224,20 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joints_output, meta
         combined_row = row[0:meta + 1]
         for j, joint in enumerate(row):
             if j > meta:
+                if j == meta + 1:
+                    avg_joint = avg_coord(row[meta + 2: meta + 9])
+                    avg_vel = avg_coord(vel_data[i][meta + 2: meta + 9])
+                    avg_ang = avg_coord(angle_data[i][meta + 2: meta + 9])
+
+                    combined_row.append([avg_joint[0], avg_joint[1], avg_joint[2],
+                    avg_vel[0], avg_vel[1], avg_vel[2], 
+                    avg_ang[0], avg_ang[1], avg_ang[2] ])
+                elif j > 10:
                 #print("row before: ", combined_row[0:5])
                 #print("lens: ", len(joint), len(vel_data[i][j]), len(angle_data[i][j]))
-                combined_row.append([joint[0], joint[1], joint[2],
-                                     vel_data[i][j][0], vel_data[i][j][1], vel_data[i][j][2], 
-                                     angle_data[i][j][0], angle_data[i][j][1], angle_data[i][j][2] ])
+                    combined_row.append([joint[0], joint[1], joint[2],
+                                        vel_data[i][j][0], vel_data[i][j][1], vel_data[i][j][2], 
+                                        angle_data[i][j][0], angle_data[i][j][1], angle_data[i][j][2] ])
                 #print("row after: ", combined_row[0:5])
         
         #print("final combined row: ", combined_row[0:5])

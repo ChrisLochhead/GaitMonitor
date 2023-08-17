@@ -26,7 +26,7 @@ joint_connections = [[15, 13], [13, 11], # left foot to hip
 
                     #Top dataset
                      [9, 7], [7, 5], # left hand to shoulder
-                     [10, 8], [6, 8], #right hand to shoulder
+                     [10, 8], [8, 6], #right hand to shoulder
                      [5, 0], [6, 0], # Shoulders to origin
                      [1, 3], [2, 4], # ears to eyes
                      [3, 0], [4, 0]]# Eyes to origin = total of 11
@@ -37,7 +37,7 @@ joint_connections_no_head_m_hip = [[10, 8], [8, 6], # left foot to hip
 
                     #Top dataset
                      [4, 2], [2, 0], # left hand to shoulder
-                     [5, 3], [1, 3], #right hand to shoulder
+                     [5, 3], [3, 1], #right hand to shoulder
                      [0, 12], [1, 12]] # Shoulders to origin (origin is midhip)
 
 joint_connections_m_hip = [[15, 13], [13, 11], # left foot to hip 
@@ -46,10 +46,19 @@ joint_connections_m_hip = [[15, 13], [13, 11], # left foot to hip
 
                     #Top dataset
                      [9, 7], [7, 5], # left hand to shoulder
-                     [10, 8], [6, 8], #right hand to shoulder
+                     [10, 8], [8, 6], #right hand to shoulder
                      [5, 0], [6, 0], # Shoulders to origin
                      [1, 3], [2, 4], # ears to eyes
                      [3, 0], [4, 0]]# Eyes to origin = total of 11
+
+joint_connections_n_head = [[11, 9], [9, 7], # left foot to hip 
+                     [12, 10], [10, 8], # right foot to hip
+                     [8, 13], [9, 13], [13,0],# hips to origin #total of 7 including mid-hip
+
+                    #Top dataset
+                     [5, 3], [3, 1], # left hand to shoulder
+                     [6, 4], [4, 2], #right hand to shoulder
+                     [1, 0], [2, 0]]# Shoulders to origin (head avg)
 
 bottom_joint_connection = [[5, 3], [3, 1], # left foot to hip 
                      [6, 4], [4, 2], # right foot to hip

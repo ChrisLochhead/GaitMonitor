@@ -46,6 +46,12 @@ colnames=['Instance', 'No_In_Sequence', 'Class', 'Freeze', 'Obstacle', 'Person',
 colnames_midhip = ['Instance', 'No_In_Sequence', 'Class', 'Freeze', 'Obstacle', 'Person', 'Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
     'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', "M_hip"] 
 
+colnames_default = ['Instance', 'No_In_Sequence', 'Class', 'Freeze', 'Obstacle', 'Person', 'Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
+    'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot'] 
+
+colnames_nohead = ['Instance', 'No_In_Sequence', 'Class', 'Freeze', 'Obstacle', 'Person', 'Nose', 'L_shoulder','R_shoulder',
+    'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', "M_hip"] 
+
 colnames_top = ['Instance', 'No_In_Sequence', 'Class', 'Freeze', 'Obstacle', 'Person', 'Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
     'L_elbow','R_elbow','L_hand','R_hand'] 
 
@@ -362,6 +368,10 @@ def save_dataset(data, name, colnames = colnames):
         colnames = hcf_colnames
     elif len(data[0]) == 16:
         colnames = fused_colnames
+    elif len(data[0]) == 20:
+        colnames = colnames_nohead
+    elif len(data[0]) == 23:
+        colnames = colnames_default
 
 
     new_dataframe = pd.DataFrame(data, columns = colnames)
