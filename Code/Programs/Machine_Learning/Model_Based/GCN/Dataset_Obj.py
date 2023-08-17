@@ -102,7 +102,7 @@ class JointDataset(Dataset):
                     for frame in cycle:
                         counter +=1
 
-                print("counter? ", counter, len(self.base_cycles))
+                print("counter? ", counter, len(self.base_cycles), len(self.base_cycles[0]), len(self.base_cycles[1]))
 
             else:
                 self.base_cycles = self.set_gait_cycles(self.data.to_numpy())

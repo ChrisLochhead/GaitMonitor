@@ -58,9 +58,9 @@ def normalize_joint_scales(joints, images, meta = 5):
             #             joint[2]]
             
             #If not using depth sensor
-            norm_joint = [((width * 2) * (joint[0] - min_x)/(max_x - min_x) )/10,
-                          ((height * 2) * (joint[1] - min_y)/(max_y - min_y))/10,
-                          joint[2]]
+            norm_joint = [round(((width * 2) * (joint[0] - min_x)/(max_x - min_x) )/10, 2),
+                          round(((height * 2) * (joint[1] - min_y)/(max_y - min_y))/10, 2),
+                          round(joint[2], 2)]
             
             norm_joint_row.append(norm_joint)
         norm_joints.append(norm_joint_row)

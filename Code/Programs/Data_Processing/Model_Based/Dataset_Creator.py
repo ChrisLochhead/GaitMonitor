@@ -768,80 +768,63 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
 def create_dummy_dataset(data, output_name):
     #Get single datapoint of all 3 classes
     data, _ = Utilities.process_data_input(data, None)
-    class_examples = [[], [], []]
-    frame_counter = -1
-    current_class = 0
-    current_instance = -1
-    examples_of_class = 0
-
-    #For every row in the normal dataset
-    current_sequence = []
-    for i, datapoint in enumerate(data):
-
-        #If the class of this row is the current class
-        if datapoint[2] == current_class:
-            #If current instance not currently set, set it to the first instance of the desired class
-            if current_instance == -1:
-                current_instance = datapoint[0]
-
-            #And if the instance number is still the same
-            if datapoint[0] == current_instance:
-                print("appending new example", datapoint[1], datapoint[2], current_class)
-                #class_examples[current_class].append(datapoint)
-                current_sequence.append(datapoint)
-            else:
-                #Iterate to the next class and reset the instance
-                examples_of_class += 1
-                current_instance += 1
-                class_examples[current_class].append(copy.deepcopy(current_sequence))
-                current_sequence = []
-
-                #If we have enough examples of this class now
-                if examples_of_class >= 19:
-                    #Move to the next class
-                    current_class += 1
-                    examples_of_class = 0
-                    current_instance = -1
-                else:
-                    #Otherwise add this current one to the list
-                    #class_examples[current_class].append(datapoint)
-                    current_sequence.append(datapoint)
-
-    
-    print("finished:", len(class_examples), len(class_examples[0]), len(class_examples[1]), len(class_examples[2]))
 
     #Apply gaussian noise to each 1000*
     mean = 0  # Mean of the Gaussian distribution
     std_dev = 0.1 
-    fake_examples = []
-    instance_counter = 0
-    for i, example in enumerate(class_examples):
-        for j in range(2):
-            for frame_block in example:
-                for frame in frame_block:
-                    print("frame: ", len(frame), len(example[2]), len(example), len(class_examples))
-                    frame_metadata = frame[0:6]
-                    frame_metadata[0] = instance_counter
-                    joints_frame = frame[6:]
-                    noisy_frame = joints_frame + np.random.normal(mean, std_dev, (len(joints_frame), len(joints_frame[0])))
+    #instance_counter = 0
 
-                    #Convert from numpy arrays to lists so it saves to csv nicely
-                    noisy_frame = list(noisy_frame)
-                    for k, tmp in enumerate(noisy_frame):
-                        noisy_frame[k] = list(noisy_frame[k])
+    sequences = []
+    current_sequence = 0
+    sequence = []
+    for i, example in enumerate(data):
+        if example[0] == current_sequence:
+            sequence.append(example)
+        else:
+            sequences.append(copy.deepcopy(sequence))
+            sequence = []
+            sequence.append(example)
+            current_sequence += 1
+    sequences.append(sequence)
 
-                    #Unravel the denoised frame and attach to the metadata
-                    for f in noisy_frame:
-                        frame_metadata.append(f)
+    print("should be 59: ", len(sequences))
 
-                    fake_examples.append(frame_metadata)
-                instance_counter += 1
+    noise_sequences = []
+    for i, sequence in enumerate(sequences):
+
+        #noise_sequences.append(sequence)
+        #First: Add the original frames
+        for frame in sequence:
+            noise_sequences.append(frame)
+
+
+        for j in range(1):
+            for frame in sequence:
+                frame_metadata = frame[0:6]
+                frame_metadata[0] = frame_metadata[0] + len(sequences)
+                #frame_metadata[0] = instance_counter
+                joints_frame = frame[6:]
+                noisy_frame = joints_frame + np.random.normal(mean, std_dev, (len(joints_frame), len(joints_frame[0])))
+                
+                #Convert from numpy arrays to lists so it saves to csv nicely
+                noisy_frame = list(noisy_frame)
+                for k, tmp in enumerate(noisy_frame):
+                    noisy_frame[k] = list(noisy_frame[k])
+
+                #Unravel the denoised frame and attach to the metadata
+                for f in noisy_frame:
+                    frame_metadata.append(f)
+
+                #done = 5/0
+                noise_sequences.append(frame_metadata)
+                #instance_counter += 1
+        #noise_sequences.append(noisy_sequence)
 
     
-    print("final number of fake examples: ", len(fake_examples))
+    print("final number of fake examples, should be 959 * 3: ", len(noise_sequences))
     #Save as csv
-    Utilities.save_dataset(fake_examples, output_name)
-    return fake_examples
+    Utilities.save_dataset(noise_sequences, output_name)
+    return noise_sequences
 
 
 def interpolate_gait_cycle(data_cycles, joint_output, step = 5):

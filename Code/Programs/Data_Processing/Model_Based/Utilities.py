@@ -369,13 +369,19 @@ def save_dataset(data, name, colnames = colnames):
     file_name = name.split("/")
     file_name = file_name[-1]
 
-    if len(data[0]) == 26:
-        print("size: ", new_dataframe.shape)
-        print(new_dataframe.head())
     #Convert to dataframe 
     os.makedirs(name + "/raw/" ,exist_ok=True)
-    new_dataframe.to_csv(name + "/raw/" + file_name + ".csv",index=False, header=False)     
 
+    for i, data in new_dataframe.iterrows():
+        for j, unit in enumerate(data):
+            if isinstance(unit, list):
+                new_unit = []
+                for number in unit:
+                    new_unit.append(round(number, 4))
+                new_dataframe.iat[i, j] = new_unit
+
+
+    new_dataframe.to_csv(name + "/raw/" + file_name + ".csv",index=False, header=False, float_format='%.3f')    
 
 def get_3D_coords(coords_2d, dep_img, pts3d_net = True, dilate = True, meta_data = 3):
 

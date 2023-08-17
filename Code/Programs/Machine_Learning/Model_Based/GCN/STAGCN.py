@@ -20,7 +20,7 @@ class STGCNBlock(torch.nn.Module):
         self.b1 = BatchNorm1d(dim_h).to("cuda")
         self.temporal_conv2 = torch.nn.Conv1d(dim_h, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to("cuda")
         self.relu = ReLU()
-        self.dropout = torch.nn.Dropout(0.2)
+        self.dropout = torch.nn.Dropout(0.1)
         self.skip_connection = torch.nn.Conv1d(in_channels, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to("cuda")
 
         #Shape Info
@@ -102,7 +102,7 @@ class MultiInputSTGACN(torch.nn.Module):
             self.len_steams -= 1
 
         linear_input = self.stgcn_filters[-1] * self.cycle_size * self.len_steams
-        #print("Linear input info: ", self.stgcn_filters, dim_8th, len(self.streams), self.num_inputs, self.cycle_size, self.len_steams)
+        print("Linear input info: ", self.stgcn_filters, dim_8th, len(self.streams), self.num_inputs, self.cycle_size, self.len_steams)
 
         #If HCF data is being used, append the length of it's final layer 
         #to the linear input. If there is only one stream and self.hcf is true,
@@ -118,8 +118,8 @@ class MultiInputSTGACN(torch.nn.Module):
         #self.max_pooling = torch.nn.MaxPool1d(5)
 
         self.combination_layer = torch.nn.Sequential(
-        Linear(int(linear_input/1), 1024), ReLU(), BatchNorm1d(1024), torch.nn.Dropout(0.35),
-        Linear(1024, 512), ReLU(), BatchNorm1d(512), torch.nn.Dropout(0.35),
+        Linear(int(linear_input/1), 1024), ReLU(), BatchNorm1d(1024), torch.nn.Dropout(0.2),
+        Linear(1024, 512), ReLU(), BatchNorm1d(512), torch.nn.Dropout(0.2),
         Linear(512, num_classes)
         )
 

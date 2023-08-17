@@ -67,12 +67,9 @@ def process_data(folder = "Chris"):
      
     print("\nStage 4.5:")
     #render_joints_series(image_data, abs_joint_data, size=10)
-    #Change format of pre-scale to list of arrays instead of list of lists
-    pre_scale = abs_joint_data
-
     #Normalize size (use absolute dataset)
-    abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data,
-                                               joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
+    #abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data,
+    #                                           joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
 
     print("\nStage 5: ")
     #render_joints_series(image_data, abs_joint_data, size=10)
@@ -90,7 +87,10 @@ def process_data(folder = "Chris"):
 
     abs_joint_data = Creator.create_flipped_joint_dataset(abs_joint_data, abs_joint_data, image_data,
                                                             joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/7_Abs_Data(flipped)") 
-    
+    pre_scale = abs_joint_data
+    #Normalize size (use absolute dataset)
+    abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data,
+                                               joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
     print("\nStage 7:")
     #render_joints_series("None", flipped_joint_data, size=5, plot_3D=True, x_rot = -90, y_rot = 180)
 
@@ -120,6 +120,9 @@ def process_data(folder = "Chris"):
     #Combine datasets (relative, velocity, joint angles, regions)
 
     #Individually add noise 
+
+    cycle_dummy = Creator.create_dummy_dataset(pre_scale, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_ABS_cycle")
+
     abs_joint_data = Creator.create_dummy_dataset(abs_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_ABS_Noise")
 
     relative_joint_data = Creator.create_dummy_dataset(relative_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_REL_Noise")
@@ -209,13 +212,13 @@ def load_datasets(types, folder, person = None):
         
     for i, t in enumerate(types):
         print("loading dataset {} of {}. ".format(i + 1, len(types)), t)
-        base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_ABS_Noise', '15.5_ABS_Noise.csv',
+        base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_ABS_cycle', '15.5_ABS_cycle.csv',
                                                 joint_connections=Render.joint_connections_m_hip, cycles=True)
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
             datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
-                                                    joint_connections=Render.joint_connections_m_hip, cycles=True))
+                                                    joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=base_cycle.base_cycles))
             
             #20 multi person DATASET
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_4_people', '20_4_people.csv',
@@ -430,10 +433,10 @@ if __name__ == '__main__':
     #Person: full dataset only, denotes which person to extract otherwise 0 or none.
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
-    run_model(dataset_types= [1, 2], model_type = "ST-AGCN", hcf=True,
+    run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
            batch_size = 64, epochs = 100, folder="WeightGait", leave_one_out=False, person = None, label = 5 )
 
-    #Next steps RESET THE DATA IT HAS BEEN SCALED!!!!!!!!!
+    #Next steps
     #Run 3
     #Run 4
     #Run 1,3
