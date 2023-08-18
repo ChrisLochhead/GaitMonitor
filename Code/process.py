@@ -50,6 +50,8 @@ def process_data(folder = "Chris"):
     abs_joint_data, image_data = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)/raw/3_Absolute_Data(trimmed instances).csv",
                                                               "./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
     print("lens: ", len(abs_joint_data), len(image_data))
+
+
     abs_joint_data = Creator.new_normalize_values(abs_joint_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(normed)", 3)
 
     
@@ -67,9 +69,6 @@ def process_data(folder = "Chris"):
      
     print("\nStage 4.5:")
     #render_joints_series(image_data, abs_joint_data, size=10)
-    #Normalize size (use absolute dataset)
-    #abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data,
-    #                                           joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
 
     print("\nStage 5: ")
     #render_joints_series(image_data, abs_joint_data, size=10)
@@ -89,8 +88,8 @@ def process_data(folder = "Chris"):
                                                             joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/7_Abs_Data(flipped)") 
     pre_scale = abs_joint_data
     #Normalize size (use absolute dataset)
-    #abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data,
-    #                                           joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
+    abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data,
+                                               joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
     print("\nStage 7:")
     #render_joints_series("None", flipped_joint_data, size=5, plot_3D=True, x_rot = -90, y_rot = 180)
 
@@ -121,15 +120,13 @@ def process_data(folder = "Chris"):
 
     #Individually add noise 
 
-    #cycle_dummy = Creator.create_dummy_dataset(pre_scale, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_ABS_cycle")#
+    cycle_dummy = Creator.create_dummy_dataset(pre_scale, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_ABS_cycle")#
+    abs_joint_data = Creator.create_dummy_dataset(abs_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_ABS_Noise")
+    relative_joint_data = Creator.create_dummy_dataset(relative_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_REL_Noise")
 
-    #abs_joint_data = Creator.create_dummy_dataset(abs_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_ABS_Noise")
+    velocity_data = Creator.create_dummy_dataset(velocity_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_VEL_Noise")
 
-    #relative_joint_data = Creator.create_dummy_dataset(relative_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_REL_Noise")
-
-    #velocity_data = Creator.create_dummy_dataset(velocity_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_VEL_Noise")
-
-    #joint_bones_data = Creator.create_dummy_dataset(joint_bones_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_BONE_Noise")
+    joint_bones_data = Creator.create_dummy_dataset(joint_bones_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_BONE_Noise")
 
     combined_data = Creator.combine_datasets(relative_joint_data, velocity_data, joint_bones_data, image_data,
                                              joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/15_Combined_Data")
@@ -137,11 +134,11 @@ def process_data(folder = "Chris"):
     #combined_data = Creator.create_dummy_dataset(combined_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_Combined_Noise")
 
 
-    hcf_data = Creator.create_hcf_dataset(abs_joint_data, abs_joint_data, relative_joint_data, velocity_data, image_data, 
-                               joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_HCF_Data")
+    #hcf_data = Creator.create_hcf_dataset(abs_joint_data, abs_joint_data, relative_joint_data, velocity_data, image_data, 
+    #                           joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_HCF_Data")
     
-    hcf_data_normed = Creator.normalize_hcf(hcf_data, 
-                                             joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13.5_HCF_Data(normed)")
+    #hcf_data_normed = Creator.normalize_hcf(hcf_data, 
+    #                                         joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13.5_HCF_Data(normed)")
     
     
     print("\nStage 14:")
@@ -226,13 +223,13 @@ def load_datasets(types, folder, person = None):
             
             #7 3s co-ords
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
-            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person))#
+            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person, preset_cycle = base_cycle.base_cycles))#
 
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/8_Velocity_Data(velocity)', '8_Velocity_Data(velocity).csv',
-            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person, preset_cycle = datasets[0].base_cycles))
+            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person, preset_cycle = base_cycle.base_cycles))
             
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/10_Bones_Data(integrated)', '10_Bones_Data(integrated).csv',
-            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person, preset_cycle = datasets[0].base_cycles))
+            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person, preset_cycle = base_cycle.base_cycles))
             
             #19 simplified dataset
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/12_75_no_head_Data__decimated', '12_75_no_head_Data__decimated.csv',
@@ -416,7 +413,7 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    #process_data("Weightgait")
+    #process_data("Chris")
     #process_autoencoder("Chris", 100, 8)
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
@@ -434,8 +431,10 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 32, epochs = 100, folder="WeightGait", leave_one_out=False, person = None, label = 5 )
+           batch_size = 32, epochs = 200, folder="Chris", leave_one_out=False, person = None, label = 5 )
 
+
+    #Changed HCF extractor for gait cycles
 
     #no head 9D is 75.00%, 5.04% 25.39062
     #No head 3D is 71.56%, 2.19% 4.78516

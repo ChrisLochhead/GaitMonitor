@@ -316,26 +316,26 @@ def get_gait_cycles(joint_data, images):
                     found_initial_direction = True
 
             #Check for legs mixing up in frame, only need to check one leg
-            #print("gap: ", abs(row_18_previous - row[18][1]), row_18_previous, row[18][1])
-            if abs(row_18_previous - row[-2][1]) > 50 and found_initial_direction:
-                gait_cycle.append(row)
-                #print("detected leg switch", j)
-                row_18_previous = row[-2][1]
-                #Render.render_joints(images[j], row, delay=True, use_depth=False)
-                continue
+            #print("gap: ", abs(row_18_previous - row[-2][1]), row_18_previous, row[-1][1])
+            #if abs(row_18_previous - row[-2][1]) > 100 and found_initial_direction:
+            #    gait_cycle.append(row)
+            #    #print("detected leg switch", j)
+            #    row_18_previous = row[-2][1]
+            #    #Render.render_joints(images[j], row, delay=True, use_depth=False)
+            #    continue
 
             row_18_previous = row[-2][1]
             #Check if the direction matches the current movement and append as appropriate
-            if row[-2][1] > row[-1][1] and direction == 0:
+            if row[-2][1] > row[-3][1] and direction == 0:
                 gait_cycle.append(row)
-            elif row[-2][1] < row[-1][1] and direction == 1:
+            elif row[-2][1] < row[-3][1] and direction == 1:
                 gait_cycle.append(row)
-            elif row[-2][1] > row[-1][1] and direction == 1:
+            elif row[-2][1] > row[-3][1] and direction == 1:
                 crossovers += 1
                 #print("crossover detected a ", row[18][1], row[19][1], direction )
                 gait_cycle.append(row)
                 direction = 0
-            elif row[-2][1] < row[-1][1] and direction == 0:
+            elif row[-2][1] < row[-3][1] and direction == 0:
                 crossovers += 1
                 #print("crossover detected b ", row[18][1], row[19][1], direction)
                 gait_cycle.append(row)

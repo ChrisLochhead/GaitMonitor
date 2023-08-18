@@ -175,10 +175,10 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
         #Reduce by 0.1 times at 10th and 60th epoch
         if epoch == 40:
             #print("reducing learing rate")
-            optimizer.param_groups[0]['lr'] = 0.01
+            optimizer.param_groups[0]['lr'] = 0.1
         elif epoch == 80:
             #print("reducing learning rate again")
-            optimizer.param_groups[0]['lr'] = 0.001
+            optimizer.param_groups[0]['lr'] = 0.01
 
         total_loss = 0
         acc = 0

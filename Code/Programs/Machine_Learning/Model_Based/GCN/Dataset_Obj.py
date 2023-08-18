@@ -58,16 +58,13 @@ class JointDataset(Dataset):
     def set_gait_cycles(self, data):
         new_cycles = []
         data_iter = 0
-        print("len data in set should be 1960: ", len(data))
         for i, cycle in enumerate(self.preset_cycle):
             new_cycle = []
             for j, frame in enumerate(cycle):
-                print("data iter: ", data_iter, len(self.preset_cycle), len(cycle))
                 new_cycle.append(data[data_iter])
                 data_iter += 1
             new_cycles.append(new_cycle)
         
-        print("final lens: ", len(new_cycles), len(self.preset_cycle))
         return new_cycles
 
 
@@ -93,7 +90,7 @@ class JointDataset(Dataset):
             #Full cycles per instance
             #self.data_cycles = HCF.split_by_instance(self.data.to_numpy())
             #Several cycles per instance
-            print("data length: ", len(self.data))
+           # print("data length: ", len(self.data))
             if self.preset_cycle == None:
                 self.base_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
                 counter = 0
@@ -103,7 +100,7 @@ class JointDataset(Dataset):
                         counter +=1
 
                 print("counter? ", counter, len(self.base_cycles), len(self.base_cycles[0]), len(self.base_cycles[1]))
-
+                #done = 5/0
             else:
                 self.base_cycles = self.set_gait_cycles(self.data.to_numpy())
 
