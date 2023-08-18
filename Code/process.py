@@ -226,7 +226,7 @@ def load_datasets(types, folder, person = None):
             
             #7 3s co-ords
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
-            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person))
+            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person))#
 
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/8_Velocity_Data(velocity)', '8_Velocity_Data(velocity).csv',
             #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person, preset_cycle = datasets[0].base_cycles))
@@ -410,13 +410,13 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     model = model.to("cuda")
 
     train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                     k_fold=10, batch=batch_size, epochs=epochs, type=model_type)
+                                                                     k_fold=5, batch=batch_size, epochs=epochs, type=model_type)
 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    #process_data("Chris")
+    #process_data("Weightgait")
     #process_autoencoder("Chris", 100, 8)
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
@@ -434,7 +434,7 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 32, epochs = 100, folder="Chris", leave_one_out=False, person = None, label = 5 )
+           batch_size = 32, epochs = 100, folder="WeightGait", leave_one_out=False, person = None, label = 5 )
 
 
     #no head 9D is 75.00%, 5.04% 25.39062

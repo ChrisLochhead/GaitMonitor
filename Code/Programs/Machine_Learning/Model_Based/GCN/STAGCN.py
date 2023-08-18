@@ -31,7 +31,7 @@ class STGCNBlock(torch.nn.Module):
 
         x = self.b0(x)
         residual = x
-        residual = self.skip_connection(residual)
+        residual = self.relu(self.skip_connection(residual))
         #x = self.relu(self.temporal_conv1(x))
         #Convert to 2D representation for GAT layer (Batch * Cycle, Channel)
         x = x.view(x.shape[2] * x.shape[0], x.shape[1])
