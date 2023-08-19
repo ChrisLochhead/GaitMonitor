@@ -581,7 +581,7 @@ def load(file = "image_data.csv", metadata = True, colnames = colnames_midhip):
     dataset = convert_to_literals(dataset, metadata)
 
     #Convert to 2D array 
-    joints = dataset.to_numpy()
+    joints = dataset.values.tolist()#to_numpy()
     #Print array to check
     return joints
 

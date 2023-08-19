@@ -317,12 +317,12 @@ def get_gait_cycles(joint_data, images):
 
             #Check for legs mixing up in frame, only need to check one leg
             #print("gap: ", abs(row_18_previous - row[-2][1]), row_18_previous, row[-1][1])
-            #if abs(row_18_previous - row[-2][1]) > 100 and found_initial_direction:
-            #    gait_cycle.append(row)
-            #    #print("detected leg switch", j)
-            #    row_18_previous = row[-2][1]
-            #    #Render.render_joints(images[j], row, delay=True, use_depth=False)
-            #    continue
+            if abs(row_18_previous - row[-2][1]) > 50 and found_initial_direction:
+                gait_cycle.append(row)
+                #print("detected leg switch", j)
+                row_18_previous = row[-2][1]
+                #Render.render_joints(images[j], row, delay=True, use_depth=False)
+                continue
 
             row_18_previous = row[-2][1]
             #Check if the direction matches the current movement and append as appropriate
@@ -405,9 +405,11 @@ def sample_gait_cycles(data_cycles):
     cycles = [[],[],[]]
     print("len gait cycles: ", len(data_cycles))
     for cycle in data_cycles:
+        #print("cycle: ", cycle[0][2], cycle[0][0], cycle[0][1])
         cycles[cycle[0][2]].append(cycle)
 
     print("lens: ", len(cycles[0]),len(cycles[1]),len(cycles[2]))
+    #done = 5/0
     min_length = min(len(sublist) for sublist in cycles)
 
     for i, cycle in enumerate(cycles):

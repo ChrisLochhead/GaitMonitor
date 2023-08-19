@@ -93,9 +93,10 @@ class JointDataset(Dataset):
            # print("data length: ", len(self.data))
             if self.preset_cycle == None:
                 self.base_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
+                #self.base_cycles = HCF.split_by_instance(self.data.to_numpy())
                 counter = 0
                 for cycle in self.base_cycles:
-                    #print("cycle: ", len(cycle))
+                    print("cycle size:: ", len(cycle))
                     for frame in cycle:
                         counter +=1
 

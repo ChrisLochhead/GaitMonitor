@@ -89,15 +89,14 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         test_loaders = []
 
         #Set up so identical seed is used
-        #torch.manual_seed(13)
         G = torch.Generator()
 
         train_sample = RandomSampler(folded_train[0][fold], generator=G)
 
         #Restrict validation and testing batch sizes to be one batch
         if type == "ST-AGCN":
-            val_sample = RandomSampler(folded_val[0][fold][0:batch], generator=G)
-            test_sample = RandomSampler(test_dataset[0][0:batch], generator=G)
+            val_sample = RandomSampler(folded_val[0][fold], generator=G)
+            test_sample = RandomSampler(test_dataset[0], generator=G)
         else:
             val_sample = RandomSampler(folded_val[0][fold], generator=G)
             test_sample = RandomSampler(test_dataset[0], generator=G)
@@ -113,17 +112,16 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
             #ST-GCNs, these are different because ST-GCN requires padded samples of all the same size
             if type == "ST-AGCN":
                 #Restrict val set to only being 1 batch, so the same batch and hence the same data is always picked for testing
-                test_set = test_set[0:batch]
-                val_set = val_set[0:batch]
-                val_loaders.append(GeoLoader(val_set, batch_size=batch,sampler = val_sample, drop_last = True ))
-                test_loaders.append(GeoLoader(test_set, batch_size=batch,sampler = test_sample, drop_last = True))
-            else:
+                #test_set = test_set[0:batch]
+                #val_set = val_set[0:batch]
+                val_loaders.append(GeoLoader(val_set, batch_size=batch, sampler = val_sample, drop_last = True))
+                test_loaders.append(GeoLoader(test_set, batch_size=batch, sampler = test_sample, drop_last = True))
+            #else:
             #GATs
-                val_loaders.append(GeoLoader(val_set, batch_size=batch))
-                test_loaders.append(GeoLoader(test_set, batch_size=batch))
+            #    val_loaders.append(GeoLoader(val_set, batch_size=batch))
+            #    test_loaders.append(GeoLoader(test_set, batch_size=batch))
 
-                #for l in test_loaders[0]:
-                #    print("l: ", l)
+
             if make_loaders:
                 return train_loaders, val_loaders, test_loaders
             #Reset the generator so every dataset gets the same sampling 
@@ -207,7 +205,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
 
             #print("Lens: ", len(out), len(data_y[0]), out.shape, data_y[0].shape)  
 
-            out = modify_loss(out, data_y[0])    
+            #out = modify_loss(out, data_y[0])    
               
             loss = criterion(out, data_y[0]) / len(loader[0])
 
@@ -241,7 +239,11 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
                 #print("going to test")
                 break
             
-
+            if test_loader != None:
+                generator.set_state(init)
+                test_loss, test_acc = test(model, test_loader, generator, validation=False)
+                print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
+                test_accs.append(test_acc)
         #Tidy up to save memory
         del total_loss, acc, val_loss, val_acc 
 
@@ -270,7 +272,6 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
         for i, load in enumerate(loaders): 
             generator.set_state(init)
             for j, data in enumerate(load):
-                #print("j of ", j, data)
                 data = data.to("cuda")
                 xs_batch[i].append(data.x)
                 indice_batch[i].append(data.edge_index)
@@ -287,7 +288,6 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
     #with torch.no_grad():
         total_loss = 0
         for index, data in enumerate(loaders[0]):
-
             data_x = [xs_batch[i][index] for i in range(len(loaders))]
             data_i = [indice_batch[i][index] for i in range(len(loaders))]
             data_b = [batch_batch[i][index] for i in range(len(loaders))]
@@ -309,11 +309,11 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
             total_loss = total_loss + loss
             out = F.softmax(out, dim=1)
             #if validation == False:
-            #    print("out: ", out, out.argmax(dim=1))
+            #    print("out: ", out, out.argmax(dim=1))#
 
-            #if validation == False:
-            #    print("guesses: ", out.argmax(dim=1))
-            #    print("actuall: ", data_y[0])
+#            if validation == False:
+#                print("guesses: ", out.argmax(dim=1))
+#                print("actuall: ", data_y[0])
 
             acc = acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loaders[0])
 

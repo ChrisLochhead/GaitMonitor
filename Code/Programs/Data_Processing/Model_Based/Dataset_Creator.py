@@ -394,8 +394,11 @@ def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output, meta 
     rel_sequence_data = Utilities.generate_relative_sequence_data(sequence_data, rel_data)
 
     flipped_data = [] 
-    print("size before flip: ", len(rel_sequence_data))
+    print("size before flip: ", len(rel_sequence_data), len(sequence_data))
+    original_len = len(sequence_data)
+    flipped_sequences = []
     for i, seq in enumerate(tqdm(rel_sequence_data)):
+
 
         #Get first and last head positions (absolute values)
         first = sequence_data[i][1]
@@ -403,18 +406,27 @@ def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output, meta 
 
         #This is going from right to left: the ones we want to flip
         #if first[meta+1][1] > last[meta+1][1]:
+
+        #First append regular data:
+        for joints in seq:
+            flipped_data.append(joints)
+
+
         for joints in seq:
             #Append original data
-            flipped_data.append(joints)
             #Append with metadata
             flipped_joints = joints[0:meta + 1]
+            print("sequence: ", flipped_joints[0], original_len, flipped_joints[0] + original_len)
+            flipped_joints[0] = flipped_joints[0] + original_len
             for j, joint in enumerate(joints):
                 #Flip X value on each individual co-ordinate
                 if j > meta:
                     flipped_joints.append([joint[0], -joint[1], joint[2]])
             #Append flipped joints instance to the list
-            flipped_data.append(flipped_joints)
+            flipped_sequences.append(flipped_joints)
 
+    for frame in flipped_sequences:
+        flipped_data.append(frame)
         #else:
         #Just add the data sequentially for the joints already going from left to right.
         #    for joints in seq:
@@ -792,8 +804,7 @@ def create_dummy_dataset(data, output_name):
 
     #Apply gaussian noise to each 1000*
     mean = 0  # Mean of the Gaussian distribution
-    std_dev = 0.1 
-    #instance_counter = 0
+    std_dev = 1 
 
     sequences = []
     current_sequence = 0
@@ -809,8 +820,9 @@ def create_dummy_dataset(data, output_name):
     sequences.append(sequence)
 
     print("should be 59: ", len(sequences))
-
+    original_len = len(sequences)
     noise_sequences = []
+    novel_sequences = []
     for i, sequence in enumerate(sequences):
 
         #noise_sequences.append(sequence)
@@ -819,10 +831,10 @@ def create_dummy_dataset(data, output_name):
             noise_sequences.append(frame)
 
 
-        for j in range(1):
+        for j in range(3):
             for frame in sequence:
                 frame_metadata = frame[0:6]
-                frame_metadata[0] = frame_metadata[0] + len(sequences)
+                frame_metadata[0] = frame_metadata[0] + original_len
                 #frame_metadata[0] = instance_counter
                 joints_frame = frame[6:]
                 noisy_frame = joints_frame + np.random.normal(mean, std_dev, (len(joints_frame), len(joints_frame[0])))
@@ -837,7 +849,10 @@ def create_dummy_dataset(data, output_name):
                     frame_metadata.append(f)
 
                 #done = 5/0
-                noise_sequences.append(frame_metadata)
+                novel_sequences.append(frame_metadata)
+        
+    for frame in novel_sequences:
+        noise_sequences.append(frame)
                 #instance_counter += 1
         #noise_sequences.append(noisy_sequence)
 

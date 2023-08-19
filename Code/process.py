@@ -51,6 +51,10 @@ def process_data(folder = "Chris"):
                                                               "./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
     print("lens: ", len(abs_joint_data), len(image_data))
 
+    #Normalize size (use absolute dataset)
+    abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data,
+                                               joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
+    
 
     abs_joint_data = Creator.new_normalize_values(abs_joint_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(normed)", 3)
 
@@ -87,9 +91,7 @@ def process_data(folder = "Chris"):
     abs_joint_data = Creator.create_flipped_joint_dataset(abs_joint_data, abs_joint_data, image_data,
                                                             joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/7_Abs_Data(flipped)") 
     pre_scale = abs_joint_data
-    #Normalize size (use absolute dataset)
-    abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data,
-                                               joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
+
     print("\nStage 7:")
     #render_joints_series("None", flipped_joint_data, size=5, plot_3D=True, x_rot = -90, y_rot = 180)
 
@@ -143,12 +145,12 @@ def process_data(folder = "Chris"):
     
     print("\nStage 14:")
     #Create regions data of combined data
-    top_region_dataset, bottom_region_dataset = Creator.create_2_regions_dataset(combined_data,
-                                                                                 joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/16_Combined_Data_2Region",
-                                                                                 images = image_data)
-    regions_data = Creator.create_5_regions_dataset(combined_data,
-                                                    "./Code/Datasets/Joint_Data/" + str(folder) + "/17_Combined_Data_5Region",
-                                                      image_data)
+    #top_region_dataset, bottom_region_dataset = Creator.create_2_regions_dataset(combined_data,
+    #                                                                             joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/16_Combined_Data_2Region",
+    #                                                                             images = image_data)
+    #regions_data = Creator.create_5_regions_dataset(combined_data,
+    #                                                "./Code/Datasets/Joint_Data/" + str(folder) + "/17_Combined_Data_5Region",
+    #                                                  image_data)
     
     #fused_data = Creator.create_fused_dataset(combined_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/18_Combined_Data_Fused")
 
@@ -305,11 +307,10 @@ def process_datasets(datasets):
 
         #Append indices based on the first dataset length
         train_indices = random.sample(range(dataset_size), int(0.9 * dataset_size))
-        print("original indices:", len(train_indices), train_indices )
+        print("original indices:", len(train_indices) )
         test_indices = random.sample(set(range(dataset_size)) - set(train_indices), int(0.1 * dataset_size))
-        print("original test indices:", len(test_indices), test_indices )
+        print("original test indices:", len(test_indices) )
         #train_indices, test_indices = get_balanced_samples(datasets[0])
-        #done = 5/0
         train_indice_list.append(train_indices)
         test_indice_list.append(test_indices)
 
@@ -320,6 +321,7 @@ def process_datasets(datasets):
         multi_input_train_val.append(dataset[train_indice_list[i]])
         multi_input_test.append(dataset[test_indice_list[i]])
     
+    print("indices lens so number of examples per: train: ", len(multi_input_train_val[0]), len(multi_input_test[0]))
     print("Dataset processing complete.")
 
     return multi_input_train_val, multi_input_test
@@ -385,11 +387,11 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     print("number of datasets: ", num_datasets)
     
     #Split classes by just making the last person the test set and the rest training and validation.
-    if leave_one_out:
-        multi_input_train_val, multi_input_test = graph_utils.split_data_by_person(datasets)
-    else:
+    #if leave_one_out:
+    #    multi_input_train_val, multi_input_test = graph_utils.split_data_by_person(datasets)
+    #else:
         #Process datasets by manually shuffling to account for cycles
-        multi_input_train_val, multi_input_test = process_datasets(datasets)
+    multi_input_train_val, multi_input_test = process_datasets(datasets)
 
     dim_out = 3
 
@@ -413,6 +415,7 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
+    #
     #process_data("Chris")
     #process_autoencoder("Chris", 100, 8)
     #Run the model:
@@ -431,22 +434,5 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 32, epochs = 200, folder="Chris", leave_one_out=False, person = None, label = 5 )
+           batch_size = 32, epochs = 1000, folder="Chris", leave_one_out=False, person = None, label = 5 )
 
-
-    #Changed HCF extractor for gait cycles
-
-    #no head 9D is 75.00%, 5.04% 25.39062
-    #No head 3D is 71.56%, 2.19% 4.78516
-    #No head all 3s 3D is (overfitting on train, need bigger network): 78.12%, 3.12% 9.76562
-    #No head 1 and 3: 74.06%, 4.43% 19.62891
-    #No head 3
-    #No head 5:
-    #Next steps
-    #Run 3
-    #Run 4
-    #Run 1,3
-    #Run 1,4
-    #Run 1,3,4
-    #Run best of all with 2
-    #Do all the same again with the big network and see if there's a difference.
