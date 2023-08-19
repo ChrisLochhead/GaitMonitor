@@ -51,7 +51,7 @@ class STGCNBlock(torch.nn.Module):
         #print("shapes: ", residual.shape, x.shape)
         #residual = self.dropout(residual)
         x = residual + x
-        x = self.dropout(x)
+        #x = self.dropout(x)
         return x
 
 class MultiInputSTGACN(torch.nn.Module):

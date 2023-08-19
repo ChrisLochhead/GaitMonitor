@@ -85,11 +85,11 @@ def process_data(folder = "Chris"):
     #render_joints_series("None", relative_joint_data, size=5, plot_3D=True, x_rot = -90, y_rot = 180)
 
     #Double dataset by flipping all joints
-    relative_joint_data = Creator.create_flipped_joint_dataset(relative_joint_data, abs_joint_data, image_data,
-                                                               joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/7_Relative_Data(flipped)") 
+    #relative_joint_data = Creator.create_flipped_joint_dataset(relative_joint_data, abs_joint_data, image_data,
+    #                                                           joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/7_Relative_Data(flipped)") 
 
-    abs_joint_data = Creator.create_flipped_joint_dataset(abs_joint_data, abs_joint_data, image_data,
-                                                            joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/7_Abs_Data(flipped)") 
+    #abs_joint_data = Creator.create_flipped_joint_dataset(abs_joint_data, abs_joint_data, image_data,
+    #                                                        joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/7_Abs_Data(flipped)") 
     pre_scale = abs_joint_data
 
     print("\nStage 7:")
@@ -124,9 +124,9 @@ def process_data(folder = "Chris"):
 
     cycle_dummy = Creator.create_dummy_dataset(pre_scale, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_ABS_cycle")#
     abs_joint_data = Creator.create_dummy_dataset(abs_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_ABS_Noise")
-    relative_joint_data = Creator.create_dummy_dataset(relative_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_REL_Noise")
+    relative_joint_data = Creator.create_dummy_dataset(relative_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_REL_Noise")#
 
-    velocity_data = Creator.create_dummy_dataset(velocity_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_VEL_Noise")
+    velocity_data = Creator.create_dummy_dataset(velocity_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_VEL_Noise")#
 
     joint_bones_data = Creator.create_dummy_dataset(joint_bones_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_BONE_Noise")
 
@@ -154,7 +154,7 @@ def process_data(folder = "Chris"):
     
     #fused_data = Creator.create_fused_dataset(combined_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/18_Combined_Data_Fused")
 
-    #precise_data = Creator.normal_examples_only(combined_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/19_Normal_Only" )
+    precise_data = Creator.normal_examples_only(combined_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/19_Normal_Only" )
     
     if folder == "WeightGaitt":
         full_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/15_Combined_Data/raw/15_Combined_Data.csv",
@@ -211,13 +211,13 @@ def load_datasets(types, folder, person = None):
         
     for i, t in enumerate(types):
         print("loading dataset {} of {}. ".format(i + 1, len(types)), t)
-        base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Abs_Data(flipped)', '7_Abs_Data(flipped).csv',
+        base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_ABS_cycle', '15.5_ABS_cycle.csv',
                                                 joint_connections=Render.joint_connections_m_hip, cycles=True)
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
             datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
-                                                    joint_connections=Render.joint_connections_n_head, cycles=True, preset_cycle=base_cycle.base_cycles))
+                                                   joint_connections=Render.joint_connections_n_head, cycles=True, preset_cycle=base_cycle.base_cycles))
             
             #20 multi person DATASET
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_4_people', '20_4_people.csv',
@@ -234,8 +234,8 @@ def load_datasets(types, folder, person = None):
             #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person, preset_cycle = base_cycle.base_cycles))
             
             #19 simplified dataset
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/12_75_no_head_Data__decimated', '12_75_no_head_Data__decimated.csv',
-             #                                       joint_connections=Render.joint_connections_no_head_m_hip, cycles=True))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/19_Normal_Only', '19_Normal_Only.csv',
+            #                                       joint_connections=Render.joint_connections_no_head_m_hip, cycles=True))
             
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/0_Dummy_Data_15.5',
             #                                          '0_Dummy_Data_15.5.csv',
@@ -415,7 +415,6 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    #
     #process_data("Chris")
     #process_autoencoder("Chris", 100, 8)
     #Run the model:
@@ -434,5 +433,5 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 32, epochs = 1000, folder="Chris", leave_one_out=False, person = None, label = 5 )
+           batch_size = 16, epochs = 100, folder="Chris", leave_one_out=False, person = None, label = 5 )
 

@@ -831,7 +831,7 @@ def create_dummy_dataset(data, output_name):
             noise_sequences.append(frame)
 
 
-        for j in range(3):
+        for j in range(5):
             for frame in sequence:
                 frame_metadata = frame[0:6]
                 frame_metadata[0] = frame_metadata[0] + original_len
