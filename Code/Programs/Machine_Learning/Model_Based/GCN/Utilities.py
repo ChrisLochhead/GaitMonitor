@@ -9,6 +9,7 @@ from torch.nn.utils.rnn import pad_sequence
 from sklearn.model_selection import StratifiedKFold
 import copy
 import torch.nn.functional as F
+from sklearn.metrics import confusion_matrix
 
 def assess_data(dataset):
     print("Dataset type: ", type(dataset), type(dataset[0]))
@@ -31,6 +32,7 @@ def assess_data(dataset):
     # Calculate accuracy
 def accuracy(pred_y, y):
     return (pred_y == y).sum() / len(y)
+        
 
 
 #Returns two arrays where the last person is split off from the rest
@@ -82,6 +84,9 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
             folded_train[d_ind].append(copy.deepcopy(train_data))
             folded_val[d_ind].append(copy.deepcopy(val_data))
 
+    total_preds = []
+    total_ys = []
+
     for fold in range(k_fold):
         print("Fold: ", fold)
         train_loaders = []
@@ -132,10 +137,15 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         model = copy.deepcopy(MY_model)
         model = model.to("cuda")
             
-        model, accuracies, vals, tests = train(model, train_loaders, val_loaders, test_loaders, G, epochs)
+        model, accuracies, vals, tests, all_y, all_pred = train(model, train_loaders, val_loaders, test_loaders, G, epochs)
+        total_ys += all_y
+        total_preds += all_pred
         train_score.append(accuracies[-1])
         val_score.append(vals[-1])
         test_score.append(tests[-1])
+
+    print("final confusion: ")
+    print(confusion_matrix(total_ys, total_preds))
     
     return train_score, val_score, test_score
 
@@ -153,6 +163,9 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
     val_accs = []
     test_accs = []
     
+    all_pred = []
+    all_y = []
+
     #First pass, append all the data together into arrays
     xs_batch = [[] for l in range(len(loader))]
     indice_batch = [[] for l in range(len(loader))]
@@ -221,7 +234,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
 
         # Validation
         #generator.set_state(init)
-        val_loss, val_acc = test(model, val_loader, generator, train = True, validation=True, optimizer = optimizer)
+        val_loss, val_acc, _, _ = test(model, val_loader, generator, train = True, validation=True, optimizer = optimizer)
         val_accs.append(val_acc)
 
         # Print metrics every 10 epochs
@@ -241,7 +254,9 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
             
             if test_loader != None:
                 generator.set_state(init)
-                test_loss, test_acc = test(model, test_loader, generator, validation=False)
+                test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False)
+                all_pred += pred_y
+                all_y += lab_y
                 print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
                 test_accs.append(test_acc)
         #Tidy up to save memory
@@ -249,12 +264,15 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
 
     if test_loader != None:
         generator.set_state(init)
-        test_loss, test_acc = test(model, test_loader, generator, validation=False)
+        test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False)
+        all_pred += pred_y
+        all_y += lab_y
         print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
         test_accs.append(test_acc)
+
     #return model
     #print("returned lens: ", len(embeddings[0]), len(losses), len(accuracies), len(outputs), len(hs))
-    return model, train_accs, val_accs, test_accs
+    return model, train_accs, val_accs, test_accs, all_y, all_pred
 
 def test(model, loaders, generator, validation, train = False, x_b = None, i_b = None, b_b = None, optimizer = None):
     init = generator.get_state()
@@ -262,6 +280,8 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
     model.eval()
     loss = 0
     acc = 0
+    all_y = []
+    all_pred = []
     with torch.no_grad():
         #First pass, append all the data together into arrays
         xs_batch = [[] for l in range(len(loaders))]
@@ -285,7 +305,7 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
 
         #Second pass: process the data 
         generator.set_state(init)
-    #with torch.no_grad():
+
         total_loss = 0
         for index, data in enumerate(loaders[0]):
             data_x = [xs_batch[i][index] for i in range(len(loaders))]
@@ -316,8 +336,12 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
 #                print("actuall: ", data_y[0])
 
             acc = acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loaders[0])
+            #Record all the predictions and labels for each fold of each test
+            if validation == False:
+                all_pred += out.argmax(dim=1).cpu()
+                all_y += data_y[0].cpu()
 
-    return total_loss, acc
+    return total_loss, acc, all_pred, all_y
 
 
 def modify_loss(out, actual):

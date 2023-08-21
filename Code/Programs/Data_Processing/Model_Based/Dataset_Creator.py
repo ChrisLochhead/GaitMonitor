@@ -262,6 +262,18 @@ def combined_ground_truth_dataset(hcf, ground_truths, joints_output):
     Utilities.save_dataset(combined_data, joints_output, colnames=Utilities.combined_colnames)
 
 
+def created_modelled_dataset(data, joints_output):
+    #create average array of all class 0, 1 and 2 frames as sequences
+    #Convert these sequences to relative value equivalents
+    #Interpolate all sequences to 100 frames
+    #Create an average frame for each 100 frame sequence and this is the normalizer frame
+    #Go over every frame in the sequence, subtracting the average from the frame, saving the result as a dataset
+
+
+    #Alternate ideas if this doesn't work: separate models for obstacle and freeze, new one for each class so there's an average for each combination of obstacle, freeze and weight
+    #For the big dataset, new one's per person too.
+    pass
+
 def create_ground_truth_dataset(pre_abs_data, abs_data, rel_data, vel_data, hcf_data, images, joints_output, meta = 5):
     #Intuition: just averaging data will do little to outline potential discriminating data, especially with absolute data, rel or velocities.
     #Instead 

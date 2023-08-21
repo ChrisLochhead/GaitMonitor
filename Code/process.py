@@ -122,13 +122,13 @@ def process_data(folder = "Chris"):
 
     #Individually add noise 
 
-    cycle_dummy = Creator.create_dummy_dataset(pre_scale, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_ABS_cycle")#
-    abs_joint_data = Creator.create_dummy_dataset(abs_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_ABS_Noise")
-    relative_joint_data = Creator.create_dummy_dataset(relative_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_REL_Noise")#
+    #cycle_dummy = Creator.create_dummy_dataset(pre_scale, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_ABS_cycle")#
+    #abs_joint_data = Creator.create_dummy_dataset(abs_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_ABS_Noise")
+    #relative_joint_data = Creator.create_dummy_dataset(relative_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_REL_Noise")#
 
-    velocity_data = Creator.create_dummy_dataset(velocity_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_VEL_Noise")#
+    #velocity_data = Creator.create_dummy_dataset(velocity_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_VEL_Noise")#
 
-    joint_bones_data = Creator.create_dummy_dataset(joint_bones_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_BONE_Noise")
+    #joint_bones_data = Creator.create_dummy_dataset(joint_bones_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_BONE_Noise")
 
     combined_data = Creator.combine_datasets(relative_joint_data, velocity_data, joint_bones_data, image_data,
                                              joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/15_Combined_Data")
@@ -211,7 +211,9 @@ def load_datasets(types, folder, person = None):
         
     for i, t in enumerate(types):
         print("loading dataset {} of {}. ".format(i + 1, len(types)), t)
-        base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_ABS_cycle', '15.5_ABS_cycle.csv',
+        #base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_ABS_cycle', '15.5_ABS_cycle.csv',
+        #                                        joint_connections=Render.joint_connections_m_hip, cycles=True)
+        base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/4.5_Absolute_Data(midhip)', '4.5_Absolute_Data(midhip).csv',
                                                 joint_connections=Render.joint_connections_m_hip, cycles=True)
         #Type 1: Normal, full dataset
         if t == 1:  
@@ -433,5 +435,5 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 16, epochs = 100, folder="Chris", leave_one_out=False, person = None, label = 5 )
+           batch_size = 16, epochs = 1, folder="Chris", leave_one_out=False, person = None, label = 5 )
 
