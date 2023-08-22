@@ -307,15 +307,10 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
                 y_classes[d.item()] += 1
 
             out = model(data_x, data_i, data_b, train)
+            #out = F.softmax(out, dim=1)
+            out = modify_loss(out, data_y[0])
             loss = criterion(out, data_y[0]) / len(loaders[0]) 
             total_loss = total_loss + loss
-            out = F.softmax(out, dim=1)
-            #if validation == False:
-            #    print("out: ", out, out.argmax(dim=1))#
-
-#            if validation == False:
-#                print("guesses: ", out.argmax(dim=1))
-#                print("actuall: ", data_y[0])
 
             acc = acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loaders[0])
             #Record all the predictions and labels for each fold of each test
@@ -339,8 +334,17 @@ def modify_loss(out, actual):
                 #print("calling?", predictions[i], actual[i])
                 #Make incorrect prediction WAY wronger
                 #new_row[predictions[i].item()] *= 1.0
-                new_out[i][predictions[i].item()] *= 1.5
+                pred_1 = 0
+                pred_2 = 1
+                if predictions[i].item() == 0:
+                    pred_1 = 1
+                    pred_2 = 2
+                elif predictions[i].item() == 1:
+                    pred_1 = 0
+                    pred_2 = 2
 
+                new_out[i][pred_1] *= 1.5
+                new_out[i][pred_2] *= 1.5
         #new_out.append(new_row)
 
     return new_out#torch.tensor(new_out, requires_grad=True).to("cuda")

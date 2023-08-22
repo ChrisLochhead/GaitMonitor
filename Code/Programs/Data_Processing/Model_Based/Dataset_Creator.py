@@ -1055,11 +1055,17 @@ def subtract_skeleton(rel_data, joint_output, base_output):
     rel_sequences = interpolate_gait_cycle(rel_sequences, base_output, 0, restrict_cycle=True) # try just cutting all to minimum size first, then by padding
 
     overlay_sequence = rel_sequences[0]
+    overlay_sequences = [s for i, s in enumerate(rel_sequences) if i % 60 == 0]
+
+    print("should be 16 sequences for weight gait: ", len(overlay_sequences))
     #for seq in rel_sequences:
     #    print("len: ", len(seq))
     #done = 5/0
-
+    overlay_iter = -1
     for i, sequence in enumerate(rel_sequences):
+        if i % 60 == 0:
+            overlay_iter += 1
+            print("overlay iter: ", overlay_iter)
         for j, frame in enumerate(sequence):
             #One example of each type
             #if i == 10 or i == 15:
@@ -1069,7 +1075,7 @@ def subtract_skeleton(rel_data, joint_output, base_output):
             for k, coord in enumerate (frame):
                 if k> 5:
                     #Check if coord and overlay[j][k] are within a radius of eachother
-                    if check_within_radius(coord, overlay_sequence[j][k], 75):
+                    if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 100):
                         #print("detected within raidus: ", coord, overlay_sequence[j][k])
                         rel_sequences[i][j][k] = [0.001, 0.001, 0.001]
 

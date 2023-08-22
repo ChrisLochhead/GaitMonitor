@@ -20,7 +20,7 @@ class STGCNBlock(torch.nn.Module):
         self.b1 = BatchNorm1d(dim_h).to("cuda")
         self.temporal_conv2 = torch.nn.Conv1d(dim_h, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to("cuda")
         self.relu = ReLU()
-        self.dropout = torch.nn.Dropout(0.2)
+        self.dropout = torch.nn.Dropout(0.1)
         self.skip_connection = torch.nn.Conv1d(in_channels, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to("cuda")
 
         #Shape Info
@@ -51,11 +51,11 @@ class STGCNBlock(torch.nn.Module):
         #print("shapes: ", residual.shape, x.shape)
         #residual = self.dropout(residual)
         x = residual + x
-        #x = self.dropout(x)
+        x = self.dropout(x)
         return x
 
 class MultiInputSTGACN(torch.nn.Module):
-    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 4, stgcn_filters = [16, 16, 32, 32], 
+    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 5, stgcn_filters = [16, 16, 32, 32, 64], 
                  max_cycle = 49, num_nodes_per_graph = 18):
         super(MultiInputSTGACN, self).__init__()
 
