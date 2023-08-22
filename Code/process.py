@@ -24,7 +24,7 @@ def process_data(folder = "Chris"):
 
     #Extract joints from images
     #run_images("./Code/Datasets/" + str(folder) + "/Full_Dataset", out_folder="./Code/Datasets/Joint_Data/" + str(folder) + "/", exclude_2D=False, 
-    #          start_point=0)
+    #          start_point=-1)
     
     #Display first 2 instances of results 
     #print("\nStage 1: ")
@@ -49,127 +49,52 @@ def process_data(folder = "Chris"):
 
     abs_joint_data, image_data = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)/raw/3_Absolute_Data(trimmed instances).csv",
                                                               "./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
-    print("lens: ", len(abs_joint_data), len(image_data))
-
-    #Normalize size (use absolute dataset)
-    abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data,
-                                               joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
     
-
-    abs_joint_data = Creator.new_normalize_values(abs_joint_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(normed)", 3)
-
-    
-
-    print("\nStage 3: ")
-    #render_joints_series(image_data, abs_joint_data, size=10)
-
-    #Normalize outliers
-    abs_joint_data = Creator.create_normalized_dataset(abs_joint_data, image_data, 
-                                                   joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/4_Absolute_Data(normalized)")
     print("\nStage 4:")
     #render_joints_series(image_data, abs_joint_data, size=10)
     abs_joint_data = Creator.append_midhip(abs_joint_data, image_data, 
-                                                   joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/4.5_Absolute_Data(midhip)")
-     
-    print("\nStage 4.5:")
-    #render_joints_series(image_data, abs_joint_data, size=10)
+                                                   joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(midhip)")
 
-    print("\nStage 5: ")
-    #render_joints_series(image_data, abs_joint_data, size=10)
+    #abs_joint_data = Creator.new_normalize_values(abs_joint_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/9_Absolute_Data(normed)", 3)
 
     #Create relative dataset
     relative_joint_data = Creator.create_relative_dataset(abs_joint_data, image_data,
                                                  joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/6_Relative_Data(relative)")
+
+    #Flip all the joints to be facing one way to prepare for background skeleton subtraction
+    relative_joint_data = Creator.create_flipped_joint_dataset(relative_joint_data, abs_joint_data, None,
+                                                                joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/12_Flipped(same_way)", double_size=False)
+    relative_joint_data = Creator.subtract_skeleton(relative_joint_data, 
+                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/12_Rel_Subtracted",
+                                                      base_output="./Code/Datasets/Joint_Data/" + str(folder) + "/12_Rel_base")
     
-    print("\nStage 6:")
-    #render_joints_series("None", relative_joint_data, size=5, plot_3D=True, x_rot = -90, y_rot = 180)
-
-    #Double dataset by flipping all joints
-    #relative_joint_data = Creator.create_flipped_joint_dataset(relative_joint_data, abs_joint_data, image_data,
-    #                                                           joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/7_Relative_Data(flipped)") 
-
-    #abs_joint_data = Creator.create_flipped_joint_dataset(abs_joint_data, abs_joint_data, image_data,
-    #                                                        joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/7_Abs_Data(flipped)") 
-    pre_scale = abs_joint_data
-
-    print("\nStage 7:")
-    #render_joints_series("None", flipped_joint_data, size=5, plot_3D=True, x_rot = -90, y_rot = 180)
 
     #Create velocity dataset
     velocity_data = Creator.create_velocity_dataset(abs_joint_data, image_data, 
-                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/8_Velocity_Data(velocity)")
-    print("\nStage 8:")
-    #render_velocity_series(abs_joint_data, velocity_data, image_data, size=20)
-
-    #velocity_data = Creator.create_flipped_joint_dataset(velocity_data, abs_joint_data, image_data,
-    #                                                           joint_output = "./Code/Datasets/Joint_Data/" + str(folder) + "/9_Velocity_Data(flipped)")  
-
-    print("\nStage 9: ")
+                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Velocity_Data(velocity)")
+    #Flip all the joints to be facing one way to prepare for background skeleton subtraction
+    velocity_data = Creator.create_flipped_joint_dataset(velocity_data, abs_joint_data, None,
+                                                                joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Vel_Flipped(same_way)", double_size=False)
+    velocity_data = Creator.subtract_skeleton(velocity_data, 
+                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Vel_Subtracted",
+                                                      base_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Vel_base")
+    
     #Create joint angles data
     joint_bones_data = Creator.create_bone_dataset(abs_joint_data, image_data, 
-                                                   joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/10_Bones_Data(integrated)")
+                                                   joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/15_Bones_Data(integrated)")
+    #Flip all the joints to be facing one way to prepare for background skeleton subtraction
+    joint_bones_data = Creator.create_flipped_joint_dataset(joint_bones_data, abs_joint_data, None,
+                                                                joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/14_Bone_Flipped(same_way)", double_size=False)
+    joint_bones_data = Creator.subtract_skeleton(joint_bones_data, 
+                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/14_Bone_Subtracted",
+                                                      base_output="./Code/Datasets/Joint_Data/" + str(folder) + "/14_Bone_base")
     
     #render_velocity_series(abs_joint_data, joint_bones_data, image_data, size=20)
 
-    print("\nStage 10:")
-    regions_data = Creator.create_decimated_dataset(abs_joint_data,
-                                                "./Code/Datasets/Joint_Data/" + str(folder) + "/12_75_no_head_Data_",
-                                                    image_data)
-    #print("\nStage 11:", pre_scale[0])
-    #Create HCF dataset
-    print("\nStage 13:")
-    #Combine datasets (relative, velocity, joint angles, regions)
-
-    #Individually add noise 
-
-    #cycle_dummy = Creator.create_dummy_dataset(pre_scale, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_ABS_cycle")#
-    #abs_joint_data = Creator.create_dummy_dataset(abs_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_ABS_Noise")
-    #relative_joint_data = Creator.create_dummy_dataset(relative_joint_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_REL_Noise")#
-
-    #velocity_data = Creator.create_dummy_dataset(velocity_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_VEL_Noise")#
-
-    #joint_bones_data = Creator.create_dummy_dataset(joint_bones_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_BONE_Noise")
-
     combined_data = Creator.combine_datasets(relative_joint_data, velocity_data, joint_bones_data, image_data,
-                                             joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/15_Combined_Data")
-    
-    #combined_data = Creator.create_dummy_dataset(combined_data, output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15.5_Combined_Noise")
+                                             joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/19_Combined_Data")
 
-
-    #hcf_data = Creator.create_hcf_dataset(abs_joint_data, abs_joint_data, relative_joint_data, velocity_data, image_data, 
-    #                           joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_HCF_Data")
     
-    #hcf_data_normed = Creator.normalize_hcf(hcf_data, 
-    #                                         joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13.5_HCF_Data(normed)")
-    
-    
-    print("\nStage 14:")
-    #Create regions data of combined data
-    #top_region_dataset, bottom_region_dataset = Creator.create_2_regions_dataset(combined_data,
-    #                                                                             joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/16_Combined_Data_2Region",
-    #                                                                             images = image_data)
-    #regions_data = Creator.create_5_regions_dataset(combined_data,
-    #                                                "./Code/Datasets/Joint_Data/" + str(folder) + "/17_Combined_Data_5Region",
-    #                                                  image_data)
-    
-    #fused_data = Creator.create_fused_dataset(combined_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/18_Combined_Data_Fused")
-
-    precise_data = Creator.normal_examples_only(combined_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/19_Normal_Only" )
-    
-    if folder == "WeightGaitt":
-        full_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/15_Combined_Data/raw/15_Combined_Data.csv",
-                                                              "./Code/Datasets/" + str(folder) + "/15_Combined_Data/", cols=Utilities.colnames_midhip, ignore_depth=False)
-        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_1_People", [1])
-        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_2_People", [0,1])
-        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_3_People", [0,1,2])
-        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_4_People", [0,3,5,6])
-        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_Cade", [2])
-        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_Elisa", [4])
-        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_Longfei", [5])
-        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_Pheobe", [6])
-        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_SeanC", [7])
-        two_person_data = Creator.create_n_size_dataset(full_data, "./Code/Datasets/Joint_Data/" + str(folder) + "/20_SeanG", [8])
-#########################################################################################################################
 
 def load_2_region_data(folder, base):
     top_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/16_Combined_Data_2Region_top',
@@ -213,27 +138,35 @@ def load_datasets(types, folder, person = None):
         print("loading dataset {} of {}. ".format(i + 1, len(types)), t)
         #base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_ABS_cycle', '15.5_ABS_cycle.csv',
         #                                        joint_connections=Render.joint_connections_m_hip, cycles=True)
-        base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/4.5_Absolute_Data(midhip)', '4.5_Absolute_Data(midhip).csv',
+        base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/12_Rel_base', '12_Rel_base.csv',
                                                 joint_connections=Render.joint_connections_m_hip, cycles=True)
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Combined_Data', '15_Combined_Data.csv',
-                                                   joint_connections=Render.joint_connections_n_head, cycles=True, preset_cycle=base_cycle.base_cycles))
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/19_Combined_Data', '19_Combined_Data.csv',
+                                                   joint_connections=Render.joint_connections_n_head, cycles=True))
             
-            #20 multi person DATASET
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_4_people', '20_4_people.csv',
-            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True))
+            #Experimental
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/12_Rel_Subtracted', '12_Rel_Subtracted.csv',
+            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=base_cycle.base_cycles))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/13_Vel_Subtracted', '13_Vel_Subtracted.csv',
+            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=base_cycle.base_cycles))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/14_Bone_Subtracted', '14_Bone_Subtracted.csv',
+            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=base_cycle.base_cycles))
+              
+            #Modelled dataset
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/9_Absolute_Data(normed)', '9_Absolute_Data(normed).csv',
+            #                                      joint_connections=Render.joint_connections_m_hip, cycles=True, interpolate=False))
             
             #7 3s co-ords
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/7_Relative_Data(flipped)', '7_Relative_Data(flipped).csv',
-            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person, preset_cycle = base_cycle.base_cycles))#
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/12_Flipped', '12_Flipped.csv',
+            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person))#
 
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/8_Velocity_Data(velocity)', '8_Velocity_Data(velocity).csv',
-            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person, preset_cycle = base_cycle.base_cycles))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/12_Velocity_Data(velocity)', '12_Velocity_Data(velocity).csv',
+            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person, preset_cycle = datasets[0].base_cycles))
             
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/10_Bones_Data(integrated)', '10_Bones_Data(integrated).csv',
-            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person, preset_cycle = base_cycle.base_cycles))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Bones_Data(integrated)', '15_Bones_Data(integrated).csv',
+            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person, preset_cycle = datasets[0].base_cycles))
             
             #19 simplified dataset
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/19_Normal_Only', '19_Normal_Only.csv',
@@ -417,7 +350,7 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    #process_data("Chris")
+    process_data("Chris")
     #process_autoencoder("Chris", 100, 8)
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
@@ -435,5 +368,5 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 16, epochs = 1, folder="Chris", leave_one_out=False, person = None, label = 5 )
+           batch_size = 8, epochs = 100, folder="Chris", leave_one_out=False, person = None, label = 5 )
 

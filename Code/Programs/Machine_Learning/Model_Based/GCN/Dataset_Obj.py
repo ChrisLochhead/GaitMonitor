@@ -14,7 +14,7 @@ import copy
 
 class JointDataset(Dataset):
     def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip,
-                  cycles = False, meta = 5, person = None, preset_cycle = None):
+                  cycles = False, meta = 5, person = None, preset_cycle = None, interpolate = True):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
@@ -30,6 +30,7 @@ class JointDataset(Dataset):
         self.cycle_indices = []
         self.person = person
         self.preset_cycle = preset_cycle
+        self.interpolate = interpolate
         super(JointDataset, self).__init__(root, transform, pre_transform)
         
     @property
@@ -58,6 +59,12 @@ class JointDataset(Dataset):
     def set_gait_cycles(self, data):
         new_cycles = []
         data_iter = 0
+        total_size_of_preset = 0
+        for c in self.preset_cycle:
+            total_size_of_preset += len(c)
+        
+        print("total lens: ", total_size_of_preset, len(data))
+        #stop = 5/0
         for i, cycle in enumerate(self.preset_cycle):
             new_cycle = []
             for j, frame in enumerate(cycle):
@@ -108,7 +115,8 @@ class JointDataset(Dataset):
             #self.data_cycles = HCF.alternate_get_gait_cycles(self.data.to_numpy(), None)
             self.data_cycles = HCF.sample_gait_cycles(copy.deepcopy(self.base_cycles))
             self.data_cycles = HCF.normalize_gait_cycle_lengths(self.data_cycles)
-            self.data_cycles = Creator.interpolate_gait_cycle(self.data_cycles, None)
+            #if self.interpolate:
+            #    self.data_cycles = Creator.interpolate_gait_cycle(self.data_cycles, None)
 
             print("here's the cycles: ", len(self.data_cycles), len(self.data_cycles[0]))
 

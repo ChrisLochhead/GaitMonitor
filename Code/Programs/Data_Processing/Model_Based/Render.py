@@ -236,9 +236,9 @@ def filter_coords(joints, index, metadata = 3):
 
 def plot3D_joints(joints, pixel = True, metadata = 3, x_rot = 90, y_rot = 180):
     # generate data
-    x = filter_coords(joints, 0)
-    y = filter_coords(joints, 1)
-    z = filter_coords(joints, 2)
+    x = filter_coords(joints, 0, metadata=metadata)
+    y = filter_coords(joints, 1, metadata=metadata)
+    z = filter_coords(joints, 2, metadata=metadata)
 
     # axes instance
     fig = plt.figure(figsize=(6,6))
@@ -290,17 +290,23 @@ def plot3D_joints(joints, pixel = True, metadata = 3, x_rot = 90, y_rot = 180):
     # save
     #plt.savefig("scatter_hue", bbox_inches='tight')
 
-def render_joints_series(image_source, joints, size, delay = True, use_depth = True, plot_3D = False, x_rot = 90, y_rot= 180):
+def render_joints_series(image_source, joints, size, delay = True, use_depth = True, plot_3D = False, x_rot = 90, y_rot= 180, background = False):
     
     joints, images = Utilities.process_data_input(joints, image_source)
     for i in range(size):
         if plot_3D:
             plot3D_joints(joints[i], x_rot=x_rot, y_rot=y_rot)
         else:
-            render_joints(images[i], joints[i], delay, use_depth)
+            if background:
+                print("len iamges: ", len(images))
+                print("\njoints: ", joints[i])
+                render_joints(images[0], joints[i], delay, use_depth)
+            else:
+                render_joints(images[i], joints[i], delay, use_depth)  
+
             cv2.destroyWindow("Joint Utilities Image")
 
-def render_joints(image, joints, delay = False, use_depth = True, metadata = 6, colour = (255, 0, 0)):
+def render_joints(image, joints, delay = False, use_depth = True, metadata = 6, colour = (0, 255, 0)):
     tmp_image = copy.deepcopy(image)
     tmp_image = draw_joints_on_frame(tmp_image, joints, use_depth_as_colour=use_depth, metadata = metadata, colour=colour)
     cv2.imshow('Joint Utilities Image',tmp_image)

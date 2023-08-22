@@ -186,7 +186,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
         #Reduce by 0.1 times at 10th and 60th epoch
         if epoch == 40:
             #print("reducing learing rate")
-            optimizer.param_groups[0]['lr'] = 0.01
+            optimizer.param_groups[0]['lr'] = 0.1
         elif epoch == 80:
             #print("reducing learning rate again")
             optimizer.param_groups[0]['lr'] = 0.001
@@ -206,25 +206,13 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
             data_b = [batch_batch[i][index] for i in range(len(loader))]
             data_y =  [ys_batch[i][index] for i in range(len(loader))]
 
-            #print("data: ", len(data_x), data_x[0].shape)
             out = model(data_x, data_i, data_b, train=True)
             #First data batch with Y has to have the right outputs
 
-            #y_classes = [0,0,0]
-            #for d in data_y[0]:
-            #   y_classes[d.item()] += 1
-            
-            #print("ratio: ", y_classes)
-
-            #print("Lens: ", len(out), len(data_y[0]), out.shape, data_y[0].shape)  
-
-            #out = modify_loss(out, data_y[0])    
-              
+            #out = F.softmax(out, dim=1)
+            out = modify_loss(out, data_y[0])
             loss = criterion(out, data_y[0]) / len(loader[0])
-
             total_loss = total_loss + loss
-
-            out = F.softmax(out, dim=1)
             acc =  acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loader[0])
             train_accs.append(acc)
             loss.backward()
@@ -297,6 +285,7 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
                 indice_batch[i].append(data.edge_index)
                 batch_batch[i].append(data.batch)
                 ys_batch[i].append(data.y)
+                #print("loader: ", data, len(data))
 
         #if validation:
         #    print("validation batch: ", len(xs_batch[0]))
@@ -316,13 +305,6 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
             y_classes = [0,0,0]
             for d in data_y[0]:
                 y_classes[d.item()] += 1
-            
-            #if validation:
-            #    print("ratio: ", y_classes)
-            #else:
-            #if validation == False: 
-            #    print("test ratio", y_classes)
-
 
             out = model(data_x, data_i, data_b, train)
             loss = criterion(out, data_y[0]) / len(loaders[0]) 

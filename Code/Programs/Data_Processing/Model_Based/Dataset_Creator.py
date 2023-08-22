@@ -262,17 +262,113 @@ def combined_ground_truth_dataset(hcf, ground_truths, joints_output):
     Utilities.save_dataset(combined_data, joints_output, colnames=Utilities.combined_colnames)
 
 
-def created_modelled_dataset(data, joints_output):
+def created_modelled_dataset(data, rel_data, joints_output):
     #create average array of all class 0, 1 and 2 frames as sequences
-    #Convert these sequences to relative value equivalents
-    #Interpolate all sequences to 100 frames
-    #Create an average frame for each 100 frame sequence and this is the normalizer frame
-    #Go over every frame in the sequence, subtracting the average from the frame, saving the result as a dataset
+    sequence_data = Utilities.convert_to_sequences(data)
 
+    #Convert these sequences to relative value equivalents
+    rel_sequence_data = sequence_data# Utilities.generate_relative_sequence_data(sequence_data, rel_data)
+
+    for i, template in enumerate(rel_sequence_data):
+        if i == 0:
+            print("length of template: ", len(template))
+            print("first example: ", template[0])
+
+    smallest_size = min(len(sub_list) for sub_list in rel_sequence_data)
+    print("small: ", smallest_size)
+
+    #Interpolate all sequences to 100 frames
+    rel_sequence_data =  interpolate_gait_cycle(rel_sequence_data, None, restrict_cycle=True)
+
+    for i, template in enumerate(rel_sequence_data):
+        if i == 0:
+            print("length of template (after interpolation): ", len(template))
+            print("first example: ", template[0])
+
+
+    #Create an average frame for each 100 frame sequence and this is the normalizer frame
+    print("length of sequences should be 60: ", len(rel_sequence_data))
+
+    class_template = []
+    for i, sequence in enumerate(rel_sequence_data):
+        #class 0, normal walks
+        if i >= 0 and i <= 9:
+            class_template.append(sequence)
+        
+
+    for i, template in enumerate(class_template):
+        if i == 0:
+            print("length of template: ", len(template))
+            print("appearance after next stage: ", template[0])
+
+    #Class template is 10 sequences of 144 frames, we want to have 144 frames left of each index frame added together
+    class_average = copy.deepcopy(class_template[0])
+    for i, sequence in enumerate(class_template):
+        #Ignore first sequence as it's already appended to class average
+        if i > 0:
+            #Go through the frames in each sequence
+            for j, frame in enumerate(sequence):
+                #for each set of co-ordinates (so every value after 5 to exclude metadata)
+                #print("\nframe: ", frame)
+                for k, coord in enumerate(frame):
+                    if k > 5:
+                        if j == 0 and k == 7:
+                            print("\nfirst co-ord:", coord)
+                        #Add this co-ord to the corresponding class average
+                        for l, value in enumerate(coord):
+                            class_average[j][k][l] += value
+
+    print("total class average: ", class_average[0], len(class_template))
+
+    for i, frame in enumerate(class_average):
+        for j, coord in enumerate(frame):
+            if j > 5:
+                for k, value in enumerate(coord):
+                    class_average[i][j][k] /= len(class_template)
+
+    print("\nclass average after divide: ", class_average[0])
+
+    #Go over every frame in the sequence, subtracting the average from the frame, saving the result as a dataset
+    print("what are these: ", len(rel_sequence_data), len(rel_sequence_data[0]), len(class_average), len(class_average[i]))
+
+    final_sequence_data = []
+    for i, rel_sequence in enumerate(rel_sequence_data):
+        print("rel sequence: ", rel_sequence[0])
+        final_sequence_data.append(subtract_list_of_lists(rel_sequence, class_average))
+
+    #Unravel the data for saving
+    final_data = []
+    for sequence in final_sequence_data:
+        for frame in sequence:
+            final_data.append(frame)
+
+    print("final here: ", final_data[0])
+            
+    Utilities.save_dataset(final_data, joints_output)
+    return final_sequence_data
 
     #Alternate ideas if this doesn't work: separate models for obstacle and freeze, new one for each class so there's an average for each combination of obstacle, freeze and weight
     #For the big dataset, new one's per person too.
-    pass
+
+def subtract_list_of_lists(sequence1, sequence2):
+    result = copy.deepcopy(sequence1)
+    for i, frame in enumerate(sequence1):
+        for j, coords in enumerate(frame):
+            if j > 5:
+                if i == 0 or i == 3:
+                    print("\nsubtracting: ", result[i])
+                    print("\nfrom: ", sequence2[i])
+                for k, value in enumerate(coords):
+                    result[i][j][k] -= sequence2[i][j][k]
+                
+                if i == 0:
+                    print("\nresult: ", result[i])
+
+    return result
+
+
+
+
 
 def create_ground_truth_dataset(pre_abs_data, abs_data, rel_data, vel_data, hcf_data, images, joints_output, meta = 5):
     #Intuition: just averaging data will do little to outline potential discriminating data, especially with absolute data, rel or velocities.
@@ -397,12 +493,20 @@ def create_scaled_dataset(joint_data, image_data, joint_output):
     print("Data scale processing complete.")
     return joint_data
 
-def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output, meta = 5):
+def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output, meta = 5, double_size = True):
     print("\nCreating flipped dataset...")
     abs_data, images = Utilities.process_data_input(abs_data, images)
     rel_data, _ = Utilities.process_data_input(rel_data, images)
 
     sequence_data = Utilities.convert_to_sequences(abs_data)
+    print("lens: ", len(sequence_data), len(rel_data))
+    totals = [0,0]
+    for l in sequence_data:
+        totals[0] += len(l)
+    for a in rel_data:
+        totals[1] += len(a)
+
+    print("totals: ", totals)
     rel_sequence_data = Utilities.generate_relative_sequence_data(sequence_data, rel_data)
 
     flipped_data = [] 
@@ -417,37 +521,33 @@ def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output, meta 
         last = sequence_data[i][-1]
 
         #This is going from right to left: the ones we want to flip
-        #if first[meta+1][1] > last[meta+1][1]:
+        if (first[meta+1][1] > last[meta+1][1] and double_size == False) or double_size == True:
 
-        #First append regular data:
-        for joints in seq:
-            flipped_data.append(joints)
+            #First append regular data:
+            if double_size:
+                for joints in seq:
+                    flipped_data.append(joints)
 
-
-        for joints in seq:
-            #Append original data
-            #Append with metadata
-            flipped_joints = joints[0:meta + 1]
-            print("sequence: ", flipped_joints[0], original_len, flipped_joints[0] + original_len)
-            flipped_joints[0] = flipped_joints[0] + original_len
-            for j, joint in enumerate(joints):
-                #Flip X value on each individual co-ordinate
-                if j > meta:
-                    flipped_joints.append([joint[0], -joint[1], joint[2]])
-            #Append flipped joints instance to the list
-            flipped_sequences.append(flipped_joints)
-
+            for joints in seq:
+                flipped_joints = joints[0:meta + 1]
+                flipped_joints[0] = flipped_joints[0] + original_len
+                for j, joint in enumerate(joints):
+                    #Flip X value on each individual co-ordinate
+                    if j > meta:
+                        flipped_joints.append([joint[0], -joint[1], joint[2]])
+                #Append flipped joints instance to the list
+                flipped_sequences.append(flipped_joints)
+        else:
+            for joints in seq:
+                flipped_sequences.append(joints)
+                
     for frame in flipped_sequences:
         flipped_data.append(frame)
-        #else:
-        #Just add the data sequentially for the joints already going from left to right.
-        #    for joints in seq:
-        #        flipped_data.append(joints)
-
     
     #Illustrate results
     print("illustrating results: ")
     print("size after flip: ", len(flipped_data))
+
     for k, joints in enumerate(flipped_data):
         if k > 20 and k < 50:
             pass
@@ -875,28 +975,31 @@ def create_dummy_dataset(data, output_name):
     return noise_sequences
 
 
-def interpolate_gait_cycle(data_cycles, joint_output, step = 5):
+def interpolate_gait_cycle(data_cycles, joint_output, step = 5, restrict_cycle = False):
     inter_cycles = []
+    min_cycle_count = min(len(sub_list) for sub_list in data_cycles) - 1
     for a, cycle in enumerate(data_cycles):
+        
         inter_cycle = []
-        #print("original cycle length: ", len(cycle))
+        print("original cycle length: ", len(cycle))
         for i, frame in enumerate(cycle):
-            #Add the frame first
-            inter_cycle.append(frame)
+            if i < min_cycle_count or restrict_cycle == False:
+                #Add the frame first
+                inter_cycle.append(frame)
 
-            #Ignore the last frame for interpolation
-            if i < len(cycle) - 1:
-                inter_frames = interpolate_coords(frame, cycle[i + 1], step)
-                #Unwrap and add to full cycle 
-                for j in range(step):
-                    inter_cycle.append(inter_frames[j])
-                    #print("inter frames: ", inter_frames[j])
-                    #print("normal frame: ", frame)
-                    #print("types: ", type(inter_frames[0][6]), type(frame[6]))
-                    #print("actual: ", inter_frames[0][6], frame[6])
-                    #stop = 5/0
+                #Ignore the last frame for interpolation
+                if i < len(cycle) - 1:
+                    inter_frames = interpolate_coords(frame, cycle[i + 1], step)
+                    #Unwrap and add to full cycle 
+                    for j in range(step):
+                        inter_cycle.append(inter_frames[j])
+                        #print("inter frames: ", inter_frames[j])
+                        #print("normal frame: ", frame)
+                        #print("types: ", type(inter_frames[0][6]), type(frame[6]))
+                        #print("actual: ", inter_frames[0][6], frame[6])
+                        #stop = 5/0
 
-        #print("new cycle should be ", step, " times longer: ", len(inter_cycle))
+        print("new cycle should be ", step, " times longer: ", len(inter_cycle), min_cycle_count)
            # if i > 1:
            #     for c in inter_cycle:
            #         print("here: ", type(c), c)
@@ -904,6 +1007,12 @@ def interpolate_gait_cycle(data_cycles, joint_output, step = 5):
         inter_cycles.append(inter_cycle)
     
     print("cycle length should be same: ", len(inter_cycles), len(data_cycles))
+    save_cycles = []
+    for c in inter_cycles:
+        for f in c:
+            save_cycles.append(f)
+
+    Utilities.save_dataset(save_cycles, joint_output)
     return inter_cycles
 
 
@@ -930,4 +1039,62 @@ def interpolate_coords(start_frame, end_frame, step):
         
     return inter_frames
 
-            
+
+def check_within_radius(point1, point2, radius):
+    if len(point1) != 3 or len(point2) != 3:
+        raise ValueError("Both points should have exactly 3 dimensions.")
+    
+    #3D is no good for this
+    distance = math.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)# + (point1[2] - point2[2])**2)
+    return distance <= radius
+
+def subtract_skeleton(rel_data, joint_output, base_output):
+
+    rel_sequences = Utilities.convert_to_sequences(rel_data)
+
+    rel_sequences = interpolate_gait_cycle(rel_sequences, base_output, 0, restrict_cycle=True) # try just cutting all to minimum size first, then by padding
+
+    overlay_sequence = rel_sequences[0]
+    #for seq in rel_sequences:
+    #    print("len: ", len(seq))
+    #done = 5/0
+
+    for i, sequence in enumerate(rel_sequences):
+        for j, frame in enumerate(sequence):
+            #One example of each type
+            #if i == 10 or i == 15:
+            #    print("showing  before: ", frame)
+            #    Render.plot3D_joints(frame, metadata=6)
+
+            for k, coord in enumerate (frame):
+                if k> 5:
+                    #Check if coord and overlay[j][k] are within a radius of eachother
+                    if check_within_radius(coord, overlay_sequence[j][k], 75):
+                        #print("detected within raidus: ", coord, overlay_sequence[j][k])
+                        rel_sequences[i][j][k] = [0.001, 0.001, 0.001]
+
+            #if i == 10 or i == 15:
+            #    print("showing  after: ", frame)
+            #    Render.plot3D_joints(frame, metadata=6)
+
+    #Unwrap sequences
+    final_data = []
+    for i, sequence in enumerate(rel_sequences):
+        for frame in sequence:
+            final_data.append(frame)
+            #Render.plot3D_joints(frame, metadata=6)
+
+    Utilities.save_dataset(final_data, joint_output)
+    return final_data
+
+
+
+#3D show before and after render joints to verify its working,make it so it shows all of Instance 0, 10, 15
+
+
+#Voting strategy:
+
+# split batch into individual elements,
+#split element into individual frames
+#pass each frame through network individually, and append its output 
+#list the votes,convery to 3D vector for softmaxing pick the majority and use that as loss
