@@ -137,7 +137,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         model = copy.deepcopy(MY_model)
         model = model.to("cuda")
             
-        model, accuracies, vals, tests, all_y, all_pred = train(model, train_loaders, val_loaders, test_loaders, G, epochs)
+        model, accuracies, vals, tests, all_y, all_pred = train(model, train_loaders, val_loaders, test_loaders, G, epochs, batch)
         total_ys += all_y
         total_preds += all_pred
         train_score.append(accuracies[-1])
@@ -149,7 +149,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
     
     return train_score, val_score, test_score
 
-def train(model, loader, val_loader, test_loader, generator, epochs):
+def train(model, loader, val_loader, test_loader, generator, epochs, batch_size):
     init = generator.get_state()
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(),
@@ -182,7 +182,8 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
             ys_batch[ind].append(data.y)  
 
     for epoch in range(epochs + 1):
-        
+
+        #optimizer.zero_grad()
         #Reduce by 0.1 times at 10th and 60th epoch
         if epoch == 40:
             #print("reducing learing rate")
@@ -198,13 +199,43 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
         #Second pass: process the data 
         generator.set_state(init)
         for index, data in enumerate(loader[0]):
-
             optimizer.zero_grad()
-            data = data.to("cuda")
             data_x = [xs_batch[i][index] for i in range(len(loader))]
             data_i = [indice_batch[i][index] for i in range(len(loader))]
             data_b = [batch_batch[i][index] for i in range(len(loader))]
             data_y =  [ys_batch[i][index] for i in range(len(loader))]
+
+            #print("what is this: ", data_x[0], type(data_x[0]))
+            #done = 5/0
+            #size_of_batch = len(data_x) / batch_size
+            #print("size of batch should be 294: ", size_of_batch)
+            #out_votes = [0,0,0]
+            #for i in range(size_of_batch):
+            #    #Extract an individual sequence
+            #    multiplier = i * size_of_batch
+            #    batch_x = data_x[multiplier: i + multiplier]
+            #    batch_i = data_x[multiplier: i + multiplier]
+            #    batch_b = data_x[multiplier: i + multiplier]
+            #    batch_y = data_x[multiplier: i + multiplier]
+            #    print("are these correct?", len(batch_x), batch_y)
+            #    done = 5/0
+            #    frame_votes = [0,0,0]
+            #    #For every frame in the sequence of this batch
+            #    for j in size_of_batch:
+            #        out = model(batch_x, batch_i, batch_b, train=True)
+            #        out = modify_loss(out, data_y[0])##
+
+            #        print("what's out here: ", out, out.argmax(dim=1))
+            #        frame_votes[out] += 1
+            #    print("frame votes: ", frame_votes)
+            #    print("max: ", max(frame_votes))
+            #    out_votes[max(frame_votes)] += 1
+            #    done = 5/0
+                
+            #Apply loss at the end of the full batch
+            #loss = criterion(out, data_y[0])# / len(loader[0])
+            #total_loss = total_loss + loss
+
 
             out = model(data_x, data_i, data_b, train=True)
             #First data batch with Y has to have the right outputs
@@ -236,9 +267,9 @@ def train(model, loader, val_loader, test_loader, generator, epochs):
                 optimizer.param_groups[0]['lr'] = 0.01
             if val_loss < 0.85:
                 optimizer.param_groups[0]['lr'] = 0.001
-            if val_loss < 0.75:
+            #if val_loss < 0.75:
                 #print("going to test")
-                break
+            #    break
             
             if test_loader != None:
                 generator.set_state(init)

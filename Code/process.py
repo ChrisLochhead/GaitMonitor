@@ -165,16 +165,16 @@ def load_datasets(types, folder, person = None):
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Combined_Data_Noise', '20_Combined_Data_Noise.csv',
-            #                                       joint_connections=Render.joint_connections_n_head, cycles=True))
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Combined_Data_Noise', '20_Combined_Data_Noise.csv',
+                                                   joint_connections=Render.joint_connections_n_head, cycles=True))
             
             #Experimental
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Rel_Data_Noise', '20_Rel_Data_Noise.csv',
-                                                   joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=base_cycle.base_cycles))
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Vel_Data_Noise', '20_Vel_Data_Noise.csv',
-                                                   joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=base_cycle.base_cycles))
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Bone_Data_Noise', '20_Bone_Data_Noise.csv',
-                                                   joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=base_cycle.base_cycles))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Rel_Data_Noise', '20_Rel_Data_Noise.csv',
+            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=base_cycle.base_cycles))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Vel_Data_Noise', '20_Vel_Data_Noise.csv',
+            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=base_cycle.base_cycles))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Bone_Data_Noise', '20_Bone_Data_Noise.csv',
+            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=base_cycle.base_cycles))
               
             #Modelled dataset
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/9_Absolute_Data(normed)', '9_Absolute_Data(normed).csv',
@@ -372,7 +372,8 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    #process_data("weightgait")
+    #
+    process_data("Chris")
     #process_autoencoder("Chris", 100, 8)
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
@@ -390,5 +391,5 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 16, epochs = 100, folder="weightgait", leave_one_out=False, person = None, label = 5 )
+           batch_size = 8, epochs = 100, folder="Chris", leave_one_out=False, person = None, label = 5 )
 
