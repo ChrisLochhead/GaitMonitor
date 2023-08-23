@@ -493,12 +493,16 @@ def create_scaled_dataset(joint_data, image_data, joint_output):
     print("Data scale processing complete.")
     return joint_data
 
-def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output, meta = 5, double_size = True):
+def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output, meta = 5, double_size = True, already_sequences = False):
     print("\nCreating flipped dataset...")
     abs_data, images = Utilities.process_data_input(abs_data, images)
     rel_data, _ = Utilities.process_data_input(rel_data, images)
 
-    sequence_data = Utilities.convert_to_sequences(abs_data)
+    if already_sequences == False:
+        sequence_data = Utilities.convert_to_sequences(abs_data)
+    else:
+        sequence_data = abs_data
+
     print("lens: ", len(sequence_data), len(rel_data))
     totals = [0,0]
     for l in sequence_data:
@@ -507,7 +511,10 @@ def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output, meta 
         totals[1] += len(a)
 
     print("totals: ", totals)
-    rel_sequence_data = Utilities.generate_relative_sequence_data(sequence_data, rel_data)
+    if already_sequences == False:
+        rel_sequence_data = Utilities.generate_relative_sequence_data(sequence_data, rel_data)
+    else:
+        rel_sequence_data = rel_data
 
     flipped_data = [] 
     print("size before flip: ", len(rel_sequence_data), len(sequence_data))
@@ -981,7 +988,7 @@ def interpolate_gait_cycle(data_cycles, joint_output, step = 5, restrict_cycle =
     for a, cycle in enumerate(data_cycles):
         
         inter_cycle = []
-        print("original cycle length: ", len(cycle))
+        #print("original cycle length: ", len(cycle))
         for i, frame in enumerate(cycle):
             if i < min_cycle_count or restrict_cycle == False:
                 #Add the frame first
@@ -993,17 +1000,7 @@ def interpolate_gait_cycle(data_cycles, joint_output, step = 5, restrict_cycle =
                     #Unwrap and add to full cycle 
                     for j in range(step):
                         inter_cycle.append(inter_frames[j])
-                        #print("inter frames: ", inter_frames[j])
-                        #print("normal frame: ", frame)
-                        #print("types: ", type(inter_frames[0][6]), type(frame[6]))
-                        #print("actual: ", inter_frames[0][6], frame[6])
-                        #stop = 5/0
 
-        print("new cycle should be ", step, " times longer: ", len(inter_cycle), min_cycle_count)
-           # if i > 1:
-           #     for c in inter_cycle:
-           #         print("here: ", type(c), c)
-                #stop = 5/0
         inter_cycles.append(inter_cycle)
     
     print("cycle length should be same: ", len(inter_cycles), len(data_cycles))
@@ -1011,15 +1008,12 @@ def interpolate_gait_cycle(data_cycles, joint_output, step = 5, restrict_cycle =
     for c in inter_cycles:
         for f in c:
             save_cycles.append(f)
-
-    Utilities.save_dataset(save_cycles, joint_output)
+    if joint_output != None:
+        Utilities.save_dataset(save_cycles, joint_output)
     return inter_cycles
 
 
 def interpolate_coords(start_frame, end_frame, step):
-    #start_frame = np.array(start_frame)
-    #end_frame = np.array(end_frame)
-
     # Calculate the step size for interpolation
     inter_frames = []
     for i in range(1, step + 1):
@@ -1034,9 +1028,7 @@ def interpolate_coords(start_frame, end_frame, step):
                 #print("\ninterpolated coord 2: ", type(listed), listed)
                 inter_frame[j] = listed
         inter_frames.append(inter_frame)
-
-
-        
+       
     return inter_frames
 
 
@@ -1075,9 +1067,9 @@ def subtract_skeleton(rel_data, joint_output, base_output):
             for k, coord in enumerate (frame):
                 if k> 5:
                     #Check if coord and overlay[j][k] are within a radius of eachother
-                    if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 100):
+                    if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 75):
                         #print("detected within raidus: ", coord, overlay_sequence[j][k])
-                        rel_sequences[i][j][k] = [0.001, 0.001, 0.001]
+                        rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
 
             #if i == 10 or i == 15:
             #    print("showing  after: ", frame)

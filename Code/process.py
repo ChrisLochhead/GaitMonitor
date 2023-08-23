@@ -67,8 +67,13 @@ def process_data(folder = "Chris"):
     relative_joint_data = Creator.subtract_skeleton(relative_joint_data, 
                                                     joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/12_Rel_Subtracted",
                                                       base_output="./Code/Datasets/Joint_Data/" + str(folder) + "/12_Rel_base")
-    relative_joint_data = Creator.create_flipped_joint_dataset(relative_joint_data, abs_joint_data, None,
-                                                                joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Rel_Flipped(double)", double_size=True)
+    
+ 
+    relative_joint_data = Creator.create_flipped_joint_dataset(Utilities.convert_to_sequences(relative_joint_data),
+                                                                Creator.interpolate_gait_cycle(Utilities.convert_to_sequences(abs_joint_data),
+                                                                None, 0, restrict_cycle=True), None,
+                                                                joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Rel_Flipped(double)",
+                                                                double_size=True, already_sequences=True)
     rel_dummy = Creator.create_dummy_dataset(relative_joint_data, 
                                                 output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Rel_Data_Noise")
 
@@ -81,8 +86,11 @@ def process_data(folder = "Chris"):
     velocity_data = Creator.subtract_skeleton(velocity_data, 
                                                     joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Vel_Subtracted",
                                                       base_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Vel_base")
-    velocity_data = Creator.create_flipped_joint_dataset(velocity_data, abs_joint_data, None,
-                                                                joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Vel_Flipped(double)", double_size=True)
+    velocity_data = Creator.create_flipped_joint_dataset(Utilities.convert_to_sequences(velocity_data),
+                                                                Creator.interpolate_gait_cycle(Utilities.convert_to_sequences(abs_joint_data),
+                                                                None, 0, restrict_cycle=True), None,
+                                                                joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Vel_Flipped(double)",
+                                                                double_size=True, already_sequences=True)
     vel_dummy = Creator.create_dummy_dataset(velocity_data, 
                                             output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Vel_Data_Noise")
     #Create joint angles data
@@ -94,9 +102,11 @@ def process_data(folder = "Chris"):
     joint_bones_data = Creator.subtract_skeleton(joint_bones_data, 
                                                     joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/14_Bone_Subtracted",
                                                       base_output="./Code/Datasets/Joint_Data/" + str(folder) + "/14_Bone_base")
-    joint_bones_data = Creator.create_flipped_joint_dataset(joint_bones_data, abs_joint_data, None,
-                                                                joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Bone_Flipped(double)", double_size=True)
-    
+    joint_bones_data = Creator.create_flipped_joint_dataset(Utilities.convert_to_sequences(joint_bones_data),
+                                                                Creator.interpolate_gait_cycle(Utilities.convert_to_sequences(abs_joint_data),
+                                                                None, 0, restrict_cycle=True), None,
+                                                                joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Bone_Flipped(double)",
+                                                                double_size=True, already_sequences=True)
     joint_bone_dummy = Creator.create_dummy_dataset(joint_bones_data, 
                                                 output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Bone_Data_Noise")
     #render_velocity_series(abs_joint_data, joint_bones_data, image_data, size=20)
@@ -362,7 +372,7 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
-    process_data("chris")
+    #process_data("weightgait")
     #process_autoencoder("Chris", 100, 8)
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
@@ -380,5 +390,5 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 8, epochs = 100, folder="chris", leave_one_out=False, person = None, label = 5 )
+           batch_size = 16, epochs = 100, folder="weightgait", leave_one_out=False, person = None, label = 5 )
 
