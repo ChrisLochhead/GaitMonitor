@@ -60,7 +60,7 @@ def split_data_by_person(datasets):
         
 
 # define a cross validation function
-def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=None,k_fold=3, batch = 16, inputs_size = 1, epochs = 100, type = "GAT", make_loaders = False):
+def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=None,k_fold=3, batch = 16, inputs_size = 1, epochs = 100, type = "GAT", make_loaders = False, device = 'cuda'):
     
     train_score = []
     val_score = []
@@ -135,9 +135,10 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         G.set_state(init)
 
         model = copy.deepcopy(MY_model)
-        model = model.to("cuda")
+        model = model.to(device)
             
-        model, accuracies, vals, tests, all_y, all_pred = train(model, train_loaders, val_loaders, test_loaders, G, epochs, batch)
+        #model, accuracies, vals, tests, all_y, all_pred = train(model, train_loaders, val_loaders, test_loaders, G, epochs, batch)
+        model, accuracies, vals, tests, all_y, all_pred = train_individual(model, train_loaders, val_loaders, test_loaders, G, epochs, batch, device)
         total_ys += all_y
         total_preds += all_pred
         train_score.append(accuracies[-1])
@@ -149,7 +150,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
     
     return train_score, val_score, test_score
 
-def train(model, loader, val_loader, test_loader, generator, epochs, batch_size):
+def train(model, loader, val_loader, test_loader, generator, epochs, batch_size, device):
     init = generator.get_state()
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(),
@@ -175,7 +176,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size)
     for ind, load in enumerate(loader): 
         generator.set_state(init)
         for j, data in enumerate(load):
-            data = data.to("cuda")
+            data = data.to(device)
             xs_batch[ind].append(data.x)
             indice_batch[ind].append(data.edge_index)
             batch_batch[ind].append(data.batch)
@@ -253,7 +254,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size)
 
         # Validation
         #generator.set_state(init)
-        val_loss, val_acc, _, _ = test(model, val_loader, generator, train = True, validation=True, optimizer = optimizer)
+        val_loss, val_acc, _, _ = test(model, val_loader, generator, train = True, validation=True, optimizer = optimizer, device = device)
         val_accs.append(val_acc)
 
         # Print metrics every 10 epochs
@@ -273,7 +274,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size)
             
             if test_loader != None:
                 generator.set_state(init)
-                test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False)
+                test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False, device = device)
                 all_pred += pred_y
                 all_y += lab_y
                 print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
@@ -283,7 +284,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size)
 
     if test_loader != None:
         generator.set_state(init)
-        test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False)
+        test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False, device = device)
         all_pred += pred_y
         all_y += lab_y
         print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
@@ -293,7 +294,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size)
     #print("returned lens: ", len(embeddings[0]), len(losses), len(accuracies), len(outputs), len(hs))
     return model, train_accs, val_accs, test_accs, all_y, all_pred
 
-def test(model, loaders, generator, validation, train = False, x_b = None, i_b = None, b_b = None, optimizer = None):
+def test(model, loaders, generator, validation, train = False, x_b = None, i_b = None, b_b = None, optimizer = None, device = 'cuda'):
     init = generator.get_state()
     criterion = torch.nn.CrossEntropyLoss()
     model.eval()
@@ -311,7 +312,7 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
         for i, load in enumerate(loaders): 
             generator.set_state(init)
             for j, data in enumerate(load):
-                data = data.to("cuda")
+                data = data.to(device)
                 xs_batch[i].append(data.x)
                 indice_batch[i].append(data.edge_index)
                 batch_batch[i].append(data.batch)
@@ -378,4 +379,175 @@ def modify_loss(out, actual):
                 new_out[i][pred_2] *= 1.5
         #new_out.append(new_row)
 
-    return new_out#torch.tensor(new_out, requires_grad=True).to("cuda")
+    return new_out
+
+
+
+def train_individual(model, loader, val_loader, test_loader, generator, epochs, batch_size, device = 'cuda'):
+    init = generator.get_state()
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model.parameters(),
+                                lr=0.1,
+                                weight_decay=0.001)
+    
+    epochs = epochs
+    model.train()
+
+    train_accs = []
+    val_accs = []
+    test_accs = []
+    
+    all_pred = []
+    all_y = []
+
+    #First pass, append all the data together into arrays
+    xs_batch = [[] for l in range(len(loader))]
+    indice_batch = [[] for l in range(len(loader))]
+    batch_batch = [[] for l in range(len(loader))]
+    ys_batch = [[] for l in range(len(loader))]
+
+    for ind, load in enumerate(loader): 
+        generator.set_state(init)
+        for j, data in enumerate(load):
+            data = data.to(device)
+            xs_batch[ind].append(data.x)
+            indice_batch[ind].append(data.edge_index)
+            batch_batch[ind].append(data.batch)
+            ys_batch[ind].append(data.y)  
+            print("total here: ", data)
+            original_node_indices = torch.arange(data.x.size(0)) 
+
+
+    for epoch in range(epochs + 1):
+        #Reduce by 0.1 times at 10th and 60th epoch
+        if epoch == 40:
+            #print("reducing learing rate")
+            optimizer.param_groups[0]['lr'] = 0.1
+        elif epoch == 80:
+            #print("reducing learning rate again")
+            optimizer.param_groups[0]['lr'] = 0.001
+
+        total_loss = 0
+        acc = 0
+        val_loss = 0
+        val_acc = 0
+        #Second pass: process the data 
+        generator.set_state(init)
+        for index, data in enumerate(loader[0]):
+            optimizer.zero_grad()
+            data_x = [xs_batch[i][index] for i in range(len(loader))]
+            data_i = [indice_batch[i][index] for i in range(len(loader))]
+            data_b = [batch_batch[i][index] for i in range(len(loader))]
+            data_y =  [ys_batch[i][index] for i in range(len(loader))]
+
+            print("what is this: ", type(data_x), type(data_x[0]), len(data_x), len(data_x[0]))
+            size_of_batch = int(len(data_x[0]) / batch_size)
+            size_of_indices = int(len(data_i[0][1]) / batch_size)
+            print("size of batch should be 294: ", size_of_batch, size_of_indices, len(data_i), len(data_i[0]), len(data_i[0][1]))
+            print("data i ; ", data_i[0])
+            out_votes = [0 for i in range(batch_size)]
+
+            for i in range(batch_size):
+                #Extract an individual sequence
+                multiplier = i * size_of_batch
+                batch_x = data_x[index][multiplier: (i + 1) * size_of_batch]# 0, 294
+                batch_i = data_i[index][:, i * size_of_indices: (i + 1) * size_of_indices] # 8, 16
+                batch_b = data_b[index][multiplier: (i + 1) * size_of_batch] #16, 24
+                #Only 1 y value per tensor
+                batch_y = [data_y[index][i: i + 1]]
+
+                frame_votes = [0,0,0]
+                #For every frame in the sequence of this batch
+                for j in range(size_of_batch):
+                    #At the start of every new frame, send a frame through
+                    if j % 14 == 0:
+                        #print(" i of : ", batch_size, "which should be 8 and j of : ", size_of_batch, "which should be 294")
+                        print("data_x", len(data_x))
+                        print("batch x j: ", batch_x[j])
+                        print("shapes: ", data_x[0].shape, batch_x.shape, batch_x[j: j+14].shape, batch_i[:, j:j+14].shape, batch_b[j: j+14].shape)
+                        #stop = 5/0
+                        frame_x = batch_x[j: j+14]
+                        frame_i = batch_i[:, j:j+14]
+                        print("frame info: ", frame_i)
+                        frame_b = batch_b[j:j+14]
+                        print("how long are these: ", len(frame_x), len(data_x))
+                        print("how long are these: ", len(frame_i), len(data_i), data_i[0].max())
+                        print("maxes:" , frame_i.max(), frame_i.min())
+                        for col_index, col in enumerate(frame_i):
+                            for row_index, row in enumerate(col):
+                                if frame_i[col_index][row_index].item() > 13:
+                                    frame_i[col_index][row_index] = frame_i[col_index][row_index].item() % 13
+
+                        #print("info:", frame_x, frame_x.shape)
+
+                        out = model([frame_x], [frame_i], [frame_b], train=True)
+                        out = modify_loss(out, batch_y)##
+
+                        #print("what's out here: ", out, out.argmax(), batch_y)
+                        frame_votes[out.argmax()] += 1
+                        print("frame votes now: ", frame_votes)
+
+                print("frame votes: ", frame_votes)
+                print("max: ", max(frame_votes))
+                out_votes[i] = [max(frame_votes)]
+
+            
+            print("types: ", type(out), type(out_votes), out.argmax(dim = 1))
+            print("out votes: ")
+
+            #Apply loss at the end of the full batch
+            loss = criterion(out_votes, data_y[0])# / len(loader[0])
+            total_loss = total_loss + loss
+            done = 5/0
+
+            #out = model(data_x, data_i, data_b, train=True)
+            #First data batch with Y has to have the right outputs
+
+            #out = modify_loss(out, data_y[0])
+            #loss = criterion(out, data_y[0]) / len(loader[0])
+            #total_loss = total_loss + loss
+            acc =  acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loader[0])
+            train_accs.append(acc)
+            loss.backward()
+            optimizer.step()
+
+            del data, data_x, data_i, data_b, data_y, out
+
+        # Validation
+        #generator.set_state(init)
+        val_loss, val_acc, _, _ = test(model, val_loader, generator, train = True, validation=True, optimizer = optimizer)
+        val_accs.append(val_acc)
+
+        # Print metrics every 10 epochs
+        if (epoch % 10 == 0):
+            print(f'Epoch {epoch:>3} | Train Loss: {total_loss:.2f} '
+                f'| Train Acc: {acc * 100:>5.2f}% '
+                f'| Val Loss: {val_loss:.2f} '
+                f'| Val Acc: {val_acc * 100:.2f}%')
+            
+            if val_loss < 0.9:
+                optimizer.param_groups[0]['lr'] = 0.01
+            if val_loss < 0.8:
+                optimizer.param_groups[0]['lr'] = 0.001
+
+            if test_loader != None:
+                generator.set_state(init)
+                test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False)
+                all_pred += pred_y
+                all_y += lab_y
+                print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
+                test_accs.append(test_acc)
+        #Tidy up to save memory
+        del total_loss, acc, val_loss, val_acc 
+
+    if test_loader != None:
+        generator.set_state(init)
+        test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False)
+        all_pred += pred_y
+        all_y += lab_y
+        print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
+        test_accs.append(test_acc)
+
+    #return model
+    #print("returned lens: ", len(embeddings[0]), len(losses), len(accuracies), len(outputs), len(hs))
+    return model, train_accs, val_accs, test_accs, all_y, all_pred
