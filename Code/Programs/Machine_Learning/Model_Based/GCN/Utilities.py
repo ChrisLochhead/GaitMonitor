@@ -137,8 +137,8 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         model = copy.deepcopy(MY_model)
         model = model.to(device)
             
-        #model, accuracies, vals, tests, all_y, all_pred = train(model, train_loaders, val_loaders, test_loaders, G, epochs, batch)
-        model, accuracies, vals, tests, all_y, all_pred = train_individual(model, train_loaders, val_loaders, test_loaders, G, epochs, batch, device)
+        model, accuracies, vals, tests, all_y, all_pred = train(model, train_loaders, val_loaders, test_loaders, G, epochs, batch, device)
+        #model, accuracies, vals, tests, all_y, all_pred = train_individual(model, train_loaders, val_loaders, test_loaders, G, epochs, batch, device)
         total_ys += all_y
         total_preds += all_pred
         train_score.append(accuracies[-1])
@@ -206,42 +206,8 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size,
             data_b = [batch_batch[i][index] for i in range(len(loader))]
             data_y =  [ys_batch[i][index] for i in range(len(loader))]
 
-            #print("what is this: ", data_x[0], type(data_x[0]))
-            #done = 5/0
-            #size_of_batch = len(data_x) / batch_size
-            #print("size of batch should be 294: ", size_of_batch)
-            #out_votes = [0,0,0]
-            #for i in range(size_of_batch):
-            #    #Extract an individual sequence
-            #    multiplier = i * size_of_batch
-            #    batch_x = data_x[multiplier: i + multiplier]
-            #    batch_i = data_x[multiplier: i + multiplier]
-            #    batch_b = data_x[multiplier: i + multiplier]
-            #    batch_y = data_x[multiplier: i + multiplier]
-            #    print("are these correct?", len(batch_x), batch_y)
-            #    done = 5/0
-            #    frame_votes = [0,0,0]
-            #    #For every frame in the sequence of this batch
-            #    for j in size_of_batch:
-            #        out = model(batch_x, batch_i, batch_b, train=True)
-            #        out = modify_loss(out, data_y[0])##
-
-            #        print("what's out here: ", out, out.argmax(dim=1))
-            #        frame_votes[out] += 1
-            #    print("frame votes: ", frame_votes)
-            #    print("max: ", max(frame_votes))
-            #    out_votes[max(frame_votes)] += 1
-            #    done = 5/0
-                
-            #Apply loss at the end of the full batch
-            #loss = criterion(out, data_y[0])# / len(loader[0])
-            #total_loss = total_loss + loss
-
-
             out = model(data_x, data_i, data_b, train=True)
             #First data batch with Y has to have the right outputs
-
-            #out = F.softmax(out, dim=1)
             out = modify_loss(out, data_y[0])
             loss = criterion(out, data_y[0]) / len(loader[0])
             total_loss = total_loss + loss
@@ -381,8 +347,6 @@ def modify_loss(out, actual):
 
     return new_out
 
-
-
 def train_individual(model, loader, val_loader, test_loader, generator, epochs, batch_size, device = 'cuda'):
     init = generator.get_state()
     criterion = torch.nn.CrossEntropyLoss()
@@ -414,9 +378,6 @@ def train_individual(model, loader, val_loader, test_loader, generator, epochs, 
             indice_batch[ind].append(data.edge_index)
             batch_batch[ind].append(data.batch)
             ys_batch[ind].append(data.y)  
-            print("total here: ", data)
-            original_node_indices = torch.arange(data.x.size(0)) 
-
 
     for epoch in range(epochs + 1):
         #Reduce by 0.1 times at 10th and 60th epoch
@@ -431,25 +392,24 @@ def train_individual(model, loader, val_loader, test_loader, generator, epochs, 
         acc = 0
         val_loss = 0
         val_acc = 0
+
         #Second pass: process the data 
         generator.set_state(init)
-        for index, data in enumerate(loader[0]):
+        for index, data in enumerate(loader):
             optimizer.zero_grad()
             data_x = [xs_batch[i][index] for i in range(len(loader))]
             data_i = [indice_batch[i][index] for i in range(len(loader))]
             data_b = [batch_batch[i][index] for i in range(len(loader))]
             data_y =  [ys_batch[i][index] for i in range(len(loader))]
 
-            print("what is this: ", type(data_x), type(data_x[0]), len(data_x), len(data_x[0]))
             size_of_batch = int(len(data_x[0]) / batch_size)
             size_of_indices = int(len(data_i[0][1]) / batch_size)
-            print("size of batch should be 294: ", size_of_batch, size_of_indices, len(data_i), len(data_i[0]), len(data_i[0][1]))
-            print("data i ; ", data_i[0])
             out_votes = [0 for i in range(batch_size)]
 
             for i in range(batch_size):
                 #Extract an individual sequence
                 multiplier = i * size_of_batch
+                #print("multiples: ", index, len(data_b), len(data_b[0]), size_of_batch, multiplier, (i + 1) * size_of_batch)
                 batch_x = data_x[index][multiplier: (i + 1) * size_of_batch]# 0, 294
                 batch_i = data_i[index][:, i * size_of_indices: (i + 1) * size_of_indices] # 8, 16
                 batch_b = data_b[index][multiplier: (i + 1) * size_of_batch] #16, 24
@@ -461,61 +421,52 @@ def train_individual(model, loader, val_loader, test_loader, generator, epochs, 
                 for j in range(size_of_batch):
                     #At the start of every new frame, send a frame through
                     if j % 14 == 0:
-                        #print(" i of : ", batch_size, "which should be 8 and j of : ", size_of_batch, "which should be 294")
-                        print("data_x", len(data_x))
-                        print("batch x j: ", batch_x[j])
-                        print("shapes: ", data_x[0].shape, batch_x.shape, batch_x[j: j+14].shape, batch_i[:, j:j+14].shape, batch_b[j: j+14].shape)
-                        #stop = 5/0
                         frame_x = batch_x[j: j+14]
                         frame_i = batch_i[:, j:j+14]
-                        print("frame info: ", frame_i)
                         frame_b = batch_b[j:j+14]
-                        print("how long are these: ", len(frame_x), len(data_x))
-                        print("how long are these: ", len(frame_i), len(data_i), data_i[0].max())
-                        print("maxes:" , frame_i.max(), frame_i.min())
                         for col_index, col in enumerate(frame_i):
                             for row_index, row in enumerate(col):
                                 if frame_i[col_index][row_index].item() > 13:
                                     frame_i[col_index][row_index] = frame_i[col_index][row_index].item() % 13
-
-                        #print("info:", frame_x, frame_x.shape)
-
+                        #print("going in: ", len(frame_x[0]), len(frame_x[0].shape))
                         out = model([frame_x], [frame_i], [frame_b], train=True)
-                        out = modify_loss(out, batch_y)##
-
-                        #print("what's out here: ", out, out.argmax(), batch_y)
+                        #print("out here? ", out)
+                        #print("training at any point?")
+                        #out = modify_loss(out, batch_y)
+                        loss = criterion(out, torch.tensor(batch_y, dtype=torch.long, requires_grad=False)) / size_of_batch
+                        total_loss = total_loss + loss
                         frame_votes[out.argmax()] += 1
-                        print("frame votes now: ", frame_votes)
+                        #print("Out: , ", out, batch_y, out.argmax(), out.argmax(dim=1))
 
-                print("frame votes: ", frame_votes)
-                print("max: ", max(frame_votes))
-                out_votes[i] = [max(frame_votes)]
-
-            
-            print("types: ", type(out), type(out_votes), out.argmax(dim = 1))
-            print("out votes: ")
+                        acc =  acc + accuracy(out.argmax(dim=1), torch.tensor(batch_y)) / size_of_batch
+                        #print("accuracy: ", accuracy(out.argmax(dim=1), torch.tensor(batch_y)), out.argmax(dim=1), torch.tensor(batch_y))
+                        #done = 5/0
+                
+                        #print("frame votes: ", frame_votes)
+                        loss.backward()
+                        optimizer.step()
+                
+                out_votes[i] = frame_votes# normalize_to_range(frame_votes, 0, 1)#frame_votes.index(max(frame_votes))
 
             #Apply loss at the end of the full batch
-            loss = criterion(out_votes, data_y[0])# / len(loader[0])
-            total_loss = total_loss + loss
-            done = 5/0
-
-            #out = model(data_x, data_i, data_b, train=True)
-            #First data batch with Y has to have the right outputs
-
-            #out = modify_loss(out, data_y[0])
-            #loss = criterion(out, data_y[0]) / len(loader[0])
+            final_out = torch.tensor(out_votes, dtype=torch.float, requires_grad=True)
+            #loss = criterion(final_out, data_y[0])# / len(loader[0])
             #total_loss = total_loss + loss
-            acc =  acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loader[0])
+            #print("out votes: ", out_votes, final_out.argmax(dim=1))
+            #print("final out: ", final_out)
+            #print("argmax: ", final_out.argmax(dim=1))
+            #print("data: ", data_y[0])
+            #acc =  acc + accuracy(final_out.argmax(dim=1), data_y[0])# / len(loader[0])
+            #print("accuracy: ", acc, accuracy(final_out.argmax(dim=1), data_y[0]))
             train_accs.append(acc)
-            loss.backward()
-            optimizer.step()
+            #loss.backward()
+            #optimizer.step()
 
-            del data, data_x, data_i, data_b, data_y, out
+            #del data, data_x, data_i, data_b, data_y, out
 
         # Validation
         #generator.set_state(init)
-        val_loss, val_acc, _, _ = test(model, val_loader, generator, train = True, validation=True, optimizer = optimizer)
+        val_loss, val_acc, _, _ = test_individual(model, val_loader, generator, batch_size, validation=True, device=device)
         val_accs.append(val_acc)
 
         # Print metrics every 10 epochs
@@ -532,7 +483,7 @@ def train_individual(model, loader, val_loader, test_loader, generator, epochs, 
 
             if test_loader != None:
                 generator.set_state(init)
-                test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False)
+                test_loss, test_acc, pred_y, lab_y = test_individual(model, test_loader, generator, batch_size, validation=False, device=device)
                 all_pred += pred_y
                 all_y += lab_y
                 print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
@@ -542,7 +493,7 @@ def train_individual(model, loader, val_loader, test_loader, generator, epochs, 
 
     if test_loader != None:
         generator.set_state(init)
-        test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False)
+        test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False, device=device)
         all_pred += pred_y
         all_y += lab_y
         print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
@@ -551,3 +502,115 @@ def train_individual(model, loader, val_loader, test_loader, generator, epochs, 
     #return model
     #print("returned lens: ", len(embeddings[0]), len(losses), len(accuracies), len(outputs), len(hs))
     return model, train_accs, val_accs, test_accs, all_y, all_pred
+
+
+def test_individual(model, loaders, generator, batch_size, validation, device):
+    init = generator.get_state()
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model.parameters(),
+                                lr=0.1,
+                                weight_decay=0.001)
+
+    model.eval()
+
+    train_accs = []
+    all_pred = []
+    all_y = []
+
+    #First pass, append all the data together into arrays
+    xs_batch = [[] for l in range(len(loaders))]
+    indice_batch = [[] for l in range(len(loaders))]
+    batch_batch = [[] for l in range(len(loaders))]
+    ys_batch = [[] for l in range(len(loaders))]
+    with torch.no_grad():
+        for ind, load in enumerate(loaders): 
+            generator.set_state(init)
+            for j, data in enumerate(load):
+                data = data.to(device)
+                xs_batch[ind].append(data.x)
+                indice_batch[ind].append(data.edge_index)
+                batch_batch[ind].append(data.batch)
+                ys_batch[ind].append(data.y)  
+
+        total_loss = 0
+        acc = 0
+        val_loss = 0
+        val_acc = 0
+
+        #Second pass: process the data 
+        generator.set_state(init)
+        for index, data in enumerate(loaders):
+            data_x = [xs_batch[i][index] for i in range(len(loaders))]
+            data_i = [indice_batch[i][index] for i in range(len(loaders))]
+            data_b = [batch_batch[i][index] for i in range(len(loaders))]
+            data_y =  [ys_batch[i][index] for i in range(len(loaders))]
+
+            size_of_batch = int(len(data_x[0]) / batch_size)
+            size_of_indices = int(len(data_i[0][1]) / batch_size)
+            out_votes = [0 for i in range(batch_size)]
+
+            for i in range(batch_size):
+                #Extract an individual sequence
+                multiplier = i * size_of_batch
+                #print("multiples: ", index, len(data_b), len(data_b[0]), size_of_batch, multiplier, (i + 1) * size_of_batch)
+                batch_x = data_x[index][multiplier: (i + 1) * size_of_batch]# 0, 294
+                batch_i = data_i[index][:, i * size_of_indices: (i + 1) * size_of_indices] # 8, 16
+                batch_b = data_b[index][multiplier: (i + 1) * size_of_batch] #16, 24
+                #Only 1 y value per tensor
+                batch_y = [data_y[index][i: i + 1]]
+
+                frame_votes = [0,0,0]
+                #For every frame in the sequence of this batch
+                for j in range(size_of_batch):
+                    #At the start of every new frame, send a frame through
+                    if j % 14 == 0:
+                        frame_x = batch_x[j: j+14]
+                        frame_i = batch_i[:, j:j+14]
+                        frame_b = batch_b[j:j+14]
+                        for col_index, col in enumerate(frame_i):
+                            for row_index, row in enumerate(col):
+                                if frame_i[col_index][row_index].item() > 13:
+                                    frame_i[col_index][row_index] = frame_i[col_index][row_index].item() % 13
+                        #print("going in: ", len(frame_x[0]), len(frame_x[0].shape))
+                        out = model([frame_x], [frame_i], [frame_b], train=True)
+                        #print("training at any point?")
+                        out = modify_loss(out, batch_y)
+                        frame_votes[out.argmax()] += 1
+
+                
+                out_votes[i] = normalize_to_range(frame_votes, 0, 1)#frame_votes.index(max(frame_votes))
+
+            #Apply loss at the end of the full batch
+            loss = criterion(torch.tensor(out_votes, dtype=torch.float, requires_grad=True), data_y[0])# / len(loader[0])
+            total_loss = total_loss + loss
+            acc =  acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loaders)
+            train_accs.append(acc)
+
+            del data, data_x, data_i, data_b#, data_y#, out
+
+
+            if validation == False:
+                all_pred += out.argmax(dim=1).cpu()
+                all_y += data_y[0].cpu()
+
+        #Tidy up to save memory
+        #del total_loss, acc, val_loss, val_acc 
+
+    return total_loss, acc, all_pred, all_y
+
+def normalize_to_range(values, new_min, new_max):
+    # Find the minimum and maximum values in the list
+    min_value = min(values)
+    max_value = max(values)
+    
+    normalized_values = []
+    #print("values: ", values)
+    # Normalize each value to the new range [new_min, new_max]
+    for value in values:
+        normalized_value = (value - min_value) / (max_value - min_value) * (new_max - new_min) + new_min
+        #print("norm: ", normalized_value, float(normalized_value))
+        normalized_values.append(float(normalized_value))
+    
+    #print("final: ", normalized_values)
+    
+    return normalized_values

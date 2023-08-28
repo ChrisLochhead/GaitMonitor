@@ -68,10 +68,10 @@ class MultiInputSTGACN(torch.nn.Module):
         self.hcf = hcf
         self.size_stgcn = stgcn_size
         self.stgcn_filters = stgcn_filters
-        self.batch_size = int(batch_size/batch_size) ###############################CHANGE THIS BACK
+        self.batch_size = batch_size #int(batch_size/batch_size) ###############################CHANGE THIS BACK
         self.data_dims = data_dims
         self.num_nodes_per_graph = num_nodes_per_graph
-        self.cycle_size = num_nodes_per_graph # max_cycle * num_nodes_per_graph ########################AND THIS!!!!!
+        self.cycle_size = max_cycle * num_nodes_per_graph ########################AND THIS!!!!!
         self.device = device
         #Two sub-streams: the first contains the sequences that each input stream goes through,
         #the second is the single combined stream 
