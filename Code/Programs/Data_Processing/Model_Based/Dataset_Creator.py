@@ -1078,19 +1078,9 @@ def subtract_skeleton(rel_data, joint_output, base_output):
             for k, coord in enumerate (frame):
                 if k> 5:
                     #Check if coord and overlay[j][k] are within a radius of eachother, ignoring the first 10
-<<<<<<< HEAD
-                    if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 75):
-=======
-                    if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 25):# and sequence_counter > 19:
->>>>>>> 1e2829f73dbac1b02dee4fd5ae399499dabde3cb
+                    if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 75):# and sequence_counter > 19:
                         #print("detected within raidus: ", coord, overlay_sequence[j][k])
                         rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
-                    #Gradual normalizing effect
-                    elif check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 50):
-                        rel_sequences[i][j][k] = [num / 5 for num in coord]
-                    elif check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 75):
-                        rel_sequences[i][j][k] = [num / 2 for num in coord]
-
         if i % 60 == 0 and i != 0:
             overlay_iter += 1
             print("overlay iter: ", overlay_iter)
