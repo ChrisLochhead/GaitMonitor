@@ -1,6 +1,7 @@
 import Programs.Machine_Learning.Model_Based.GCN.Render as Render
 import torch
 torch.manual_seed(42)
+from sklearn.metrics import f1_score
 
 from torch_geometric.loader import DataLoader as GeoLoader
 from torch.utils.data import RandomSampler
@@ -146,12 +147,15 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
 
     print("final confusion: ")
     print(confusion_matrix(total_ys, total_preds))
+    f1 = f1_score(total_ys, total_preds, average='weighted')
+    print("f1 score: ", f1)
+
     
     return train_score, val_score, test_score
 
 def train(model, loader, val_loader, test_loader, generator, epochs, batch_size):
     init = generator.get_state()
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.CrossEntropyLoss(weight=torch.tensor([3.803, 2.865, 2.501] ,dtype=torch.float32).to('cuda'))
     optimizer = torch.optim.SGD(model.parameters(),
                                 lr=0.1,
                                 weight_decay=0.001)
@@ -204,38 +208,6 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size)
             data_i = [indice_batch[i][index] for i in range(len(loader))]
             data_b = [batch_batch[i][index] for i in range(len(loader))]
             data_y =  [ys_batch[i][index] for i in range(len(loader))]
-
-            #print("what is this: ", data_x[0], type(data_x[0]))
-            #done = 5/0
-            #size_of_batch = len(data_x) / batch_size
-            #print("size of batch should be 294: ", size_of_batch)
-            #out_votes = [0,0,0]
-            #for i in range(size_of_batch):
-            #    #Extract an individual sequence
-            #    multiplier = i * size_of_batch
-            #    batch_x = data_x[multiplier: i + multiplier]
-            #    batch_i = data_x[multiplier: i + multiplier]
-            #    batch_b = data_x[multiplier: i + multiplier]
-            #    batch_y = data_x[multiplier: i + multiplier]
-            #    print("are these correct?", len(batch_x), batch_y)
-            #    done = 5/0
-            #    frame_votes = [0,0,0]
-            #    #For every frame in the sequence of this batch
-            #    for j in size_of_batch:
-            #        out = model(batch_x, batch_i, batch_b, train=True)
-            #        out = modify_loss(out, data_y[0])##
-
-            #        print("what's out here: ", out, out.argmax(dim=1))
-            #        frame_votes[out] += 1
-            #    print("frame votes: ", frame_votes)
-            #    print("max: ", max(frame_votes))
-            #    out_votes[max(frame_votes)] += 1
-            #    done = 5/0
-                
-            #Apply loss at the end of the full batch
-            #loss = criterion(out, data_y[0])# / len(loader[0])
-            #total_loss = total_loss + loss
-
 
             out = model(data_x, data_i, data_b, train=True)
             #First data batch with Y has to have the right outputs

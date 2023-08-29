@@ -950,7 +950,7 @@ def create_dummy_dataset(data, output_name):
             noise_sequences.append(frame)
 
 
-        for j in range(5):
+        for j in range(80):
             for frame in sequence:
                 frame_metadata = frame[0:6]
                 frame_metadata[0] = frame_metadata[0] + original_len
@@ -1067,7 +1067,7 @@ def subtract_skeleton(rel_data, joint_output, base_output):
             for k, coord in enumerate (frame):
                 if k> 5:
                     #Check if coord and overlay[j][k] are within a radius of eachother, ignoring the first 10
-                    if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 75):# and i > 10:
+                    if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 75):
                         #print("detected within raidus: ", coord, overlay_sequence[j][k])
                         rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
 
