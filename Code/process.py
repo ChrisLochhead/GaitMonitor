@@ -16,8 +16,8 @@ import Programs.Machine_Learning.Model_Based.GCN.GAT as gat
 import Programs.Machine_Learning.Model_Based.GCN.STAGCN as stgcn
 import Programs.Machine_Learning.Model_Based.GCN.Utilities as graph_utils
 torch.cuda.empty_cache()
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+#device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda')
 def process_data(folder = "Chris"):
 
 ############################################# PIPELINE ##################################################################
@@ -116,7 +116,22 @@ def process_data(folder = "Chris"):
 
     combined_data = Creator.create_dummy_dataset(combined_data, 
                                                  output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Combined_Data_Noise")
+<<<<<<< HEAD
 
+=======
+    
+    combined_data = Creator.normalize_values(combined_data, 
+                                                 output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Combined_Data_Noise_OldNorm")
+    #combined_data = Creator.create_scaled_dataset(combined_data, None,
+    #                                               joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Combined_Data_Noise_Scaled")
+    
+    combined_data = Creator.new_normalize_values(combined_data, 
+                                                 joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Combined_Data_Noise_NewNorm", joint_size=9)
+    if folder == "weightgait":
+        bob = Creator.create_n_size_dataset(combined_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/Bob", n=[3])
+        chris_elisa = Creator.create_n_size_dataset(combined_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/CE", n=[5,6])
+        chris_elisa = Creator.create_n_size_dataset(combined_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/CEB", n=[3,5,6])
+>>>>>>> 1e2829f73dbac1b02dee4fd5ae399499dabde3cb
 def load_2_region_data(folder, base):
     top_region = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/16_Combined_Data_2Region_top',
                                         '16_Combined_Data_2Region_top.csv',
@@ -159,23 +174,56 @@ def load_datasets(types, folder, person = None):
         print("loading dataset {} of {}. ".format(i + 1, len(types)), t)
         #base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_ABS_cycle', '15.5_ABS_cycle.csv',
         #                                        joint_connections=Render.joint_connections_m_hip, cycles=True)
-        base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/12_Rel_base', '12_Rel_base.csv',
-                                                joint_connections=Render.joint_connections_m_hip, cycles=True)
+        #base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/12_Rel_base', '12_Rel_base.csv',
+        #                                        joint_connections=Render.joint_connections_m_hip, cycles=True)
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Combined_Data_Noise', '20_Combined_Data_Noise.csv',
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Combined_Data_Noise', '20_Combined_Data_Noise.csv',
+            #                                       joint_connections=Render.joint_connections_n_head, cycles=True))
+               
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Combined_Data_Noise_NewNorm', '20_Combined_Data_Noise_NewNorm.csv',
                                                    joint_connections=Render.joint_connections_n_head, cycles=True))
+<<<<<<< HEAD
            # 
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Combined_Data_Newnorm', '20_Combined_Data_Newnorm.csv',
              #                                      joint_connections=Render.joint_connections_n_head, cycles=True))
+=======
+            #         
+>>>>>>> 1e2829f73dbac1b02dee4fd5ae399499dabde3cb
             #Experimental
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Rel_Data_Noise', '20_Rel_Data_Noise.csv',
-            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=base_cycle.base_cycles))
+            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True))#, preset_cycle=base_cycle.base_cycles))
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Vel_Data_Noise', '20_Vel_Data_Noise.csv',
-            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=base_cycle.base_cycles))
+            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=datasets[0].base_cycles))
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Bone_Data_Noise', '20_Bone_Data_Noise.csv',
+<<<<<<< HEAD
             #                                       joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=base_cycle.base_cycles))
+=======
+            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True, preset_cycle=datasets[0].base_cycles))
+              
+            #Modelled dataset
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/9_Absolute_Data(normed)', '9_Absolute_Data(normed).csv',
+            #                                      joint_connections=Render.joint_connections_m_hip, cycles=True, interpolate=False))
+            
+            #7 3s co-ords
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/12_Flipped', '12_Flipped.csv',
+            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person))#
+
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/12_Velocity_Data(velocity)', '12_Velocity_Data(velocity).csv',
+            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person, preset_cycle = datasets[0].base_cycles))
+            
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_Bones_Data(integrated)', '15_Bones_Data(integrated).csv',
+            #                                        joint_connections=Render.joint_connections_n_head, cycles=True, person = person, preset_cycle = datasets[0].base_cycles))
+            
+            #19 simplified dataset
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/19_Normal_Only', '19_Normal_Only.csv',
+            #                                       joint_connections=Render.joint_connections_no_head_m_hip, cycles=True))
+            
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/CEB',
+            #                                          'CEB.csv',
+            #                                       joint_connections=Render.joint_connections_n_head, cycles=True))
+>>>>>>> 1e2829f73dbac1b02dee4fd5ae399499dabde3cb
         #Type 2: HCF dataset
         elif t == 2:
             #This MUST have cycles, there's no non-cycles option
@@ -309,14 +357,18 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
         print("going in: ", datasets[0].num_node_features)
         model = stgcn.MultiInputSTGACN(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=dim_out, n_inputs=num_datasets,
                                     data_dims=data_dims, batch_size=batch_size, hcf=hcf,
-                                    max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph)
+                                    max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph, device = device)
     else:
         print("Invalid model type.")
         return
-    model = model.to("cuda")
+    model = model.to(device)
 
     train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
+<<<<<<< HEAD
                                                                      k_fold=3, batch=batch_size, epochs=epochs, type=model_type)
+=======
+                                                                     k_fold=5, batch=batch_size, epochs=epochs, type=model_type, device=device)
+>>>>>>> 1e2829f73dbac1b02dee4fd5ae399499dabde3cb
 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
@@ -341,5 +393,9 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
+<<<<<<< HEAD
            batch_size = 32, epochs = 100, folder="weightgait", leave_one_out=False, person = None, label = 5 )
+=======
+           batch_size = 8, epochs = 100, folder="weightgait", leave_one_out=False, person = None, label = 5 )
+>>>>>>> 1e2829f73dbac1b02dee4fd5ae399499dabde3cb
 

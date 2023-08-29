@@ -103,6 +103,10 @@ class JointDataset(Dataset):
                 #self.base_cycles = HCF.split_by_instance(self.data.to_numpy())
                 counter = 0
                 for cycle in self.base_cycles:
+<<<<<<< HEAD
+=======
+                    #print("cycle size:: ", len(cycle))
+>>>>>>> 1e2829f73dbac1b02dee4fd5ae399499dabde3cb
                     for frame in cycle:
                         counter +=1
 

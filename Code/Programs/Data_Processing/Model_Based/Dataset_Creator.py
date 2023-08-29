@@ -1040,40 +1040,64 @@ def check_within_radius(point1, point2, radius):
     distance = math.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)# + (point1[2] - point2[2])**2)
     return distance <= radius
 
+
+def get_average_sequence(data):
+    #Get the first sequence and divide it by the number of sequences
+    result = data[0]
+    for i , frame in enumerate(result):
+        for j, coords in enumerate(frame):
+            if j > 5:
+                result[i][j] = [val / len(data) for val in coords]
+
+    #Add every subsequent frame weighted by the number of sequences in the data
+    for i, sequence in enumerate(data):
+        if i > 0:
+            for j, frame in enumerate(sequence):
+                for k, coords in enumerate(frame):
+                    if k > 5:
+                        new_addition = [val / len(data) for val in coords]
+                        result[j][k] = [x + y for x, y in zip(result[j][k], new_addition)]
+    
+    return result
+                    
 def subtract_skeleton(rel_data, joint_output, base_output):
 
     rel_sequences = Utilities.convert_to_sequences(rel_data)
 
     rel_sequences = interpolate_gait_cycle(rel_sequences, base_output, 0, restrict_cycle=True) # try just cutting all to minimum size first, then by padding
 
-    overlay_sequence = rel_sequences[0]
     overlay_sequences = [s for i, s in enumerate(rel_sequences) if i % 60 == 0]
-
-    print("should be 16 sequences for weight gait: ", len(overlay_sequences))
-    #for seq in rel_sequences:
-    #    print("len: ", len(seq))
-    #done = 5/0
-    overlay_iter = -1
     for i, sequence in enumerate(rel_sequences):
         if i % 60 == 0:
-            overlay_iter += 1
-            print("overlay iter: ", overlay_iter)
-        for j, frame in enumerate(sequence):
-            #One example of each type
-            #if i == 10 or i == 15:
-            #    print("showing  before: ", frame)
-            #    Render.plot3D_joints(frame, metadata=6)
+            overlay_sequences.append(get_average_sequence(rel_sequences[i:i+10]))
 
+    overlay_iter = 0
+    sequence_counter = 0
+    for i, sequence in enumerate(rel_sequences):
+        for j, frame in enumerate(sequence):
             for k, coord in enumerate (frame):
                 if k> 5:
                     #Check if coord and overlay[j][k] are within a radius of eachother, ignoring the first 10
+<<<<<<< HEAD
                     if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 75):
+=======
+                    if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 25):# and sequence_counter > 19:
+>>>>>>> 1e2829f73dbac1b02dee4fd5ae399499dabde3cb
                         #print("detected within raidus: ", coord, overlay_sequence[j][k])
                         rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
+                    #Gradual normalizing effect
+                    elif check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 50):
+                        rel_sequences[i][j][k] = [num / 5 for num in coord]
+                    elif check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 75):
+                        rel_sequences[i][j][k] = [num / 2 for num in coord]
 
-            #if i == 10 or i == 15:
-            #    print("showing  after: ", frame)
-            #    Render.plot3D_joints(frame, metadata=6)
+        if i % 60 == 0 and i != 0:
+            overlay_iter += 1
+            print("overlay iter: ", overlay_iter)
+            sequence_counter = 0
+        else:
+            sequence_counter += 1
+        
 
     #Unwrap sequences
     final_data = []
