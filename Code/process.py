@@ -72,11 +72,11 @@ def process_data(folder = "Chris"):
  
     relative_joint_data = Creator.create_flipped_joint_dataset(Utilities.convert_to_sequences(relative_joint_data),
                                                                 Creator.interpolate_gait_cycle(Utilities.convert_to_sequences(abs_joint_data),
-                                                                None, 0, restrict_cycle=True), None,
+                                                                None, 0, restrict_cycle=False), None,
                                                                 joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Rel_Flipped(double)",
                                                                 double_size=True, already_sequences=True)
-    rel_dummy = Creator.create_dummy_dataset(relative_joint_data, 
-                                                output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Rel_Data_Noise")
+    #rel_dummy = Creator.create_dummy_dataset(relative_joint_data, 
+    #                                            output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Rel_Data_Noise")
 
     #Create velocity dataset
     velocity_data = Creator.create_velocity_dataset(abs_joint_data, image_data, 
@@ -89,11 +89,11 @@ def process_data(folder = "Chris"):
                                                       base_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Vel_base")
     velocity_data = Creator.create_flipped_joint_dataset(Utilities.convert_to_sequences(velocity_data),
                                                                 Creator.interpolate_gait_cycle(Utilities.convert_to_sequences(abs_joint_data),
-                                                                None, 0, restrict_cycle=True), None,
+                                                                None, 0, restrict_cycle=False), None,
                                                                 joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Vel_Flipped(double)",
                                                                 double_size=True, already_sequences=True)
-    vel_dummy = Creator.create_dummy_dataset(velocity_data, 
-                                            output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Vel_Data_Noise")
+    #vel_dummy = Creator.create_dummy_dataset(velocity_data, 
+    #                                        output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Vel_Data_Noise")
     #Create joint angles data
     joint_bones_data = Creator.create_bone_dataset(abs_joint_data, image_data, 
                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/15_Bones_Data(integrated)")
@@ -105,11 +105,11 @@ def process_data(folder = "Chris"):
                                                       base_output="./Code/Datasets/Joint_Data/" + str(folder) + "/14_Bone_base")
     joint_bones_data = Creator.create_flipped_joint_dataset(Utilities.convert_to_sequences(joint_bones_data),
                                                                 Creator.interpolate_gait_cycle(Utilities.convert_to_sequences(abs_joint_data),
-                                                                None, 0, restrict_cycle=True), None,
+                                                                None, 0, restrict_cycle=False), None,
                                                                 joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Bone_Flipped(double)",
                                                                 double_size=True, already_sequences=True)
-    joint_bone_dummy = Creator.create_dummy_dataset(joint_bones_data, 
-                                                output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Bone_Data_Noise")
+    #joint_bone_dummy = Creator.create_dummy_dataset(joint_bones_data, 
+    #                                            output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Bone_Data_Noise")
     #render_velocity_series(abs_joint_data, joint_bones_data, image_data, size=20)
 
     combined_data = Creator.combine_datasets(relative_joint_data, velocity_data, joint_bones_data, image_data,
@@ -119,10 +119,10 @@ def process_data(folder = "Chris"):
                                                  output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Combined_Data_Noise")
 
     
-    if folder == "weightgait":
-        bob = Creator.create_n_size_dataset(combined_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/Bob", n=[3])
-        chris_elisa = Creator.create_n_size_dataset(combined_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/CE", n=[5,6])
-        chris_elisa = Creator.create_n_size_dataset(combined_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/CEB", n=[3,5,6])
+    #if folder == "weightgait":
+    #    bob = Creator.create_n_size_dataset(combined_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/Bob", n=[3])
+    #    chris_elisa = Creator.create_n_size_dataset(combined_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/CE", n=[5,6])
+    #    chris_elisa = Creator.create_n_size_dataset(combined_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/CEB", n=[3,5,6])
 
 def load_region_data(folder, type):
     if type == 3:
@@ -303,7 +303,7 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder):
 
 if __name__ == '__main__':
     #
-    #process_data("erin")
+    process_data("weightgait")
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
     #   1: normal full body 9D dataset
@@ -320,4 +320,4 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 64, epochs = 100, folder="big")
+           batch_size = 32, epochs = 100, folder="weightgait")

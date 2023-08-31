@@ -271,7 +271,7 @@ def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output, meta 
     else:
         rel_sequence_data = rel_data
 
-    flipped_data = [] 
+    flipped_data = []
     print("size before flip: ", len(rel_sequence_data), len(sequence_data))
     original_len = len(sequence_data)
     flipped_sequences = []
@@ -292,7 +292,8 @@ def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output, meta 
 
             for joints in seq:
                 flipped_joints = joints[0:meta + 1]
-                flipped_joints[0] = flipped_joints[0] + original_len
+                if double_size:
+                    flipped_joints[0] = flipped_joints[0] + original_len
                 for j, joint in enumerate(joints):
                     #Flip X value on each individual co-ordinate
                     if j > meta:
@@ -631,7 +632,7 @@ def create_dummy_dataset(data, output_name):
     std_dev = 1 
 
     sequences = []
-    current_sequence = 0
+    current_sequence = data[0][0]
     sequence = []
     for i, example in enumerate(data):
         if example[0] == current_sequence:
@@ -643,18 +644,60 @@ def create_dummy_dataset(data, output_name):
             current_sequence += 1
     sequences.append(sequence)
 
-    original_len = len(sequences)
     noise_sequences = []
     novel_sequences = []
+
+    print("info: ", len(sequences), len(sequences[0]))
+    #done = 5/0
+
+    #Get total number of people
+    no_people = sequences[-1][0][5]
+    if no_people <= 0:
+        no_people =1
+    print("should be 16: ", no_people)
+
+    scaling_factors = [0 for i in range(no_people)]
+    frame_counts = [0 for i in range(no_people)]
+    #Minimum number of examples you want per person in frames
+    threshold = 13000
+
+    for sequence in sequences:
+
+        for frame in sequence:
+            #Add -1 for weightgait
+            #Edge case: producing single person datasets sets person to -1
+            if frame[5] < 0:
+                frame[5] = 0
+            #print("what is this: ", frame[5], len(frame_counts), frame_counts)
+            frame_counts[frame[5]-1] += 1
+
+    print("final frame counts per person: ", frame_counts)
+    print("total frames: ", sum(frame_counts))
+
+    for i, factor in enumerate(scaling_factors):
+        #Calculate what I need to multiply by to reach a minimum of 13000 frames (or 2200ish sequences of 6)
+        #5 (chris) should be close to 5, Erin 12 and Elisa 10
+        scaling_factors[i] = int(threshold /frame_counts[i])
+
+    print("scaling factors: ", scaling_factors)
+    #done = 5/0
+
+    scaling_iter = 0
+    print("Num sequences should be 960", len(sequences))
+
     for i, sequence in enumerate(sequences):
         #First: Add the original frames
-        for frame in sequence:
-            noise_sequences.append(frame)
+        if i > 0 and i+1 % 60 == 0:
+            scaling_iter +=1
+            print("changing scale iter: ", i, len(sequences))
 
-        for j in range(12):
+        for frame_index, frame in enumerate(sequence):
+            noise_sequences.append(frame)
+        
+        for j in range(scaling_factors[scaling_iter]):
             for frame in sequence:
                 frame_metadata = frame[0:6]
-                frame_metadata[0] = frame_metadata[0] + original_len
+                frame_metadata[0] = frame_metadata[0] + len(sequences) + (60 * scaling_iter)
                 joints_frame = frame[6:]
                 noisy_frame = joints_frame + np.random.normal(mean, std_dev, (len(joints_frame), len(joints_frame[0])))
                 
@@ -667,13 +710,14 @@ def create_dummy_dataset(data, output_name):
                 for f in noisy_frame:
                     frame_metadata.append(f)
 
-                #done = 5/0
                 novel_sequences.append(frame_metadata)
-        
+    
+    print("length aFTER ADDING ALL NORmal: ", len(noise_sequences))
     for frame in novel_sequences:
         noise_sequences.append(frame)
 
     print("final number of fake examples: ", len(noise_sequences))
+    #stop = 5/0
     Utilities.save_dataset(noise_sequences, output_name)
     return noise_sequences
 
@@ -681,6 +725,8 @@ def create_dummy_dataset(data, output_name):
 def interpolate_gait_cycle(data_cycles, joint_output, step = 5, restrict_cycle = False):
     inter_cycles = []
     min_cycle_count = min(len(sub_list) for sub_list in data_cycles) - 1
+
+    print("len data cycles: ", len(data_cycles))
     for a, cycle in enumerate(data_cycles):
         
         inter_cycle = []
@@ -750,7 +796,10 @@ def get_average_sequence(data):
                 for k, coords in enumerate(frame):
                     if k > 5:
                         new_addition = [val / len(data) for val in coords]
-                        result[j][k] = [x + y for x, y in zip(result[j][k], new_addition)]
+                        try:
+                            result[j][k] = [x + y for x, y in zip(result[j][k], new_addition)]
+                        except:
+                            pass
     
     return result
                     
@@ -758,7 +807,7 @@ def subtract_skeleton(rel_data, joint_output, base_output):
 
     rel_sequences = Utilities.convert_to_sequences(rel_data)
 
-    rel_sequences = interpolate_gait_cycle(rel_sequences, base_output, 0, restrict_cycle=True) # try just cutting all to minimum size first, then by padding
+    rel_sequences = interpolate_gait_cycle(rel_sequences, base_output, 0, restrict_cycle=False) # try just cutting all to minimum size first, then by padding
 
     overlay_sequences = [s for i, s in enumerate(rel_sequences) if i % 60 == 0]
     for i, sequence in enumerate(rel_sequences):
@@ -772,9 +821,12 @@ def subtract_skeleton(rel_data, joint_output, base_output):
             for k, coord in enumerate (frame):
                 if k> 5:
                     #Check if coord and overlay[j][k] are within a radius of eachother, ignoring the first 10
-                    if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 50):# and sequence_counter > 19:
-                        #print("detected within raidus: ", coord, overlay_sequence[j][k])
-                        rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
+                    try:
+                        if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 50):# and sequence_counter > 19:
+                            #print("detected within raidus: ", coord, overlay_sequence[j][k])
+                            rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
+                    except:
+                        pass
         if i % 60 == 0 and i != 0:
             overlay_iter += 1
             print("overlay iter: ", overlay_iter)
