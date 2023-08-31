@@ -412,7 +412,6 @@ def save_dataset(data, name, colnames = colnames):
     elif len(data[0]) == 23:
         colnames = colnames_default
 
-
     new_dataframe = pd.DataFrame(data, columns = colnames)
     
     file_name = name.split("/")
@@ -494,9 +493,6 @@ def make_intrinsics(intrinsics_file = "Code/depth_intrinsics.csv"):
         '''
         Avoid having to read a bagfile to get the camera intrinsics
         '''
-        #with open(intrinsics_file, newline='') as csvfile:
-        #    data_struct = list(csv.reader(csvfile))
-
         data_struct = [['212',	'120',	'107.02976989746094',
           '61.70092010498047',	'154.89523315429688',	'154.63319396972656',	
           'distortion.inverse_brown_conrady',	'[0.0, 0.0, 0.0, 0.0, 0.0]']]
@@ -506,7 +502,6 @@ def make_intrinsics(intrinsics_file = "Code/depth_intrinsics.csv"):
             #avoid converting what is already in the correct format (distortion type)
             if i != 6:
                 data[i] = literal_eval(data[i])
-
 
         # Copied from a bagfile's intrinsics
         intrinsics = rs.intrinsics()
@@ -582,7 +577,6 @@ def apply_class_labels(num_switches, num_classes, joint_data):
     return joint_data
 
 def save_images(joint_data, image_data, directory):
-
     print("Saving images")
     for i, row in enumerate((pbar := tqdm(joint_data))):
 
@@ -602,7 +596,6 @@ def save(joints, name):
     # open the file in the write mode
     with open(name, 'w', newline='') as outfile:
         writer = csv.writer(outfile)
-
         #Save the joints as a CSV
         for j, pt in enumerate(joints):
             for in_joint in pt:

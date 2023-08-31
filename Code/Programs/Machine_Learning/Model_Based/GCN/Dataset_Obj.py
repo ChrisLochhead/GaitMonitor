@@ -11,10 +11,11 @@ import Programs.Data_Processing.Model_Based.Render as Render
 import Programs.Data_Processing.Model_Based.HCF as HCF
 import Programs.Data_Processing.Model_Based.Dataset_Creator as Creator
 import copy
+import ast 
 
 class JointDataset(Dataset):
     def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip,
-                  cycles = False, meta = 5, person = None, preset_cycle = None, interpolate = True):
+                  cycles = True, meta = 5, person = None, preset_cycle = None, interpolate = True):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
@@ -55,7 +56,6 @@ class JointDataset(Dataset):
     def download(self):
         pass
                
-    
     def set_gait_cycles(self, data):
         new_cycles = []
         data_iter = 0
@@ -63,8 +63,6 @@ class JointDataset(Dataset):
         for c in self.preset_cycle:
             total_size_of_preset += len(c)
         
-        print("total lens: ", total_size_of_preset, len(data))
-        #stop = 5/0
         for i, cycle in enumerate(self.preset_cycle):
             new_cycle = []
             for j, frame in enumerate(cycle):
@@ -73,8 +71,6 @@ class JointDataset(Dataset):
             new_cycles.append(new_cycle)
         
         return new_cycles
-
-
 
 
     def process(self):
@@ -93,87 +89,58 @@ class JointDataset(Dataset):
 
         coo_matrix = get_COO_matrix(self.joint_connections)
 
-        if self.cycles:
-            #Full cycles per instance
-            #self.data_cycles = HCF.split_by_instance(self.data.to_numpy())
-            #Several cycles per instance
-           # print("data length: ", len(self.data))
-            if self.preset_cycle == None:
-                self.base_cycles = HCF.get_gait_segments(self.data.to_numpy())
-                #self.base_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
-                #self.base_cycles = HCF.split_by_instance(self.data.to_numpy())
-                counter = 0
-                for cycle in self.base_cycles:
-                    #print("cycle size:: ", len(cycle))
-                    for frame in cycle:
-                        counter +=1
+        #Full cycles per instance
+        #self.data_cycles = HCF.split_by_instance(self.data.to_numpy())
+        if self.preset_cycle == None:
+            self.base_cycles = HCF.get_gait_segments(self.data.to_numpy())
+            #self.base_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
+            #self.base_cycles = HCF.split_by_instance(self.data.to_numpy())
+            counter = 0
+            for cycle in self.base_cycles:
+                for frame in cycle:
+                    counter +=1
 
-                print("counter? ", counter, len(self.base_cycles), len(self.base_cycles[0]), len(self.base_cycles[1]))
+            print("counter? ", counter, len(self.base_cycles), len(self.base_cycles[0]), len(self.base_cycles[1]))
 
-            else:
-                self.base_cycles = self.set_gait_cycles(self.data.to_numpy())
-
-            #self.data_cycles = HCF.alternate_get_gait_cycles(self.data.to_numpy(), None)
-            self.data_cycles = HCF.sample_gait_cycles(copy.deepcopy(self.base_cycles))
-            #self.data_cycles = HCF.normalize_gait_cycle_lengths(self.data_cycles)
-
-            
-            #if self.interpolate:
-            #    self.data_cycles = Creator.interpolate_gait_cycle(self.data_cycles, None)
-
-            print("here's the cycles: ", len(self.data_cycles), len(self.data_cycles[0]))
-            #done = 5/0
-            self.num_nodes_per_graph = len(self.data.columns) - self.meta - 1
-
-            t = 0
-            self.max_cycle = 0
-            for i, d in enumerate(self.data_cycles):
-                t += len(d)
-
-                if len(d) > self.max_cycle:
-                    self.max_cycle = len(d)
-            
-
-            self.data = pd.DataFrame(self.data_cycles)
-            self.num_cycles = len(self.data_cycles)
-            for index, row in enumerate(tqdm(self.data_cycles)):
-                
-                self.cycle_indices.append(len(self.data_cycles[index]))
-                    
-                #Start from scratch with coo matrix every cycle as cycles will be different lengths
-                coo_matrix = get_COO_matrix(self.joint_connections)
-                mod_coo_matrix = self.modify_COO_matrix(len(row), self.joint_connections, coo_matrix)
-                # Featurize molecule
-                data = data_to_graph(row, mod_coo_matrix)
-                if self.test:
-                    torch.save(data, 
-                        os.path.join(self.processed_dir, 
-                                    f'data_test_{index}.pt'))
-                else:
-                    torch.save(data, 
-                        os.path.join(self.processed_dir, 
-                                    f'data_{index}.pt'))
-                
-                t_data = torch.load(os.path.join(self.processed_dir, 
-                        f'data_{index}.pt')) 
-            
-                 
         else:
+            self.base_cycles = self.set_gait_cycles(self.data.to_numpy())
 
-            for index, row in tqdm(self.data.iterrows(), total=self.data.shape[0]):
-                # Featurize molecule
-                data = data_to_graph(row, coo_matrix)
+        self.data_cycles = HCF.sample_gait_cycles(copy.deepcopy(self.base_cycles))
+        #self.data_cycles = HCF.normalize_gait_cycle_lengths(self.data_cycles)
+        print("here's the cycles: ", len(self.data_cycles), len(self.data_cycles[0]))
+        self.num_nodes_per_graph = len(self.data.columns) - self.meta - 1
 
-                if self.test:
-                    torch.save(data, 
-                        os.path.join(self.processed_dir, 
-                                    f'data_test_{index}.pt'))
-                else:
-                    torch.save(data, 
-                        os.path.join(self.processed_dir, 
-                                    f'data_{index}.pt'))
+        t = 0
+        self.max_cycle = 0
+        for i, d in enumerate(self.data_cycles):
+            t += len(d)
+
+            if len(d) > self.max_cycle:
+                self.max_cycle = len(d)
+        
+        self.data = pd.DataFrame(self.data_cycles)
+        self.num_cycles = len(self.data_cycles)
+        for index, row in enumerate(tqdm(self.data_cycles)):
             
-
+            self.cycle_indices.append(len(self.data_cycles[index]))
+                
+            #Start from scratch with coo matrix every cycle as cycles will be different lengths
+            coo_matrix = get_COO_matrix(self.joint_connections)
+            mod_coo_matrix = self.modify_COO_matrix(len(row), self.joint_connections, coo_matrix)
+            # Featurize molecule
+            data = data_to_graph(row, mod_coo_matrix)
+            if self.test:
+                torch.save(data, 
+                    os.path.join(self.processed_dir, 
+                                f'data_test_{index}.pt'))
+            else:
+                torch.save(data, 
+                    os.path.join(self.processed_dir, 
+                                f'data_{index}.pt'))
+            
+            t_data = torch.load(os.path.join(self.processed_dir, 
+                    f'data_{index}.pt')) 
+                       
     def len(self):
         return self.data.shape[0]
 
@@ -183,12 +150,10 @@ class JointDataset(Dataset):
             frame_count = 0
             for i, c in enumerate(self.cycle_indices):
                 if idx <= frame_count:
-                    true_indice = i
                     break
                 else:
                     frame_count += c
 
-    
         if self.test:
             data = torch.load(os.path.join(self.processed_dir, 
                                  f'data_test_{idx}.pt'))
@@ -241,9 +206,6 @@ def get_COO_matrix(connections):
         res[1] += [connection[1], connection[0]]
   return res
         
-import ast 
-import copy 
-
 def convert_to_literals(data, meta = 5):
     for i,  (index, row) in enumerate(data.iterrows()):
         for col_index, col in enumerate(row):
@@ -257,55 +219,27 @@ def convert_to_literals(data, meta = 5):
             
 #Input here would be each row
 def data_to_graph(row, coo_matrix, meta = 5):
+    gait_cycle = []
+    y_arr = []
+    for cycle_part in row:
+        refined_row = cycle_part[meta + 1 :]   
+        row_as_array = np.array(refined_row)  
+
+        y = int(cycle_part[2])  
+        y_arr.append(y)
+        if len(gait_cycle) <= 0:
+            gait_cycle = row_as_array
+        else:   
+            gait_cycle = np.concatenate((gait_cycle, row_as_array), axis=0)
+
+    #Verify gait cycle is calculated correctly:
+    #Pass entire cycle as single graph
+    data = Data(x=torch.tensor(list(gait_cycle), dtype=torch.float),
+        y=torch.tensor([y], dtype=torch.long),
+        edge_index=torch.tensor(coo_matrix, dtype=torch.long),
+        )
     
-    #The single instance per row case (No gait cycles, row is a single frame)
-    if isinstance(row[0], np.ndarray) == False and isinstance(row[0], list) == False:
-        refined_row = row.iloc[meta + 1:]
-        node_f= refined_row
-
-        #This is standard Data that has edges
-        row_as_array = np.array(node_f.values.tolist())
-        #Turn into one-hot vector
-        y = int(row.iloc[2])
-
-        data = Data(x=torch.tensor(row_as_array, dtype=torch.float),
-                    y=torch.tensor(y, dtype=torch.long),
-                    edge_index=torch.tensor(coo_matrix, dtype=torch.long),
-                    #This isn't needed
-                    #edge_attr=torch.tensor(edge_attr,dtype=torch.float)
-                    )
-        
-        return data
-    #The multi-instance case (with gait cycles, row is a full cycle of frames or varying length)
-    else:
-        gait_cycle = []
-        y_arr = []
-        for cycle_part in row:
-            refined_row = cycle_part[meta + 1 :]   
-            row_as_array = np.array(refined_row)  
-
-            y = int(cycle_part[2])  
-            y_arr.append(y)
-            if len(gait_cycle) <= 0:
-                gait_cycle = row_as_array
-            else:   
-                #print("len gait: ", len(gait_cycle), len(gait_cycle[0]), len(row_as_array), len(row_as_array[0]))
-                #print("gait 1: ", gait_cycle, type(gait_cycle), type(gait_cycle[0]), type(gait_cycle[0][0]))
-                #print("gait 2: ", row_as_array, type(row_as_array), type(row_as_array[0]), type(row_as_array[0][0]))
-
-                gait_cycle = np.concatenate((gait_cycle, row_as_array), axis=0)
-                #stop = 5/0 
-
-        #Verify gait cycle is calculated correctly:
-        #Pass entire cycle as single graph
-        data = Data(x=torch.tensor(list(gait_cycle), dtype=torch.float),
-            y=torch.tensor([y], dtype=torch.long),
-            edge_index=torch.tensor(coo_matrix, dtype=torch.long),
-            #This isn't needed
-            #edge_attr=torch.tensor(edge_attr,dtype=torch.float)
-            )
-        
-        return data
+    return data
 
 
 

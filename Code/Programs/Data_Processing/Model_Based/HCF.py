@@ -198,67 +198,12 @@ def get_feet_height(gait_cycles, images):
 
     return feet_heights
 
-
-def alternate_get_gait_cycles(joint_data, images):
-    instances = []
-    instance = []
-    current_instance = 0
-    #First separate the joints into individual instances
-    for joints in joint_data:
-        #Append joints as normal
-        if joints[0] == current_instance:
-            instance.append(joints)
-        else:
-            instances.append(copy.deepcopy(instance))
-            instance = []
-            instance.append(joints)
-            current_instance = joints[0]
-    #Add the last instance hanging off missed by the loop
-    instances.append(copy.deepcopy(instance))
-
-    gait_cycles = []
-    buffer = 5
-    threshold = 50
-    for i, instance in enumerate(instances):
-        instance_cycle_count = 0
-        gait_cycle = []
-        started = False
-        crossover = 0
-        buffer = 5
-        for frame in instance:
-            #Always add the first frame to the new gait cycle
-            if started == False:
-                gait_cycle.append(frame)
-                started = True
-            else:
-                #If detected a cross over event outside of the buffer
-                if np.abs(frame[-2][0] -  frame[-1][0]) <= threshold and buffer == 0:
-                    #Count the crossover and add the frame to the cycle
-                    crossover += 1
-                    gait_cycle.append(frame)
-                    #If there's been two, this is a full gait cycle, add to the cycles and reset everything
-                    if crossover == 2:
-                        crossover = 0
-                        gait_cycles.append(copy.deepcopy(gait_cycle))
-                        instance_cycle_count += 1
-                        gait_cycle = []
-                        buffer = 7
-                else:
-                    #No crossover detected, just business as usual
-                    gait_cycle.append(frame)
-            
-            #Make sure it doesn't detect crossovers over and over by mistakes in the skeleton generation algorithm.
-            if buffer > 0:
-                buffer -= 1
-
-        print("instance: ", i, instance_cycle_count, "of : ", len(instances))
-            
-    return gait_cycles
-
 def get_gait_segments(joint_data):
+    print("length of data in gait segments: ", len(joint_data))
     instances = []
     instance = []
-    current_instance = 0
+    current_instance = joint_data[0][0]
+    
     #First separate the joints into individual instances
     for joints in joint_data:
         #Append joints as normal
@@ -276,10 +221,8 @@ def get_gait_segments(joint_data):
     division_factor = 6
     segments = []
     for instance in instances:
-        print("len instance: ", len(instance))
         segment = []
         num_in_segment = int(len(instance)/division_factor)
-        print("num segments", num_in_segment)  
 
         for i, frame in enumerate(instance):
             if i % division_factor == 0:
@@ -324,19 +267,7 @@ def get_gait_cycles(joint_data, images):
     gait_cycle = []
 
     #For each instance
-    inst_count = 0
     for i, inst in enumerate(instances):
-
-        #if i > 0:
-        #    if len(gait_cycle) > 0:
-        #        crossovers = 0
-        #        if len(gait_cycles) > 0:
-        #            for g in gait_cycle:
-        ##                gait_cycles[-1].append(g)
-        #        else:
-        #            gait_cycles.append(copy.deepcopy(gait_cycle))                    
-        #        gait_cycle = []
-
 
         found_initial_direction = False
         direction = -1
@@ -384,7 +315,6 @@ def get_gait_cycles(joint_data, images):
                 #There is either no cross over or the rows are totally equal, in which case just add as usual
                 gait_cycle.append(row)
 
-
             #row 16 is right leg at crossover point
             #print("crossover count: {} and current instance length: {}, direction: {}, row 18: {}, row 19: {} ".format(crossovers, len(gait_cycle), direction, row[18], row[19]))
             #Render.render_joints(images[j], row, delay=True, use_depth=False)
@@ -396,7 +326,6 @@ def get_gait_cycles(joint_data, images):
                 crossovers = 0
                 gait_cycles.append(copy.deepcopy(gait_cycle))
                 gait_cycle = []
-
 
             if len(gait_cycle) > 19:
                 crossovers = 0
@@ -462,7 +391,6 @@ def sample_gait_cycles(data_cycles):
     for i, lst in enumerate(cycles):
         for j, cycle in enumerate(lst):
             gait_cycles.append(cycle)
-    
 
     return gait_cycles
 
@@ -485,13 +413,7 @@ def normalize_gait_cycle_lengths(data_cycles):
                 if j > 5:
                     for k, coord in enumerate(d):
                         dummy_frame[j][k] = 0
-
-                    
+                
             for j in range(diff):
                 data_cycles[i].append(dummy_frame)
-            
-            #print("finished frame: ", data_cycles[i])
-            #print("types: ", type(data_cycles[i][0]), type(data_cycles[i][-1]))
-            #done = 5/0
-
     return data_cycles
