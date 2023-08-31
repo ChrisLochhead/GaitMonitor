@@ -99,7 +99,8 @@ class JointDataset(Dataset):
             #Several cycles per instance
            # print("data length: ", len(self.data))
             if self.preset_cycle == None:
-                self.base_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
+                self.base_cycles = HCF.get_gait_segments(self.data.to_numpy())
+                #self.base_cycles = HCF.get_gait_cycles(self.data.to_numpy(), None)
                 #self.base_cycles = HCF.split_by_instance(self.data.to_numpy())
                 counter = 0
                 for cycle in self.base_cycles:
@@ -108,18 +109,20 @@ class JointDataset(Dataset):
                         counter +=1
 
                 print("counter? ", counter, len(self.base_cycles), len(self.base_cycles[0]), len(self.base_cycles[1]))
-                #done = 5/0
+
             else:
                 self.base_cycles = self.set_gait_cycles(self.data.to_numpy())
 
             #self.data_cycles = HCF.alternate_get_gait_cycles(self.data.to_numpy(), None)
             self.data_cycles = HCF.sample_gait_cycles(copy.deepcopy(self.base_cycles))
-            self.data_cycles = HCF.normalize_gait_cycle_lengths(self.data_cycles)
+            #self.data_cycles = HCF.normalize_gait_cycle_lengths(self.data_cycles)
+
+            
             #if self.interpolate:
             #    self.data_cycles = Creator.interpolate_gait_cycle(self.data_cycles, None)
 
             print("here's the cycles: ", len(self.data_cycles), len(self.data_cycles[0]))
-
+            #done = 5/0
             self.num_nodes_per_graph = len(self.data.columns) - self.meta - 1
 
             t = 0
@@ -133,7 +136,7 @@ class JointDataset(Dataset):
 
             self.data = pd.DataFrame(self.data_cycles)
             self.num_cycles = len(self.data_cycles)
-            for index, row in enumerate(tqdm(self.data_cycles, total=len(self.data_cycles[0]))):
+            for index, row in enumerate(tqdm(self.data_cycles)):
                 
                 self.cycle_indices.append(len(self.data_cycles[index]))
                     

@@ -76,6 +76,45 @@ bone_connections =[[0, 17], [1, -1], [2, -1], [3, -1], [4, -1],
                     [12, 14], [14, 16], [16, -1],
                    ]
 
+
+def fix_multi_person_labels(data, joint_output):
+    instance_counter = 0
+    person_counter = 1
+    for i, frame in enumerate(data):
+        if i > 0:
+            if data[i][1] < data[i-1][1]:
+                instance_counter +=1
+
+        if instance_counter >= 60:
+            instance_counter = 0
+            person_counter += 1
+        #Class, freeze, obstruction, person
+        if instance_counter <= 9:
+            data[i][2:6] = [0,0,0,person_counter]
+        elif instance_counter > 9 and instance_counter <= 14:
+            data[i][2:6] = [0,1,0,person_counter]
+        elif instance_counter > 14 and instance_counter <= 19:
+            data[i][2:6] = [0,0,1,person_counter]
+
+        elif instance_counter > 19 and instance_counter <= 29:
+            data[i][2:6] = [1,0,0,person_counter]
+        elif instance_counter > 29 and instance_counter <= 34:
+            data[i][2:6] = [1,1,0,person_counter]
+        elif instance_counter > 34 and instance_counter <= 39:
+            data[i][2:6] = [1,0,1,person_counter]
+
+        elif instance_counter > 39 and instance_counter <= 49:
+            data[i][2:6] = [2,0,0,person_counter]
+        elif instance_counter > 49 and instance_counter <= 54:
+            data[i][2:6] = [2,1,0,person_counter]
+        elif instance_counter > 54 and instance_counter <= 59:
+            data[i][2:6] = [2,0,1,person_counter]
+
+    save_dataset(data, joint_output)
+    return data
+
+
+
 #Occlusion co-ordinates for home recording dataset
 occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
 

@@ -50,6 +50,9 @@ def process_data(folder = "Chris"):
     abs_joint_data, image_data = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)/raw/3_Absolute_Data(trimmed instances).csv",
                                                               "./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
     
+    abs_joint_data = Utilities.fix_multi_person_labels(abs_joint_data, 
+                                                       joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/4_Absolute_Data(class_fixed)")
+    #done = 5/0
     print("\nStage 4:")
     #render_joints_series(image_data, abs_joint_data, size=10)
     abs_joint_data = Creator.append_midhip(abs_joint_data, image_data, 
@@ -160,13 +163,13 @@ def load_datasets(types, folder, person = None):
         print("loading dataset {} of {}. ".format(i + 1, len(types)), t)
         #base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15.5_ABS_cycle', '15.5_ABS_cycle.csv',
         #                                        joint_connections=Render.joint_connections_m_hip, cycles=True)
-        base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/12_Rel_base', '12_Rel_base.csv',
-                                                joint_connections=Render.joint_connections_m_hip, cycles=True)
+        #base_cycle = Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/12_Rel_base', '12_Rel_base.csv',
+        #                                        joint_connections=Render.joint_connections_m_hip, cycles=True)
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
             datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Combined_Data_Noise', '20_Combined_Data_Noise.csv',
-                                                   joint_connections=Render.joint_connections_n_head, cycles=True))
+                                                   joint_connections=Render.joint_connections_n_head, cycles=True, preset_cycle=None))
             
             #Experimental
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Rel_Data_Noise', '20_Rel_Data_Noise.csv',
@@ -366,14 +369,14 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, leave_
     model = model.to("cuda")
 
     train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                     k_fold=5, batch=batch_size, epochs=epochs, type=model_type)
+                                                                     k_fold=2, batch=batch_size, epochs=epochs, type=model_type)
 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
 
 if __name__ == '__main__':
     #
-    process_data("Elisa")
+    #process_data("weightgait")
     #process_autoencoder("Chris", 100, 8)
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
@@ -391,5 +394,5 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 8, epochs = 100, folder="Elisa", leave_one_out=False, person = None, label = 5 )
+           batch_size = 64, epochs = 100, folder="weightgait", leave_one_out=False, person = None, label = 5 )
 

@@ -255,6 +255,46 @@ def alternate_get_gait_cycles(joint_data, images):
             
     return gait_cycles
 
+def get_gait_segments(joint_data):
+    instances = []
+    instance = []
+    current_instance = 0
+    #First separate the joints into individual instances
+    for joints in joint_data:
+        #Append joints as normal
+        if joints[0] == current_instance:
+            instance.append(joints)
+        else:
+            #Only add certain persons examples
+            instances.append(copy.deepcopy(instance))
+            instance = []
+            instance.append(joints)
+            current_instance = joints[0]
+    #Add the last instance hanging off missed by the loop
+    instances.append(copy.deepcopy(instance))
+
+    division_factor = 6
+    segments = []
+    for instance in instances:
+        print("len instance: ", len(instance))
+        segment = []
+        num_in_segment = int(len(instance)/division_factor)
+        print("num segments", num_in_segment)  
+
+        for i, frame in enumerate(instance):
+            if i % division_factor == 0:
+                if len(segment) >0:
+                    segments.append(copy.deepcopy(segment))
+                    segment = []
+                segment.append(frame)
+
+            else:
+                segment.append(frame)
+    
+    print("segments should be ", len(segments), len(joint_data), division_factor)
+    #done= 5/0
+    return segments
+
 
 #This will only work with relative data
 def get_gait_cycles(joint_data, images):

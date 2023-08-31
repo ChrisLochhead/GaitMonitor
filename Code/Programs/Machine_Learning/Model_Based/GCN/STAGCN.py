@@ -118,8 +118,8 @@ class MultiInputSTGACN(torch.nn.Module):
         #self.max_pooling = torch.nn.MaxPool1d(5)
 
         self.combination_layer = torch.nn.Sequential(
-        Linear(int(linear_input/1), 1024), ReLU(), BatchNorm1d(1024), torch.nn.Dropout(0.35),
-        Linear(1024, 512), ReLU(), BatchNorm1d(512), torch.nn.Dropout(0.35),
+        Linear(int(linear_input/1), 1024), ReLU(), BatchNorm1d(1024), torch.nn.Dropout(0.1),
+        Linear(1024, 512), ReLU(), BatchNorm1d(512), torch.nn.Dropout(0.1),
         Linear(512, num_classes)
         )
 
