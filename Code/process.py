@@ -321,5 +321,3 @@ if __name__ == '__main__':
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
            batch_size = 64, epochs = 100, folder="big")
-
-    #Chris is 2640  from 17k size, Elisa is only 1200 from 8640??
