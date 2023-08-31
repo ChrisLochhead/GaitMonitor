@@ -10,26 +10,27 @@ from Programs.Machine_Learning.Model_Based.GCN.Dataset_Obj import *
 #Basic ST-GCN Block. These can only be stacked in lists not Torch.NN.Sequentials 
 #because forward takes multiple inputs which causes problem even in custom sequential implementations.
 class STGCNBlock(torch.nn.Module):
-    def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, spatial_size):
+    def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, spatial_size, device):
         super(STGCNBlock, self).__init__()
         #Layers
-        self.b0 = BatchNorm1d(in_channels).to("cuda")
+        self.b0 = BatchNorm1d(in_channels).to(device)
         #self.temporal_conv1 = torch.nn.Conv1d(in_channels, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to("cuda")
-        self.spatial_conv = GATv2Conv(in_channels, dim_h, heads=1).to("cuda")
+        self.spatial_conv = GATv2Conv(in_channels, dim_h, heads=1).to(device)
         #self.spatial_conv = ChebConv(in_channels, dim_h, 1).to("cuda")
-        self.b1 = BatchNorm1d(dim_h).to("cuda")
-        self.temporal_conv2 = torch.nn.Conv1d(dim_h, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to("cuda")
+        self.b1 = BatchNorm1d(dim_h).to(device)
+        self.temporal_conv2 = torch.nn.Conv1d(dim_h, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
         self.relu = ReLU()
         self.dropout = torch.nn.Dropout(0.1)
-        self.skip_connection = torch.nn.Conv1d(in_channels, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to("cuda")
+        self.skip_connection = torch.nn.Conv1d(in_channels, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
 
         #Shape Info
         self.batch_size = batch_size
         self.cycle_size = cycle_size
 
     def forward(self, x, edge_index, train):
-
-        x = self.b0(x)
+        
+        if self.batch_size > 1:
+            x = self.b0(x)
         residual = x
         residual = self.relu(self.skip_connection(residual))
         #x = self.relu(self.temporal_conv1(x))
@@ -56,7 +57,7 @@ class STGCNBlock(torch.nn.Module):
 
 class MultiInputSTGACN(torch.nn.Module):
     def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 5, stgcn_filters = [16, 16, 32, 32, 64], 
-                 max_cycle = 49, num_nodes_per_graph = 18):
+                 max_cycle = 49, num_nodes_per_graph = 18, device = 'cuda'):
         super(MultiInputSTGACN, self).__init__()
 
         dim_half = int(dim_h/2)
@@ -67,11 +68,11 @@ class MultiInputSTGACN(torch.nn.Module):
         self.hcf = hcf
         self.size_stgcn = stgcn_size
         self.stgcn_filters = stgcn_filters
-        self.batch_size = batch_size
+        self.batch_size = batch_size #int(batch_size/batch_size) ###############################CHANGE THIS BACK
         self.data_dims = data_dims
         self.num_nodes_per_graph = num_nodes_per_graph
-        self.cycle_size = max_cycle * num_nodes_per_graph
-        
+        self.cycle_size = max_cycle * num_nodes_per_graph ########################AND THIS!!!!!
+        self.device = device
         #Two sub-streams: the first contains the sequences that each input stream goes through,
         #the second is the single combined stream 
         self.streams = []
@@ -85,14 +86,14 @@ class MultiInputSTGACN(torch.nn.Module):
                     Linear(dim_h, dim_half),ReLU(),BatchNorm1d(dim_half),
                     Linear(dim_half, dim_4th),ReLU(),BatchNorm1d(dim_4th),
                     Linear(dim_4th, dim_8th)
-                ).to("cuda"))
+                ).to(device))
 
             else:
             #Every other possible input will be processed via an ST-GCN block which needs to be appended in a list instead of a sequential.
                 i_stream = []
-                i_stream.append(STGCNBlock(self.dim_in[0], self.stgcn_filters[0], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph))
+                i_stream.append(STGCNBlock(self.dim_in[0], self.stgcn_filters[0], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph, device))
                 for i in range(1, self.size_stgcn):
-                    i_stream.append(STGCNBlock(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph))
+                    i_stream.append(STGCNBlock(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph, device))
 
                 self.streams.append(i_stream)
         
@@ -118,11 +119,12 @@ class MultiInputSTGACN(torch.nn.Module):
         #self.max_pooling = torch.nn.MaxPool1d(5)
 
         self.combination_layer = torch.nn.Sequential(
-        Linear(int(linear_input/1), 1024), ReLU(), BatchNorm1d(1024), torch.nn.Dropout(0.1),
-        Linear(1024, 512), ReLU(), BatchNorm1d(512), torch.nn.Dropout(0.1),
-        Linear(512, num_classes)
+        Linear(int(linear_input/1), 2048), ReLU(), BatchNorm1d(2048), torch.nn.Dropout(0.35),
+        Linear(2048, 1024), ReLU(), BatchNorm1d(1024), torch.nn.Dropout(0.35),
+        Linear(1024, 512), ReLU(), BatchNorm1d(512), torch.nn.Dropout(0.35),
+        Linear(512, 128), ReLU(), BatchNorm1d(128), torch.nn.Dropout(0.35),
+        Linear(128, num_classes)
         )
-
 
     def forward(self, data, edge_indices, batches, train):
 
@@ -130,11 +132,11 @@ class MultiInputSTGACN(torch.nn.Module):
         hidden_layers = []
         for i, stream in enumerate(self.streams):
             #Get the data and pass it to the GPU
-            data[i] = data[i].to("cuda")
+            data[i] = data[i].to(self.device)
             #If the data being passed is HCF data, it won't have edge indices.
             if edge_indices[i] != None:
-                edge_indices[i] = edge_indices[i].to("cuda")
-            batches[i] = batches[i].to("cuda")
+                edge_indices[i] = edge_indices[i].to(self.device)
+            batches[i] = batches[i].to(self.device)
 
             #Get the appropriate data for this stream
             h = data[i]
@@ -168,4 +170,4 @@ class MultiInputSTGACN(torch.nn.Module):
         #print("shape after pooling: ", h.shape)
         h = self.combination_layer(h)
     
-        return F.sigmoid(h)#, h
+        return h# F.sigmoid(h)#, h
