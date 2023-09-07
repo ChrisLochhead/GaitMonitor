@@ -207,6 +207,7 @@ def run_images(folder_name, out_folder, exclude_2D = False, write_mode = "w+", s
     joints_file_metres = []
 
     for directory_iter, (subdir, dirs, files) in enumerate(os.walk(os.fsencode(folder_name))):
+        print("do any exist??")
         dirs.sort(key=Utilities.numericalSort)
         #Skip any instances already recorded
         if directory_iter < start_point:

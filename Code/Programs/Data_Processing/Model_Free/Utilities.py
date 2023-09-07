@@ -1,14 +1,13 @@
 #Standard
 import cv2
 import re
-from PIL import Image, ImageOps
+from PIL import Image
 import numpy as np
 import os
 import sys
 import copy
 import pandas as pd
 from pathlib import Path
-import matplotlib.pyplot as plt
 import matplotlib
 from scipy import stats
 
@@ -22,8 +21,6 @@ import Programs.Machine_Learning.Model_Free.Resnet.LocalResnet as LocalResnet
 
 #Torch and SKlearn
 from torchvision.transforms import ToTensor, Lambda
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
 
 from statsmodels.stats.contingency_tables import mcnemar
 

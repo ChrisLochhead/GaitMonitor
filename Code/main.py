@@ -1,12 +1,8 @@
 #Standard packages
-import os, sys
+import os
 from pynput.keyboard import Listener
 import datetime
 import torch
-
-#Local files
-#from Programs.Data_Recording import Capture as capture
-#2from Programs.Data_Processing.Model_Free.Utilities import numericalSort
 import re
 
 #Torch
@@ -102,18 +98,7 @@ def on_press(key):
                 main()
             elif current_menu == 0:
                 print("reordering folders")
-                reorder_folders("./Code/Datasets/WeightGait/Full_Dataset/Ahmed")
-                reorder_folders("./Code/Datasets/WeightGait/Full_Dataset/Bob")
-                reorder_folders("./Code/Datasets/WeightGait/Full_Dataset/Cade")
-                reorder_folders("./Code/Datasets/WeightGait/Full_Dataset/Emma")
-                reorder_folders("./Code/Datasets/WeightGait/Full_Dataset/Erin")
-                reorder_folders("./Code/Datasets/WeightGait/Full_Dataset/Grant")
-                reorder_folders("./Code/Datasets/WeightGait/Full_Dataset/Longfei")
-                reorder_folders("./Code/Datasets/WeightGait/Full_Dataset/Pheobe")
-                reorder_folders("./Code/Datasets/WeightGait/Full_Dataset/Scarlett")       
-                reorder_folders("./Code/Datasets/WeightGait/Full_Dataset/Sean C")
-                reorder_folders("./Code/Datasets/WeightGait/Full_Dataset/Sean G")            
-                reorder_folders("./Code/Datasets/WeightGait/Full_Dataset/Wanok")
+                reorder_folders("./Code/Datasets/Individuals/Full_Dataset/Ahmed")
         if key.char == '3':
             if current_menu == 2:
                 main()

@@ -1,13 +1,6 @@
-import cv2
 import numpy as np
-import csv
-import os 
-import csv
-import copy
-import pandas as pd
 import math
 from tqdm import tqdm
-
 from Programs.Data_Processing.Model_Based.Utilities import load, load_images, get_3D_coords
 from Programs.Data_Processing.Model_Based.Demo import *   
 from Programs.Data_Processing.Model_Based.Render import * 
@@ -15,6 +8,34 @@ from Programs.Data_Processing.Model_Based.Render import *
 from sklearn.preprocessing import StandardScaler
 #normalization function
 #[x′ i, y′ i ] = [ imgwidth 2 ∗ xi − xmin xmax − xmin , imgheight 2 ∗ yi − ymin ymax − ymin ]
+
+
+def calculate_distance(x1, y1, x2, y2):
+    # Calculate the difference in x and y coordinates
+    dx = x2 - x1
+    dy = y2 - y1
+
+    # Calculate the square of the differences
+    dx_squared = dx ** 2
+    dy_squared = dy ** 2
+
+    # Calculate the sum of the squared differences and take the square root
+    distance = math.sqrt(dx_squared + dy_squared)
+
+    return distance
+
+def smooth_unlikely_values(joint_data):
+    for i, frame in enumerate(joint_data):
+        #Ignore first frame
+        if i > 0:
+            for j, coord in enumerate(frame):
+                #Ignore metadata and head co-ordinates
+                if j > 9: 
+                    if calculate_distance(coord[0], coord[1], joint_data[i - 1][j][0], joint_data[i-1][j][1]) > 50:
+                        #Just reset any odd values to its previous value
+                        joint_data[i][j] = joint_data[i-1][j]
+    
+    return joint_data
 
 def normalize_data(data):
     # create scaler

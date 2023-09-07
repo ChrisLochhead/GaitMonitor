@@ -113,8 +113,6 @@ def fix_multi_person_labels(data, joint_output):
     save_dataset(data, joint_output)
     return data
 
-
-
 #Occlusion co-ordinates for home recording dataset
 occlusion_boxes = [[140, 0, 190, 42], [190, 0, 236, 80] ]
 
@@ -127,7 +125,6 @@ def normalize_1D(arr, t_min = 0, t_max = 1):
         temp = (((i - min(arr))*diff)/diff_arr) + t_min
         norm_arr.append(temp)
     return norm_arr
-
 
 def mean_var(data_list):
     for i, d in enumerate(data_list):
@@ -151,7 +148,6 @@ def slope(x1, y1, x2, y2): # Line slope given two points:
     if denom == 0:
         denom = 0.01
     return (y2-y1)/denom
-
 
 #p12 is the length from 1 to 2, given by = sqrt((P1x - P2x)2 + (P1y - P2y)2)
 #arccos((P12^2 + P13^2 - P23^2) / (2 * P12 * P13))
@@ -267,17 +263,6 @@ def split_class_by_instance(data):
         instance.append(row)
             
     return filtered_data
-
-#Returns a list of average values in a dataset
-def create_average_data_sample(data, meta = 5):
-    dataset_size = len(data)
-    running_total = data[0]
-    for i, row in enumerate(data):
-        if i > 0:
-            running_total = [x + y if j > meta else x for j, (x, y) in enumerate(zip(running_total, row))]
-    
-    average = [x / dataset_size for x in running_total[0]]
-    return average
 
 def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, debug = False, meta = 5):
     
@@ -555,26 +540,6 @@ def blacken_frame(frame):
     dimensions = (len(frame), len(frame[0]))
     blank_frame = np.zeros((dimensions[0],dimensions[1], 3), dtype= np.uint8)
     return blank_frame
-
-def apply_class_labels(num_switches, num_classes, joint_data):
-    switch_iterator = 0
-    current_class = 0
-    for i, row in enumerate(joint_data):
-        if switch_iterator == num_switches:
-            current_class += 1
-            if current_class > num_classes:
-                current_class = 0
-            
-            switch_iterator = 0
-
-        joint_data[i][2] = current_class
-
-        #if there is at least one more datapoint next
-        if i < len(joint_data) - 1:
-            if joint_data[i][1] > joint_data[i+1][1]:
-                switch_iterator  += 1
-    
-    return joint_data
 
 def save_images(joint_data, image_data, directory):
     print("Saving images")

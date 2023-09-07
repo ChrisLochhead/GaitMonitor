@@ -2,7 +2,6 @@
 from Programs.Data_Processing.Model_Based.Demo import *
 #from Programs.Data_Processing.Model_Based.Utilities import load, load_images, save_dataset
 import Programs.Data_Processing.Model_Based.Dataset_Creator as Creator
-import Programs.Machine_Learning.Model_Based.AutoEncoder.GAE as GAE
 import Programs.Machine_Learning.Model_Based.GCN.Dataset_Obj as Dataset_Obj
 import Programs.Machine_Learning.Model_Based.GCN.Ground_Truths as GT
 import Programs.Data_Processing.Model_Based.Render as Render
@@ -23,19 +22,19 @@ def process_data(folder = "Chris"):
 ############################################# PIPELINE ##################################################################
 
     #Extract joints from images
-    #run_images("./Code/Datasets/" + str(folder) + "/Full_Dataset", out_folder="./Code/Datasets/Joint_Data/" + str(folder) + "/", exclude_2D=False, 
-    #          start_point=-1)
+    #run_images("./Code/Datasets/Individuals/" + str(folder) + "/Full_Dataset", out_folder="./Code/Datasets/Joint_Data/" + str(folder) + "/", exclude_2D=False, 
+    #          start_point=0)
     
     #Display first 2 instances of results 
-    #print("\nStage 1: ")
+    print("\nStage 1: ")
     #render_joints_series("./Code/Datasets/WeightGait/Raw_Images", joints=abs_joint_data,
     #                     size = 20, delay=True, use_depth=True)
 
     #Remove empty frames
     #abs_joint_data, image_data = Creator.process_empty_frames(joint_file="./Code/Datasets/Joint_Data/" + str(folder) + "/Absolute_Data.csv",
-    #                                             image_file="./Code/Datasets/" + str(folder) + "/Full_Dataset/",
+    #                                             image_file="./Code/Datasets/Individuals/" + str(folder) + "/Full_Dataset/",
     #                                             joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/2_Absolute_Data(empty frames removed)",
-    #                                             image_output="./Code/Datasets/" + str(folder) + "/2_Empty Frames Removed/")
+    #                                             image_output="./Code/Datasets/Individuals/" + str(folder) + "/2_Empty Frames Removed/")
 
     #Display first 2 instances of results
     print("\nStage 2: ")
@@ -45,7 +44,7 @@ def process_data(folder = "Chris"):
     #Trim start and end frames where joints get confused by image borders
     #abs_joint_data, image_data =Creator.process_trimmed_frames(abs_joint_data, image_data,
     #                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)",
-    #                                                    image_output="./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", trim = 5)
+    #                                                     image_output="./Code/Datasets/Individuals/" + str(folder) + "/3_Trimmed Instances/", trim = 5)
 
     abs_joint_data, image_data = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)/raw/3_Absolute_Data(trimmed instances).csv",
                                                               "./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
@@ -57,6 +56,19 @@ def process_data(folder = "Chris"):
     #render_joints_series(image_data, abs_joint_data, size=10)
     abs_joint_data = Creator.append_midhip(abs_joint_data, image_data, 
                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(midhip)")
+    
+    #render_joints_series(image_data, abs_joint_data, size=25)
+
+    #This normalization just removed outliers
+    abs_joint_data = Creator.create_normalized_dataset(abs_joint_data, None, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(norm)")
+
+    #render_joints_series(image_data, abs_joint_data, size=25)
+    #done = 5/0
+
+    abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, None, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
+
+    #render_joints_series(image_data, abs_joint_data, size=10)
+
 
     #Create relative dataset
     relative_joint_data = Creator.create_relative_dataset(abs_joint_data, image_data,
@@ -119,10 +131,6 @@ def process_data(folder = "Chris"):
                                                  output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Combined_Data_Noise")
 
     
-    #if folder == "weightgait":
-    #    bob = Creator.create_n_size_dataset(combined_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/Bob", n=[3])
-    #    chris_elisa = Creator.create_n_size_dataset(combined_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/CE", n=[5,6])
-    #    chris_elisa = Creator.create_n_size_dataset(combined_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/CEB", n=[3,5,6])
 
 def load_region_data(folder, type):
     if type == 3:
@@ -135,7 +143,6 @@ def load_region_data(folder, type):
     datasets = []
     for i, path in enumerate(paths):
         datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/' + path, path + ".csv",
-                                            '16_Combined_Data_2Region_top.csv',
                                             joint_connections=joints[i]))
     return datasets
 
@@ -150,16 +157,17 @@ def load_datasets(types, folder):
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Combined_Data_Noise', '20_Combined_Data_Noise.csv',
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/3_people',
+                                                      '3_people.csv',
                                                   joint_connections=Render.joint_connections_n_head))
             
             #Experimental
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Rel_Data_Noise', '20_Rel_Data_Noise.csv',
-            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True))
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Vel_Data_Noise', '20_Vel_Data_Noise.csv',
-            #                                      joint_connections=Render.joint_connections_m_hip, cycles=True))
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/20_Bone_Data_Noise', '20_Bone_Data_Noise.csv',
-            #                                       joint_connections=Render.joint_connections_m_hip, cycles=True))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/2_people/raw/2_people_rel', '2_people_rel.csv',
+            #                                       joint_connections=Render.joint_connections_n_head))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/2_people/raw/2_people_vel', '2_people_vel.csv',
+            #                                      joint_connections=Render.joint_connections_n_head))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/2_people/raw/2_people_bone', '2_people_bone.csv',
+            #                                       joint_connections=Render.joint_connections_n_head))
         #Type 2: HCF dataset
         elif t == 2:
             #This MUST have cycles, there's no non-cycles option
@@ -265,19 +273,12 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder):
     num_datasets = len(datasets)
 
     print("dataset info: ", len(datasets[0]), dataset[0])
-    #done = 5/0
 
     #Accounting for extra original dataset not used in dummy case for training but only for testing
     if 5 in dataset_types:
         num_datasets -= 1
 
     print("number of datasets: ", num_datasets)
-    
-    #Split classes by just making the last person the test set and the rest training and validation.
-    #if leave_one_out:
-    #    multi_input_train_val, multi_input_test = graph_utils.split_data_by_person(datasets)
-    #else:
-        #Process datasets by manually shuffling to account for cycles
     multi_input_train_val, multi_input_test = process_datasets(datasets)
 
     dim_out = 3
@@ -296,14 +297,101 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder):
     model = model.to(device)
 
     train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                     k_fold=2, batch=batch_size, epochs=epochs, type=model_type)
+                                                                     k_fold=5, batch=batch_size, epochs=epochs, type=model_type, device = device)
 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
 
+def create_regions_data(data, folder):
+    regions_data_2 = Creator.create_2_regions_dataset(data,
+                                                       joint_output="./Code/Datasets/Joint_Data/"  + str(folder)  + "/2_region", images=None)
+    regions_data_5 = Creator.create_5_regions_dataset(data, 
+                                                      joint_output="./Code/Datasets/Joint_Data/"  + str(folder)  + "/5_region", images=None)
+
+def unfold_3s_dataset(data, joint_output):
+    rel_data = []
+    vel_data = []
+    bones_data = []
+
+    for frame in data:
+        rel_frame = frame[0:6]
+        vel_frame = frame[0:6]
+        bones_frame = frame[0:6]
+        for i, coord in enumerate(frame):
+            if i > 5:
+                rel_frame.append(coord[0:3])
+                vel_frame.append(coord[3:6])
+                bones_frame.append(coord[6:])
+        rel_data.append(rel_frame)
+        vel_data.append(vel_frame)
+        bones_data.append(bones_frame)
+    
+    Utilities.save_dataset(rel_data, joint_output + "_rel")
+    Utilities.save_dataset(vel_data, joint_output + "_vel")
+    Utilities.save_dataset(bones_data, joint_output + "_bone")
+
+
+def load_whole_dataset(folder_names, file_name):
+    data = []
+    for name in folder_names:
+        print("loading: ", "./Code/Datasets/Joint_Data/" + str(name) + str(file_name) + "/raw/"+ str(file_name) + ".csv")
+        abs_joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(name) + str(file_name) + "/raw/"+ str(file_name) + ".csv", None,
+                                                                cols=Utilities.colnames_nohead, ignore_depth=False)
+        data.append(abs_joint_data)
+    return data
+
+def change_to_ensemble_classes():
+    joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/chris/20_Combined_Data_Noise/raw/20_Combined_Data_Noise.csv",
+                                                            None, cols=Utilities.colnames_nohead, ignore_depth=False)
+    
+    Creator.convert_person_to_type(joint_data, joint_output="./Code/Datasets/Joint_Data/chris/21_Combined_Data_Noise_Ensemble")
+        
+def extract_ensemble_data():
+    joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/big/2_people/raw/2_people.csv",
+                                                            None, cols=Utilities.colnames_nohead, ignore_depth=False)
+    print("data loaded")
+    create_regions_data(joint_data, "big")
+    print("region data completed")
+    unfold_3s_dataset(joint_data, joint_output="./Code/Datasets/Joint_Data/big/2_people/raw/2_people")
+    print("unfolding completed")
+
+def process_multiple(folders):
+    for folder in folders:
+        process_data(folder)
+
+def stitch_dataset(folder_names):
+    file_name = '/20_Combined_Data_Noise'
+    datasets = load_whole_dataset(folder_names, file_name)
+    whole_dataset = datasets[0]
+    current_instance = whole_dataset[-1][0]
+    for i, dataset in enumerate(datasets):
+        if i > 0:
+            current_instance, whole_dataset = Creator.assign_person_number(whole_dataset, dataset, 
+                                                                       "./Code/Datasets/Joint_Data/Big/" + str(i + 1) + "_people",
+                                                                       i, current_instance)
+    print("completed.")
+
 if __name__ == '__main__':
-    #
-    process_data("weightgait")
+    process_data("Ahmed")
+    process_data("Amy")
+    process_data("Anna")
+    process_data("Bob")
+    process_data("Cade")
+    process_data("Emma")
+    process_data("Erin")
+    process_data("Pheobe")
+    process_data("Scarlett")
+    process_data("Sean G")
+    process_data("Wanok")
+
+    #Done grant 100%, elisa 83%, sean c 98%, chris,
+
+    #Assign person numbers and uniform instance counts:
+    folder_names = ['Ahmed', 'Amy', 'Anna', 'Bob', 'Cade', 'Chris', 'Elisa', 'Grant', 'Emma',
+                    'Erin', 'Pheobe', 'Scarlett', 'Sean G', 'Sean C' 'Wanok']
+    
+    stitch_dataset(folder_names=folder_names)
+    
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
     #   1: normal full body 9D dataset
@@ -320,4 +408,32 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 32, epochs = 100, folder="weightgait")
+           batch_size = 64, epochs = 100, folder="big")
+    
+    #Grant results not great, sean c mid 70s, everyone else good
+
+    #Do all together excluding grant and sean c then with
+
+    #Do leave one-out
+
+    #Do 3s vs 1s, 2 region and 5 region
+
+    #Test best one with and without punishment
+
+    #Test best one with and without skeleton subtraction
+
+    #Get results on freeze or not, obstacle or not and person
+
+    #Make ensemble classifier for all classes at once
+
+
+
+    #Look into ST-GCN implementation to upload dataset to to see if ST-AGCN is better
+    
+    #Put into SVM and KNN for standard comparisons
+
+
+
+
+
+    

@@ -15,7 +15,7 @@ import ast
 
 class JointDataset(Dataset):
     def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = Render.joint_connections_m_hip,
-                  cycles = True, meta = 5, person = None, preset_cycle = None, interpolate = True):
+                  cycles = True, meta = 5, person = None, preset_cycle = None, interpolate = True, ensemble = False):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
@@ -30,6 +30,7 @@ class JointDataset(Dataset):
         self.meta = meta
         self.cycle_indices = []
         self.person = person
+        self.ensemble = ensemble
         self.preset_cycle = preset_cycle
         self.interpolate = interpolate
         super(JointDataset, self).__init__(root, transform, pre_transform)
@@ -218,7 +219,7 @@ def convert_to_literals(data, meta = 5):
     return data
             
 #Input here would be each row
-def data_to_graph(row, coo_matrix, meta = 5):
+def data_to_graph(row, coo_matrix, meta = 5, ensemble = False):
     gait_cycle = []
     y_arr = []
     for cycle_part in row:
@@ -240,43 +241,6 @@ def data_to_graph(row, coo_matrix, meta = 5):
         )
     
     return data
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 class HCFDataset(Dataset):

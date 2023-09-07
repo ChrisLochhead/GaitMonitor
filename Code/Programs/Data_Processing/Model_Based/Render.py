@@ -143,74 +143,6 @@ def plot_graph(data):
     nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=True, node_size=800)
     plt.show()
 
-def animate(i, *fargs):
-    data = fargs[0]
-    outputs = fargs[1]
-    losses = fargs[2]
-    accuracies = fargs[3] 
-
-    G = to_networkx(data, to_undirected=True)
-    nx.draw_networkx(G,
-                    pos=nx.spring_layout(G, seed=0),
-                    with_labels=True,
-                    node_size=800,
-                    node_color="blue",#outputs[i],
-                    cmap="hsv",
-                    vmin=-2,
-                    vmax=3,
-                    width=0.8,
-                    edge_color="grey",
-                    font_size=14
-                    )
-    plt.title(f'Epoch {i} | Loss: {losses[i]:.2f} | Acc: {accuracies[i]*100:.2f}%',
-              fontsize=18, pad=20)
-
-
-def animate_alt(i, *fargs):
-    embeddings = fargs[0]
-    data = fargs[1]
-    losses = fargs[2]
-    accuracies = fargs[3]
-    ax = fargs[4]
-    train_loader = fargs[5]
-
-    embed = embeddings[i].detach().cpu().numpy()
-    ax.clear()
-
-    cols = []
-    for j, point in enumerate(train_loader):
-        for k, em in enumerate(point):
-            if k == 2: 
-                class_vals = em[1].numpy()
-                for val in class_vals:
-                    col = "blue"
-                    if val == 1:
-                        col = "red"
-                    elif val == 2:
-                        col = "green"
-                    cols.append(col)
-        
-        break
-
-    ax.scatter(embed[:, 0], embed[:, 1], embed[:, 2],
-           s=200, c=cols, cmap="hsv", vmin=-2, vmax=3)
-    plt.title(f'Epoch {i} | Loss: {losses[i]:.2f} | Acc: {accuracies[i]*100:.2f}%',
-              fontsize=18, pad=40)
-
-def run_3d_animation(fig, fargs):
-        plt.axis('off')
-        plt.tick_params(left=False,
-                        bottom=False,
-                        labelleft=False,
-                        labelbottom=False)
-
-        anim = animation.FuncAnimation(fig, animate_alt, \
-                                    np.arange(0, 200, 10), interval=800, repeat=True, fargs=fargs)
-        html = HTML(anim.to_html5_video())
-
-        plt.show()
-        display(html)
-            
 def process_data_to_graph(row, coo_matrix):
     G = nx.Graph()
 
@@ -272,8 +204,6 @@ def plot3D_joints(joints, pixel = True, metadata = 3, x_rot = 90, y_rot = 180):
                 [joints[connection[0] + metadata][2], joints[connection[1] + metadata][2]], \
                     color = 'g')
 
-
-
     # plot points
     sc = ax.scatter(x, y, z, s=40, c=x, marker='o', cmap=cmap, alpha=1)
     ax.set_xlabel('X')
@@ -283,15 +213,9 @@ def plot3D_joints(joints, pixel = True, metadata = 3, x_rot = 90, y_rot = 180):
     # legend
     #-90, 180, 0 angle, azimuth and roll
     plt.legend(*sc.legend_elements(), bbox_to_anchor=(1.05, 1), loc=2)
-    #plt.draw()#block=True)
     plt.show(block=True)
-    #plt.waitforbuttonpress(0) # this will wait for indefinite time
-    #plt.close(fig)
-    # save
-    #plt.savefig("scatter_hue", bbox_inches='tight')
 
 def render_joints_series(image_source, joints, size, delay = True, use_depth = True, plot_3D = False, x_rot = 90, y_rot= 180, background = False):
-    
     joints, images = Utilities.process_data_input(joints, image_source)
     for i in range(size):
         if plot_3D:
@@ -335,7 +259,6 @@ def render_velocities(joint_data, velocity_data, image_data, delay = True, metad
         cv2.waitKey(0) & 0xff
 
 def click_event(event, x, y, flags, params):
-  
     # checking for left mouse clicks
     if event == cv2.EVENT_LBUTTONDOWN:
         # displaying the coordinates
@@ -344,7 +267,6 @@ def click_event(event, x, y, flags, params):
         quit()
 
 def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 6, colour = (0, 150, 200)):
-
     tmp_frame = copy.deepcopy(frame)
     tmp_joints = copy.deepcopy(joints)
     connections = joint_connections
@@ -374,7 +296,6 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
 
             cv2.line(tmp_frame, start, end, color = (255,0,0), thickness = 1) 
 
-
     for i, joint in enumerate(tmp_joints):
 
         if isinstance(joint, int):
@@ -394,6 +315,5 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
             tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=colour, thickness=4)
         else:
             tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(150, 100, joint[2]), thickness=4)
-
 
     return tmp_frame

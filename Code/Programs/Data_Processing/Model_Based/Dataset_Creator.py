@@ -10,15 +10,6 @@ import copy
 from sklearn.preprocessing import normalize
 from sklearn.preprocessing import StandardScaler
 
-def create_n_size_dataset(data, joint_output, n):
-    new_dataset = []
-    for i, row in enumerate(data):
-        if row[5] in n:
-            print("discovered:", row[0], i, n)
-            new_dataset.append(copy.deepcopy(row))
-
-    Utilities.save_dataset(new_dataset, joint_output)
-
 def normalize_hcf(data, joint_output):
     # create scaler
     scaler = StandardScaler()
@@ -131,50 +122,6 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joints_output, meta
     Utilities.save_dataset(combined_dataset, joints_output)
     return combined_dataset
 
-def create_ground_truth_dataset(pre_abs_data, abs_data, rel_data, vel_data, hcf_data, images, joints_output, meta = 5):
-    #Intuition: just averaging data will do little to outline potential discriminating data, especially with absolute data, rel or velocities.
-    #Instead 
-    print("Creating ground truth datasets...")
-
-    abs_data, images = Utilities.process_data_input(abs_data, images)
-    pre_abs_data, _ = Utilities.process_data_input(pre_abs_data, None)
-    rel_data, _ = Utilities.process_data_input(rel_data, None)
-    vel_data, _ = Utilities.process_data_input(vel_data, None)
-
-    #Get HCF features of whole dataset
-    hcf_data = create_hcf_dataset(pre_abs_data, abs_data, rel_data, vel_data, images, None)
-
-
-    #Split data by classes
-    normal, limp, stagger = Utilities.split_by_class_and_instance(hcf_data)
-
-    #From these datasets, create an average, this will be the actual average
-    #right now, to be replaced with an autoencoder function later and compared.
-    hcf_normal_ground = Utilities.create_average_data_sample(normal)
-    hcf_limp_ground = Utilities.create_average_data_sample(limp)
-    hcf_stag_ground = Utilities.create_average_data_sample(stagger)
-
-    #Taking the calculated average, subtract this from every original value to 
-    # produce an array of hand crafted features detailing the distance of each 
-    # value from it's nearest class. This could be done by averaging the 
-    # datasets, or passing the datasets through an autoencoder to create a 
-    #representation that's a bit more meaningful.
-    ground_truth_dataset = []
-    #Enumerate standard HCF data
-    for i, row in enumerate(hcf_data):
-        ground_truth_row  = row[0:meta + 1]
-        for j, value in enumerate(row):
-            if j > meta:
-                ground_truth_row.append([value - hcf_normal_ground[j],
-                                         value - hcf_limp_ground[j],
-                                         value - hcf_stag_ground[j]])
-        
-        ground_truth_dataset.append(ground_truth_row)
-    
-    Utilities.save_dataset(ground_truth_dataset, joints_output, Utilities.hcf_colnames)
-    print("Ground truth dataset created")
-    return ground_truth_dataset
-
 def process_empty_frames(joint_file, image_file, joint_output, image_output):
     print("\nProcessing Empty frames...")
     joint_data, image_data = Utilities.process_data_input(joint_file, image_file, cols=Utilities.colnames)
@@ -235,6 +182,8 @@ def create_normalized_dataset(joint_data, image_data, joint_output):
     joint_data = Data_Correction.normalize_outlier_depths(joint_data, image_data)
     #Normalize outlier values
     joint_data = Data_Correction.normalize_outlier_values(joint_data, image_data, 100)
+    #Smooth values that are visually a bit haywire on the arms and legs
+    joint_data = Data_Correction.smooth_unlikely_values(joint_data)
     Utilities.save_dataset(joint_data, joint_output)
     print("Data normalization complete.")
     return joint_data
@@ -384,64 +333,7 @@ def create_bone_dataset(abs_data, images, joint_output, meta = 6):
         #Render.render_velocities(abs_data[i], bone_row, images[i])
 
     Utilities.save_dataset(bone_dataset, joint_output, colnames=Utilities.colnames_midhip)
-    return bone_dataset                  
-
-def create_joint_angle_dataset(abs_data, images, joint_output, meta = 6):
-    print("Creating joint angle dataset (integrated)...")
-    joint_angle_dataset = []
-    for i, joints in enumerate(tqdm(abs_data)):
-        #Add metadata to list and ignore
-        joint_angles = joints[0:meta]
-        for j, coords in enumerate(joints):
-            #This should end up length 2 every time.
-            if j > 2:
-                coord_angles = None
-                connected_joints = []
-                for joint in Render.joint_connections:
-                    #Find the connections for every joint and build a dataset on that. different joints have different numbers of connections:
-                    #minimum 1 (the 6 extremities) and maximum 6 (origin). Strategy is find the first connection of each, then for those with only
-                    #one connection, replace the connection with an angle between itself and the origin. (In future, maybe fill third slot with distance
-                    # from origin?)
-                    #if len(connected_joints) == 2:
-                    #    break
-                    #Found a connection to this joint
-                    if joint[0] == j - 3:
-                        connected_joints.append(joints[joint[1]+3])
-                    elif joint[1] == j - 3:
-                        connected_joints.append(joints[joint[0]+3])
-
-                #This will only apply for hands and feet which have 1 joint connection
-                if len(connected_joints) < 2:
-                    #Append with the angle between the head and the joint, and the joint and it's connection. This
-                    #Should give rough relational angle between the extremities and the origin.
-
-                    #Append a slight offset incase the any of the co-ordinates are identical
-                    if coords == connected_joints[0]:
-                        coords[0] += 1
-                        coords[1] += 1
-
-                    coord_angles = Utilities.ang([coords, joints[3]], [coords, connected_joints[0]])
-
-                    #Render angle
-                    angle_plot, angle = Render.get_angle_plot([coords, joints[3]], [coords, connected_joints[0]], 1)
-                #And this will only apply for the head joint with 6 connections
-                elif len(connected_joints) > 2:
-                    #Append with the angle between the head and the mid-rif, connected by the right hip
-                    coord_angles = Utilities.ang([coords, joints[15]], [coords, Utilities.midpoint(joints[15], joints[14])])
-                    pass
-                #This is normal case for the majority of the joints, get the angle between it's two connections.
-                else:
-                    #Append a slight offset incase the any of the co-ordinates are identical
-                    if coords == connected_joints[0] or coords == connected_joints[1]:
-                        coords[0] += 1
-                        coords[1] += 1
-
-                    coord_angles = Utilities.ang([coords, connected_joints[0]], [coords, connected_joints[1]])
-                joint_angles.append(coord_angles)
-        joint_angle_dataset.append(joint_angles)
-    Utilities.save_dataset(joint_angle_dataset, joint_output)
-    print("Joint angle dataset (integrated) Completed.")
-    return joint_angle_dataset
+    return bone_dataset                 
 
 def create_2_regions_dataset(abs_data, joint_output, images, meta = 6, size = 9):
     #This will split the data into 2 datasets, top and bottom.
@@ -632,23 +524,26 @@ def create_dummy_dataset(data, output_name):
     std_dev = 1 
 
     sequences = []
-    current_sequence = data[0][0]
     sequence = []
     for i, example in enumerate(data):
-        if example[0] == current_sequence:
+        #Just add the first one as usual
+        if i == 0:
             sequence.append(example)
         else:
-            sequences.append(copy.deepcopy(sequence))
-            sequence = []
-            sequence.append(example)
-            current_sequence += 1
+            #if the current sequence value is lower than the last, then it's a new sequence
+            if example[1] < data[i-1][1]:
+                sequences.append(copy.deepcopy(sequence))
+                sequence = []
+                sequence.append(example)
+            else:
+                sequence.append(example)
+
     sequences.append(sequence)
 
     noise_sequences = []
     novel_sequences = []
 
     print("info: ", len(sequences), len(sequences[0]))
-    #done = 5/0
 
     #Get total number of people
     no_people = sequences[-1][0][5]
@@ -683,13 +578,18 @@ def create_dummy_dataset(data, output_name):
     #done = 5/0
 
     scaling_iter = 0
-    print("Num sequences should be 960", len(sequences))
-
+    print("Num sequences should be 1917", len(sequences))
+    original_len = len(sequences)
     for i, sequence in enumerate(sequences):
         #First: Add the original frames
-        if i > 0 and i+1 % 60 == 0:
+        if i > 0 and (i + 1) % 60 == 0:
             scaling_iter +=1
-            print("changing scale iter: ", i, len(sequences))
+            if scaling_iter > len(scaling_factors)-1:
+                scaling_iter = 0
+            print("changing scale iter: ", i, len(sequences), len(scaling_factors))
+            print("factor now " ,scaling_factors[scaling_iter])
+        if i %100 == 0:
+            print("whats i right now: ", i)
 
         for frame_index, frame in enumerate(sequence):
             noise_sequences.append(frame)
@@ -697,7 +597,7 @@ def create_dummy_dataset(data, output_name):
         for j in range(scaling_factors[scaling_iter]):
             for frame in sequence:
                 frame_metadata = frame[0:6]
-                frame_metadata[0] = frame_metadata[0] + len(sequences) + (60 * scaling_iter)
+                frame_metadata[0] = frame_metadata[0] + original_len + (j + 1)
                 joints_frame = frame[6:]
                 noisy_frame = joints_frame + np.random.normal(mean, std_dev, (len(joints_frame), len(joints_frame[0])))
                 
@@ -844,3 +744,74 @@ def subtract_skeleton(rel_data, joint_output, base_output):
 
     Utilities.save_dataset(final_data, joint_output)
     return final_data
+
+def convert_person_to_type(data, joint_output):
+    for i, row in enumerate(data):
+        #Types:
+        #Class 0, freeze 0, obstacle 0 = 0
+        #Class 0, freeze 1, obstacle 0 = 1    
+        #Class 0, freeze 0, obstacle 1 = 2  
+        #Class 1, freeze 0, obstacle 0 = 3
+        #Class 1, freeze 1, obstacle 0 = 4
+        #Class 1, freeze 0, obstacle 1 = 5  
+        #Class 2, freeze 0, obstacle 0 = 6
+        #Class 2, freeze 1, obstacle 0 = 7
+        #Class 2, freeze 0, obstacle 1 = 8
+
+        if row[2] == 0:
+            #Freeze 0
+            if row[3] == 0:
+                #Obstacle 0
+                if row[4] == 0:
+                    #Class 0, freeze 0, obstacle 0 = 0
+                    data[i][5] = 0
+                else:
+                    #Class 0, freeze 0, obstacle 0 = 1
+                    data[i][5] = 2
+            else:
+                data[i][5] = 1
+        elif row[2] == 1:
+            #Freeze 0
+            if row[3] == 0:
+                #Obstacle 0
+                if row[4] == 0:
+                    #Class 1, freeze 0, obstacle 0 = 0
+                    data[i][5] = 3
+                else:
+                    #Class 1, freeze 0, obstacle 0 = 1
+                    data[i][5] = 5
+            else:
+                data[i][5] = 4
+        elif row[2] == 2:
+            #Freeze 0
+            if row[3] == 0:
+                #Obstacle 0
+                if row[4] == 0:
+                    #Class 0, freeze 0, obstacle 0 = 0
+                    data[i][5] = 6
+                else:
+                    #Class 0, freeze 0, obstacle 0 = 1
+                    data[i][5] = 8
+            else:
+                data[i][5] = 7
+
+    Utilities.save_dataset(data, joint_output)
+    return data
+
+def assign_person_number(data_to_append, data, joint_output, no, start_instance):
+    current_instance = start_instance + 1
+    for i, row in enumerate(data):
+        data[i][5] = no
+        if i > 0:
+            if row[1] < data[i-1][1]:
+                current_instance +=1
+        
+        data[i][0] = current_instance
+
+    if data_to_append != None:
+        #Append to a master dataset
+        for d in data:
+            data_to_append.append(d)
+
+    Utilities.save_dataset(data_to_append, joint_output)
+    return current_instance, data_to_append 

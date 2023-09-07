@@ -1,27 +1,15 @@
 from __future__ import print_function
-
 #Standard
 import cv2
-import re
-from PIL import Image, ImageOps
 import numpy as np
 import os
-import sys
-import pandas as pd
-from pathlib import Path
-import matplotlib.pyplot as plt
-import matplotlib
 import shutil
 
 #Local files
 import Programs.Data_Recording.JetsonYolo_Main.models.JetsonYolo as JetsonYolo
 from Programs.Data_Processing.Model_Free.Utilities import numericalSort
-import torch
 
 #Torch and SKlearn
-from torchvision.transforms import ToTensor, Lambda
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
 import os.path
 
 #Function to check if more than 1 person in any frames, and deleting if so
@@ -87,8 +75,6 @@ def decimate(path = './Images/CameraTest'):
             image_names.append(im_names)
             instances.append(images)
 
-
-
     for i, ims in enumerate(instances):
         #Pass images through check human count
         contains_1_human = check_human_count(ims)
@@ -102,7 +88,6 @@ def decimate(path = './Images/CameraTest'):
             #delete folder
             delete_folder(folder_names[i])
             
-
 def delete_folder(index, path = './Images/CameraTest/'):
     deletion_folder = str(path + str(index))
     #This will delete the folder and its contents recursively

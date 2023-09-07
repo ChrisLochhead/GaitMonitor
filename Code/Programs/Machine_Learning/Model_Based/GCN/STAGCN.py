@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch_geometric.nn import global_add_pool,  GATv2Conv, ChebConv
 from torch.nn import Linear, BatchNorm1d, ReLU
 from Programs.Machine_Learning.Model_Based.GCN.Dataset_Obj import *
+import torch.nn as nn
 
 #Basic ST-GCN Block. These can only be stacked in lists not Torch.NN.Sequentials 
 #because forward takes multiple inputs which causes problem even in custom sequential implementations.
@@ -49,7 +50,7 @@ class STGCNBlock(torch.nn.Module):
         return x
 
 class MultiInputSTGACN(torch.nn.Module):
-    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 5, stgcn_filters = [32, 64, 64, 64, 128], 
+    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 6, stgcn_filters = [64, 64, 128, 128, 256, 256], 
                  max_cycle = 49, num_nodes_per_graph = 18, device = 'cuda'):
         super(MultiInputSTGACN, self).__init__()
 
@@ -109,8 +110,9 @@ class MultiInputSTGACN(torch.nn.Module):
             
         print("Final: ", linear_input)
 
+        self.avg_pool = nn.AvgPool2d(4, 4)
         self.combination_layer = torch.nn.Sequential(
-        Linear(int(linear_input/1), 2048), ReLU(), BatchNorm1d(2048), torch.nn.Dropout(0.35),
+        Linear(linear_input, 2048), ReLU(), BatchNorm1d(2048), torch.nn.Dropout(0.35),
         Linear(2048, 1024), ReLU(), BatchNorm1d(1024), torch.nn.Dropout(0.35),
         Linear(1024, 512), ReLU(), BatchNorm1d(512), torch.nn.Dropout(0.35),
         Linear(512, 128), ReLU(), BatchNorm1d(128), torch.nn.Dropout(0.35),
@@ -152,9 +154,13 @@ class MultiInputSTGACN(torch.nn.Module):
 
         # Concatenate graph embeddings
         h = torch.cat(([l for l in hidden_layers]), dim=1)
-
+        #h = h.view(h.shape[0], 14, -1)
+        #print("size before: ", h.size())
+        #h = self.avg_pool(h)
+        #print("now: ", h.size())
+        #h = h.view(h.shape[0], -1)
         # Combine the results and pass them through the combination layer
         #To compress them into classification
         h = self.combination_layer(h)
-    
+        #print("h out: ", h.size())
         return h

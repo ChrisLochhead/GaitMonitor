@@ -33,32 +33,11 @@ def assess_data(dataset):
     # Calculate accuracy
 def accuracy(pred_y, y):
     return (pred_y == y).sum() / len(y)
-        
-#Returns two arrays where the last person is split off from the rest
-def split_data_by_person(datasets):
-    split_datasets = []
-
-    for dataset in datasets:
-        #split by person
-        split_dataset = [[],[]]
-        last_person = dataset[-1][5]
-        print("last person in dataset is: ", last_person)
-        for row in dataset:
-            if row[5] != last_person:
-                split_dataset[0].append(row)
-            else:
-                split_dataset[1].append(row)
-
-        split_datasets.append(split_dataset)
     
-    #Check it's right
-    for d in split_datasets:
-        print("sizes: ", len(d[0]), len(d[1]))
-    
-    return split_datasets
         
 # define a cross validation function
-def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=None,k_fold=3, batch = 16, inputs_size = 1, epochs = 100, type = "GAT", make_loaders = False, device = 'cuda'):
+def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=None,k_fold=3, batch = 16, inputs_size = 1,
+                 epochs = 100, type = "GAT", make_loaders = False, device = 'cuda'):
     
     train_score = []
     val_score = []
@@ -181,10 +160,10 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size,
 
     for epoch in range(epochs + 1):
         #Reduce by 0.1 times at 10th and 60th epoch
-        if epoch == 70:
+        if epoch == 40:
             #print("reducing learing rate")
             optimizer.param_groups[0]['lr'] = 0.01
-        elif epoch == 85:
+        elif epoch == 80:
             #print("reducing learning rate again")
             optimizer.param_groups[0]['lr'] = 0.001
 
@@ -286,7 +265,7 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
             data_b = [batch_batch[i][index] for i in range(len(loaders))]
             data_y = [ys_batch[i][index] for i in range(len(loaders))]
 
-            y_classes = [0,0,0]
+            y_classes = [0,0,0,0,0,0,0,0,0]
             for d in data_y[0]:
                 y_classes[d.item()] += 1
 
@@ -309,7 +288,6 @@ def modify_loss(out, actual):
     predictions = out.argmax(dim=1)
     new_out = out.clone()
     for i, row in enumerate(new_out):
-        #new_row = row.tolist()
         if actual[i] != predictions[i]:
             #If 0 and 2 gettting mixed up, doesn't matter
             if actual[i] == 0 and predictions[i] == 2 or actual[i] == 2 and predictions[i] == 0:
@@ -342,6 +320,4 @@ def modify_loss(out, actual):
                     new_out[i][pred_1] *= 1.5
                 elif pred_2 == 0:
                     new_out[i][pred_2] *= 2.00      
-                #new_out[i][pred_1] *= 1.0
-                #new_out[i][pred_2] *= 1.0
     return new_out
