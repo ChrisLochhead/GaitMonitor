@@ -64,7 +64,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
     total_preds = []
     total_ys = []
 
-    for fold in range(k_fold):
+    for fold in range(k_fold - 1):
         print("Fold: ", fold)
         train_loaders = []
         val_loaders = []
@@ -127,7 +127,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
     f1 = f1_score(total_ys, total_preds, average='weighted')
     print("f1 score: ", f1)
     
-    return train_score, val_score, test_score
+    return model, train_score, val_score, test_score
 
 def train(model, loader, val_loader, test_loader, generator, epochs, batch_size, device):
     init = generator.get_state()

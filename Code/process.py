@@ -157,8 +157,8 @@ def load_datasets(types, folder):
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/3_people',
-                                                      '3_people.csv',
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/11_people',
+                                                      '11_people.csv',
                                                   joint_connections=Render.joint_connections_n_head))
             
             #Experimental
@@ -216,6 +216,26 @@ def get_balanced_samples(dataset, train = 0.9, test = 0.1):
     print("done")
     return train_indices, test_indices
 
+def leave_one_out_dataset(datasets):
+    
+    #Just make train and test from their own datasets, this will always be 2, the first dataset will be train, the second test.
+    train_indices = random.sample(range(len(datasets[0])), int(len(datasets[0])))
+    print("original indices:", len(train_indices) )
+    test_indices = random.sample(set(range(len(datasets[1]))) - set(train_indices), int(len(datasets[1])))
+    print("original test indices:", len(test_indices) )
+
+
+    #These regions will be the same for both datasets
+    #Keep as an array of arrays so it's structurally consistent with the rest of the code
+    multi_input_train_val = []
+    multi_input_test = []
+    multi_input_train_val.append(datasets[0][train_indices])
+    multi_input_test.append(datasets[1][test_indices])
+    
+    print("indices lens so number of examples per: train: ", len(multi_input_train_val[0]), len(multi_input_test[0]))
+    print("Dataset processing complete.")
+
+    return multi_input_train_val, multi_input_test
 
 def process_datasets(datasets):
     print("Processing data...")
@@ -259,7 +279,7 @@ def process_results(train_scores, val_scores, test_scores):
     mean, var = Utilities.mean_var(test_scores)
     print("mean, std and variance: {:.2f}%, {:.2f}% {:.5f}".format(mean, math.sqrt(var), var))
 
-def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder):
+def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder, save = None, load = None, leave_one_out = False):
 
     #Load the full dataset alongside HCF with gait cycles
     datasets = load_datasets(dataset_types, folder)
@@ -279,7 +299,10 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder):
         num_datasets -= 1
 
     print("number of datasets: ", num_datasets)
-    multi_input_train_val, multi_input_test = process_datasets(datasets)
+    if leave_one_out == False:
+        multi_input_train_val, multi_input_test = process_datasets(datasets)
+    else:
+        multi_input_train_val, multi_input_test = leave_one_out_dataset(datasets)
 
     dim_out = 3
 
@@ -294,11 +317,18 @@ def run_model(dataset_types, model_type, hcf, batch_size, epochs, folder):
     else:
         print("Invalid model type.")
         return
+    
+    if load != None:
+        print("loading model")
+        model.load_state_dict(torch.load('./Code/Datasets/Weights/' + str(load) + '.pth'))
+
     model = model.to(device)
 
-    train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                     k_fold=5, batch=batch_size, epochs=epochs, type=model_type, device = device)
-
+    model, train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
+                                                                     k_fold=2, batch=batch_size, epochs=epochs, type=model_type, device = device)
+    if save != None:
+        print("saving model")
+        torch.save(model.state_dict(), './Code/Datasets/Weights/' + str(save) + '.pth')
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
 
@@ -372,25 +402,25 @@ def stitch_dataset(folder_names):
     print("completed.")
 
 if __name__ == '__main__':
-    process_data("Ahmed")
-    process_data("Amy")
-    process_data("Anna")
-    process_data("Bob")
-    process_data("Cade")
-    process_data("Emma")
-    process_data("Erin")
-    process_data("Pheobe")
-    process_data("Scarlett")
-    process_data("Sean G")
-    process_data("Wanok")
+    #process_data("Ahmed")
+    #process_data("Amy")
+    #process_data("Anna")
+    #process_data("Bob")
+    #process_data("Cade")
+    #process_data("Emma")
+    #process_data("Erin")
+    #process_data("Pheobe")
+    #process_data("Scarlett")
+    #process_data("Sean G")
+    #process_data("Wanok")
 
     #Done grant 100%, elisa 83%, sean c 98%, chris,
 
     #Assign person numbers and uniform instance counts:
     folder_names = ['Ahmed', 'Amy', 'Anna', 'Bob', 'Cade', 'Chris', 'Elisa', 'Grant', 'Emma',
-                    'Erin', 'Pheobe', 'Scarlett', 'Sean G', 'Sean C' 'Wanok']
+                    'Erin', 'Pheobe', 'Scarlett', 'Sean G', 'Sean C', 'Wanok']
     
-    stitch_dataset(folder_names=folder_names)
+    #stitch_dataset(folder_names=folder_names)
     
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
@@ -408,24 +438,18 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 64, epochs = 100, folder="big")
+           batch_size = 64, epochs = 100, folder="big", save = '101Dataset', load='10_Dataset', leave_one_out = False)
     
-    #Grant results not great, sean c mid 70s, everyone else good
-
-    #Do all together excluding grant and sean c then with
-
-    #Do leave one-out
-
-    #Do 3s vs 1s, 2 region and 5 region
-
-    #Test best one with and without punishment
-
-    #Test best one with and without skeleton subtraction
-
-    #Get results on freeze or not, obstacle or not and person
-
-    #Make ensemble classifier for all classes at once
-
+    #2 people is 84.38%
+    #3 people is 82.14%
+    #4 people is 82.67% 0.81 f1
+    #5 people is 85.22% 0.82 f1
+    #6 people is 84.38% 0.82 f1
+    #7 people is 81.00% 0.79 f1
+    #8 people is 82.81% 0.78 f1
+    #9 people is 82.87% 0.80 f1
+    #10 people is 82.59% 0.807 f1
+    #11 people is 
 
 
     #Look into ST-GCN implementation to upload dataset to to see if ST-AGCN is better
