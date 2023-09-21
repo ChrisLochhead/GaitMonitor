@@ -722,9 +722,10 @@ def subtract_skeleton(rel_data, joint_output, base_output):
                 if k> 5:
                     #Check if coord and overlay[j][k] are within a radius of eachother, ignoring the first 10
                     try:
-                        if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 50):# and sequence_counter > 19:
+                        if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 0):# results were on 50. minor was 15
                             #print("detected within raidus: ", coord, overlay_sequence[j][k])
-                            rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
+                            pass
+                            #rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
                     except:
                         pass
         if i % 60 == 0 and i != 0:
@@ -797,6 +798,33 @@ def convert_person_to_type(data, joint_output):
 
     Utilities.save_dataset(data, joint_output)
     return data
+
+
+def split_into_streams(data, joint_output_r, joint_output_v, joint_output_b):
+    rel_data = []
+    vel_data = []
+    bone_data = []
+
+    for i, row in enumerate(data):
+        rel_row = row[0:6]
+        vel_row = row[0:6]
+        bone_row = row[0:6]
+
+        for j, coord in enumerate(row):
+            if j > 5:
+                rel_row.append(coord[0:3])
+                vel_row.append(coord[3:6])
+                bone_row.append(coord[6:9])
+        
+        rel_data.append(rel_row)
+        vel_data.append(vel_row)
+        bone_data.append(bone_row)
+
+    Utilities.save_dataset(rel_data, joint_output_r)
+    Utilities.save_dataset(vel_data, joint_output_v)
+    Utilities.save_dataset(bone_data, joint_output_b)
+    
+
 
 def assign_person_number(data_to_append, data, joint_output, no, start_instance):
     current_instance = start_instance + 1

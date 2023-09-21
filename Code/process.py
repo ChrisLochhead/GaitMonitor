@@ -7,7 +7,7 @@ import Programs.Machine_Learning.Model_Based.GCN.Ground_Truths as GT
 import Programs.Data_Processing.Model_Based.Render as Render
 import torch
 torch.manual_seed(42)
-
+import time
 #import torch_geometric
 import random
 random.seed(42)
@@ -157,17 +157,17 @@ def load_datasets(types, folder):
         #Type 1: Normal, full dataset
         if t == 1:  
             #15.5 COMBINED DATASET
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/11_people',
-                                                      '11_people.csv',
-                                                  joint_connections=Render.joint_connections_n_head))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_people',
+            #                                         '15_people.csv',
+            #                                      joint_connections=Render.joint_connections_n_head))
             
             #Experimental
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/2_people/raw/2_people_rel', '2_people_rel.csv',
-            #                                       joint_connections=Render.joint_connections_n_head))
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/2_people/raw/2_people_vel', '2_people_vel.csv',
-            #                                      joint_connections=Render.joint_connections_n_head))
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/2_people/raw/2_people_bone', '2_people_bone.csv',
-            #                                       joint_connections=Render.joint_connections_n_head))
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_rel', '15_rel.csv',
+                                                   joint_connections=Render.joint_connections_n_head))
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_vel', '15_vel.csv',
+                                                  joint_connections=Render.joint_connections_n_head))
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_bone', '15_bone.csv',
+                                                   joint_connections=Render.joint_connections_n_head))
         #Type 2: HCF dataset
         elif t == 2:
             #This MUST have cycles, there's no non-cycles option
@@ -407,10 +407,14 @@ if __name__ == '__main__':
     #process_data("Anna")
     #process_data("Bob")
     #process_data("Cade")
+    #process_data("Chris")
+    #process_data("Elisa")
     #process_data("Emma")
     #process_data("Erin")
+    #process_data("Grant")
     #process_data("Pheobe")
     #process_data("Scarlett")
+    #process_data("Sean C")
     #process_data("Sean G")
     #process_data("Wanok")
 
@@ -421,7 +425,12 @@ if __name__ == '__main__':
                     'Erin', 'Pheobe', 'Scarlett', 'Sean G', 'Sean C', 'Wanok']
     
     #stitch_dataset(folder_names=folder_names)
-    
+    data, _ = Utilities.process_data_input('./Code/Datasets/Joint_Data/Big/no_subtracted/15_people/raw/15_people.csv', None, 
+                                           cols=Utilities.colnames_nohead, ignore_depth=False)
+    Creator.split_into_streams(data, joint_output_r='./Code/Datasets/Joint_Data/Big/no_subtracted/15_rel',
+                               joint_output_v='./Code/Datasets/Joint_Data/Big/no_subtracted/15_vel',
+                               joint_output_b='./Code/Datasets/Joint_Data/Big/no_subtracted/15_bone')
+
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
     #   1: normal full body 9D dataset
@@ -437,24 +446,28 @@ if __name__ == '__main__':
     #Person: full dataset only, denotes which person to extract otherwise 0 or none.
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
+
+    start = time.time()
+
     run_model(dataset_types= [1], model_type = "ST-AGCN", hcf=False,
-           batch_size = 64, epochs = 100, folder="big", save = '101Dataset', load='10_Dataset', leave_one_out = False)
-    
-    #2 people is 84.38%
-    #3 people is 82.14%
-    #4 people is 82.67% 0.81 f1
-    #5 people is 85.22% 0.82 f1
-    #6 people is 84.38% 0.82 f1
-    #7 people is 81.00% 0.79 f1
-    #8 people is 82.81% 0.78 f1
-    #9 people is 82.87% 0.80 f1
-    #10 people is 82.59% 0.807 f1
-    #11 people is 
+           batch_size = 64, epochs = 50, folder="big/No_Subtracted", save ='15_weights_1s', load=None, leave_one_out = False)
+
+    end = time.time()
+    print("time elapsed: ", end - start)
 
 
-    #Look into ST-GCN implementation to upload dataset to to see if ST-AGCN is better
-    
-    #Put into SVM and KNN for standard comparisons
+    #2s loss on w/time (1) (replace)
+    #1s loss on w/time (2) (replace)
+
+    #1ss ST-GCN (compared with 1ss loss on) (9)
+    #1ss GAT (same comparison) (10)
+    #SVM (6)
+    #Logreg (7)
+    #KNN (8)
+ 
+    #Test leave one out on best data
+
+    #Done :D
 
 
 

@@ -50,7 +50,7 @@ class STGCNBlock(torch.nn.Module):
         return x
 
 class MultiInputSTGACN(torch.nn.Module):
-    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 6, stgcn_filters = [64, 64, 128, 128, 256, 256], 
+    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 3, stgcn_filters = [64, 128, 256], 
                  max_cycle = 49, num_nodes_per_graph = 18, device = 'cuda'):
         super(MultiInputSTGACN, self).__init__()
 
@@ -112,10 +112,10 @@ class MultiInputSTGACN(torch.nn.Module):
 
         self.avg_pool = nn.AvgPool2d(4, 4)
         self.combination_layer = torch.nn.Sequential(
-        Linear(linear_input, 2048), ReLU(), BatchNorm1d(2048), torch.nn.Dropout(0.35),
-        Linear(2048, 1024), ReLU(), BatchNorm1d(1024), torch.nn.Dropout(0.35),
-        Linear(1024, 512), ReLU(), BatchNorm1d(512), torch.nn.Dropout(0.35),
-        Linear(512, 128), ReLU(), BatchNorm1d(128), torch.nn.Dropout(0.35),
+        Linear(linear_input, 2048), ReLU(), BatchNorm1d(2048), torch.nn.Dropout(0.15),
+        Linear(2048, 1024), ReLU(), BatchNorm1d(1024), torch.nn.Dropout(0.15),
+        Linear(1024, 512), ReLU(), BatchNorm1d(512), torch.nn.Dropout(0.15),
+        Linear(512, 128), ReLU(), BatchNorm1d(128), torch.nn.Dropout(0.15),
         Linear(128, num_classes)
         )
 

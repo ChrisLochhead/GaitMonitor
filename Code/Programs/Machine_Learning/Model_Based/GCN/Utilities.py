@@ -64,7 +64,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
     total_preds = []
     total_ys = []
 
-    for fold in range(k_fold - 1):
+    for fold in range(k_fold-1):
         print("Fold: ", fold)
         train_loaders = []
         val_loaders = []
