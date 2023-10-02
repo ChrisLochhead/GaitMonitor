@@ -10,49 +10,144 @@ import torch.nn as nn
 
 #Basic ST-GCN Block. These can only be stacked in lists not Torch.NN.Sequentials 
 #because forward takes multiple inputs which causes problem even in custom sequential implementations.
-class STGCNBlock(torch.nn.Module):
-    def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, spatial_size, device):
+class GATBlock(torch.nn.Module):
+    def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, spatial_size, device, first = False):
         super(STGCNBlock, self).__init__()
         #Layers
         self.b0 = BatchNorm1d(in_channels).to(device)
-        self.spatial_conv = GATv2Conv(in_channels, dim_h, heads=1).to(device)
-        #self.spatial_conv = ChebConv(in_channels, dim_h, 1).to("cuda")
-        self.b1 = BatchNorm1d(dim_h).to(device)
-        self.temporal_conv2 = torch.nn.Conv1d(dim_h, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
+        self.spatial_conv = GATv2Conv(in_channels, dim_h, heads=2).to(device)
+        self.spatial_conv_gat = GATv2Conv(int(dim_h * 2), dim_h, heads=1).to(device)
+        double_dim = int(dim_h * 2)
+
+        self.b1 = BatchNorm1d(double_dim).to(device)
+        self.b2 = BatchNorm1d(dim_h).to(device)
+        self.temporal_conv2 = torch.nn.Conv1d(double_dim, int(double_dim/1), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
         self.relu = ReLU()
         self.dropout = torch.nn.Dropout(0.1)
-        self.skip_connection = torch.nn.Conv1d(in_channels, dim_h, kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
+        self.skip_connection = torch.nn.Conv1d(in_channels, int(double_dim/2), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
 
         #Shape Info
         self.batch_size = batch_size
         self.cycle_size = cycle_size
 
     def forward(self, x, edge_index, train):
-        
+        #print("in forward: ", x.shape)
         if self.batch_size > 1:
             x = self.b0(x)
         residual = x
+        #print("skip connection and residual", self.skip_connection, residual.shape)
+        residual = self.relu(self.skip_connection(residual))
+        #Convert to 2D representation for GAT layer (Batch * Cycle, Channel)
+        x = x.view(x.shape[2] * x.shape[0], x.shape[1])
+        x = self.relu(self.b1(self.spatial_conv(x, edge_index)))
+        x = self.relu(self.b2(self.spatial_conv_gat(x, edge_index)))
+
+        #print("in forward 2: ", x.shape)
+        #Convert to 3D representation for Temporal layer (Batch, Channel, Cycle)
+        x = x.view(self.batch_size, x.shape[1], self.cycle_size)
+        x = torch.permute(x, (1, 0, 2))
+        x = torch.transpose(x, 0, 1)
+        x = torch.permute(x, (1, 0, 2))
+        x = torch.transpose(x, 0, 1)
+
+        x = residual + x
+        x = self.dropout(x)
+        return x
+    
+    #Basic ST-GCN Block. These can only be stacked in lists not Torch.NN.Sequentials 
+#because forward takes multiple inputs which causes problem even in custom sequential implementations.
+class STGCNBlock(torch.nn.Module):
+    def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, spatial_size, device, first = False):
+        super(STGCNBlock, self).__init__()
+        #Layers
+        self.b0 = BatchNorm1d(in_channels).to(device)
+        self.spatial_conv = ChebConv(in_channels, dim_h, 1).to("cuda")
+        double_dim = int(dim_h * 2)
+
+        self.b1 = BatchNorm1d(double_dim).to(device)
+        self.b2 = BatchNorm1d(dim_h).to(device)
+        self.temporal_conv2 = torch.nn.Conv1d(double_dim, int(double_dim/1), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
+        self.relu = ReLU()
+        self.dropout = torch.nn.Dropout(0.1)
+        self.skip_connection = torch.nn.Conv1d(in_channels, int(double_dim/2), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
+
+        #Shape Info
+        self.batch_size = batch_size
+        self.cycle_size = cycle_size
+
+    def forward(self, x, edge_index, train):
+        #print("in forward: ", x.shape)
+        if self.batch_size > 1:
+            x = self.b0(x)
+        residual = x
+        #print("skip connection and residual", self.skip_connection, residual.shape)
         residual = self.relu(self.skip_connection(residual))
         #Convert to 2D representation for GAT layer (Batch * Cycle, Channel)
         x = x.view(x.shape[2] * x.shape[0], x.shape[1])
         x = self.relu(self.b1(self.spatial_conv(x, edge_index)))
 
+        #Convert to 3D representation for Temporal layer (Batch, Channel, Cycle)
+        x = x.view(self.batch_size, x.shape[1], self.cycle_size)
+        x = torch.permute(x, (1, 0, 2))
+        x = torch.transpose(x, 0, 1)
+
+        x = self.relu(self.b2(self.temporal_conv2(x)))
+        x = torch.permute(x, (1, 0, 2))
+        x = torch.transpose(x, 0, 1)
+
+        x = residual + x
+        x = self.dropout(x)
+        return x
+    
+
+#Basic ST-GCN Block. These can only be stacked in lists not Torch.NN.Sequentials 
+#because forward takes multiple inputs which causes problem even in custom sequential implementations.
+class STAGCNBlock(torch.nn.Module):
+    def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, spatial_size, device, first = False):
+        super(STGCNBlock, self).__init__()
+        #Layers
+        self.b0 = BatchNorm1d(in_channels).to(device)  
+        self.spatial_conv = GATv2Conv(in_channels, dim_h, heads=2).to(device)
+        double_dim = int(dim_h * 2)
+
+        self.b1 = BatchNorm1d(double_dim).to(device)
+        self.b2 = BatchNorm1d(dim_h).to(device)
+        self.temporal_conv2 = torch.nn.Conv1d(double_dim, int(double_dim/1), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
+        self.relu = ReLU()
+        self.dropout = torch.nn.Dropout(0.1)
+        self.skip_connection = torch.nn.Conv1d(in_channels, int(double_dim/2), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
+
+        #Shape Info
+        self.batch_size = batch_size
+        self.cycle_size = cycle_size
+
+    def forward(self, x, edge_index, train):
+        if self.batch_size > 1:
+            x = self.b0(x)
+        residual = x
+        #print("skip connection and residual", self.skip_connection, residual.shape)
+        residual = self.relu(self.skip_connection(residual))
+        #Convert to 2D representation for GAT layer (Batch * Cycle, Channel)
+        x = x.view(x.shape[2] * x.shape[0], x.shape[1])
+        x = self.relu(self.b1(self.spatial_conv(x, edge_index)))
 
         #Convert to 3D representation for Temporal layer (Batch, Channel, Cycle)
         x = x.view(self.batch_size, x.shape[1], self.cycle_size)
         x = torch.permute(x, (1, 0, 2))
         x = torch.transpose(x, 0, 1)
-        x = self.relu(self.b1(self.temporal_conv2(x)))
+
+        x = self.relu(self.b2(self.temporal_conv2(x)))
         x = torch.permute(x, (1, 0, 2))
         x = torch.transpose(x, 0, 1)
+
         x = residual + x
         x = self.dropout(x)
         return x
 
-class MultiInputSTGACN(torch.nn.Module):
+class GraphNetwork(torch.nn.Module):
     def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 3, stgcn_filters = [64, 128, 256], 
-                 max_cycle = 49, num_nodes_per_graph = 18, device = 'cuda'):
-        super(MultiInputSTGACN, self).__init__()
+                 max_cycle = 49, num_nodes_per_graph = 18, device = 'cuda', type = 0):
+        super(GraphNetwork, self).__init__()
 
         dim_half = int(dim_h/2)
         dim_4th = int(dim_half/2)
@@ -67,6 +162,10 @@ class MultiInputSTGACN(torch.nn.Module):
         self.num_nodes_per_graph = num_nodes_per_graph
         self.cycle_size = max_cycle * num_nodes_per_graph 
         self.device = device
+        #0 = GAT, 1=ST-GCN, 2=ST-AGCN
+        self.model_type = type
+        
+
         #Two sub-streams: the first contains the sequences that each input stream goes through,
         #the second is the single combined stream 
         self.streams = []
@@ -85,9 +184,21 @@ class MultiInputSTGACN(torch.nn.Module):
             else:
             #Every other possible input will be processed via an ST-GCN block which needs to be appended in a list instead of a sequential.
                 i_stream = []
-                i_stream.append(STGCNBlock(self.dim_in[0], self.stgcn_filters[0], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph, device))
-                for i in range(1, self.size_stgcn):
-                    i_stream.append(STGCNBlock(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph, device))
+                if self.model_type == 0:
+                    i_stream.append(GATBlock(self.dim_in[0], self.stgcn_filters[0], 5, self.batch_size, self.cycle_size,
+                                                self.num_nodes_per_graph, device, first=True))
+                    for i in range(1, self.size_stgcn):
+                        i_stream.append(GATBlock(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph, device))
+                elif self.model_type == 1:
+                    i_stream.append(STGCNBlock(self.dim_in[0], self.stgcn_filters[0], 5, self.batch_size, self.cycle_size,
+                                                self.num_nodes_per_graph, device, first=True))
+                    for i in range(1, self.size_stgcn):
+                        i_stream.append(STGCNBlock(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph, device))
+                else:
+                    i_stream.append(STAGCNBlock(self.dim_in[0], self.stgcn_filters[0], 5, self.batch_size, self.cycle_size,
+                                                self.num_nodes_per_graph, device, first=True))
+                    for i in range(1, self.size_stgcn):
+                        i_stream.append(STAGCNBlock(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph, device))
 
                 self.streams.append(i_stream)
         

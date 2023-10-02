@@ -371,13 +371,15 @@ def get_gait_cycles(joint_data, images):
 
 def sample_gait_cycles(data_cycles):
     # Find the length of the biggest sublist
-    cycles = [[],[],[]]
+    cycles = [[] for i in range(3)]
     print("len gait cycles: ", len(data_cycles))
     for cycle in data_cycles:
         #print("cycle: ", cycle[0][2], cycle[0][0], cycle[0][1])
         cycles[cycle[0][2]].append(cycle)
 
     print("lens: ", len(cycles[0]),len(cycles[1]),len(cycles[2]))
+    for c in cycles:
+        print("cycle len: ", len(c))
     #done = 5/0
     min_length = min(len(sublist) for sublist in cycles)
 

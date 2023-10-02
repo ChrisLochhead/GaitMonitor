@@ -1,15 +1,12 @@
-import Programs.Machine_Learning.Model_Based.GCN.Render as Render
 import torch
 torch.manual_seed(42)
 from sklearn.metrics import f1_score
-
 from torch_geometric.loader import DataLoader as GeoLoader
 from torch.utils.data import RandomSampler
-import Programs.Machine_Learning.Model_Based.GCN.GAT as gat
-from torch.nn.utils.rnn import pad_sequence
 from sklearn.model_selection import StratifiedKFold
 import copy
-import torch.nn.functional as F
+import Programs.Data_Processing.Model_Based.Utilities as Utilities
+import Programs.Data_Processing.Model_Based.Dataset_Creator as Creator
 from sklearn.metrics import confusion_matrix
 
 def assess_data(dataset):
@@ -38,20 +35,16 @@ def accuracy(pred_y, y):
 # define a cross validation function
 def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=None,k_fold=3, batch = 16, inputs_size = 1,
                  epochs = 100, type = "GAT", make_loaders = False, device = 'cuda'):
-    
     train_score = []
     val_score = []
     test_score = []
 
     # Extract the class labels
     class_labels = [data_point.y.item() for data_point in datasets[0]]
-
     # Initialize the StratifiedKFold object
     skf = StratifiedKFold(n_splits=k_fold)
-
     folded_train = [[] for l in range(len(datasets))]
     folded_val = [[] for l in range(len(datasets))]
-
 
     for train_indices, val_indices in skf.split(datasets[0], class_labels):
         for d_ind, dataset in enumerate(datasets):
@@ -63,8 +56,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
 
     total_preds = []
     total_ys = []
-
-    for fold in range(k_fold-1):
+    for fold in range(k_fold):
         print("Fold: ", fold)
         train_loaders = []
         val_loaders = []
@@ -72,48 +64,29 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
 
         #Set up so identical seed is used
         G = torch.Generator()
-
         train_sample = RandomSampler(folded_train[0][fold], generator=G)
-
         #Restrict validation and testing batch sizes to be one batch
-        if type == "ST-AGCN":
-            val_sample = RandomSampler(folded_val[0][fold], generator=G)
-            test_sample = RandomSampler(test_dataset[0], generator=G)
-        else:
-            val_sample = RandomSampler(folded_val[0][fold], generator=G)
-            test_sample = RandomSampler(test_dataset[0], generator=G)
-
+        val_sample = RandomSampler(folded_val[0][fold], generator=G)
+        test_sample = RandomSampler(test_dataset[0], generator=G)
         init = G.get_state()
         for i, dataset in enumerate(datasets):
             test_set = test_dataset[i]
             train_set = folded_train[i][fold]
             val_set = folded_val[i][fold]
-
             train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler = train_sample, drop_last = True))
 
-            #ST-GCNs, these are different because ST-GCN requires padded samples of all the same size
-            if type == "ST-AGCN":
-                #Restrict val set to only being 1 batch, so the same batch and hence the same data is always picked for testing
-                #test_set = test_set[0:batch]
-                #val_set = val_set[0:batch]
-                val_loaders.append(GeoLoader(val_set, batch_size=batch, sampler = val_sample, drop_last = True))
-                test_loaders.append(GeoLoader(test_set, batch_size=batch, sampler = test_sample, drop_last = True))
-            else:
-            #GATs
-                val_loaders.append(GeoLoader(val_set, batch_size=batch))
-                test_loaders.append(GeoLoader(test_set, batch_size=batch))
-
+            #Restrict val set to only being 1 batch, so the same batch and hence the same data is always picked for testing
+            val_loaders.append(GeoLoader(val_set, batch_size=batch, sampler = val_sample, drop_last = True))
+            test_loaders.append(GeoLoader(test_set, batch_size=batch, sampler = test_sample, drop_last = True))
 
             if make_loaders:
                 return train_loaders, val_loaders, test_loaders
             #Reset the generator so every dataset gets the same sampling 
             G.set_state(init)
-
         G.set_state(init)
 
         model = copy.deepcopy(MY_model)
         model = model.to(device)
-            
         model, accuracies, vals, tests, all_y, all_pred = train(model, train_loaders, val_loaders, test_loaders, G, epochs, batch, device)
         #model, accuracies, vals, tests, all_y, all_pred = train_individual(model, train_loaders, val_loaders, test_loaders, G, epochs, batch, device)
         total_ys += all_y
@@ -135,14 +108,12 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size,
     optimizer = torch.optim.SGD(model.parameters(),
                                 lr=0.1,
                                 weight_decay=0.001)
-    
     model.train()
     train_accs = []
     val_accs = []
     test_accs = []
     all_pred = []
     all_y = []
-
     #First pass, append all the data together into arrays
     xs_batch = [[] for l in range(len(loader))]
     indice_batch = [[] for l in range(len(loader))]
@@ -179,7 +150,6 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size,
             data_i = [indice_batch[i][index] for i in range(len(loader))]
             data_b = [batch_batch[i][index] for i in range(len(loader))]
             data_y =  [ys_batch[i][index] for i in range(len(loader))]
-
             out = model(data_x, data_i, data_b, train=True)
             #First data batch with Y has to have the right outputs
             out = modify_loss(out, data_y[0])
@@ -193,7 +163,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size,
             del data, data_x, data_i, data_b, data_y, out
 
         # Validation
-        #generator.set_state(init)
+        generator.set_state(init)
         val_loss, val_acc, _, _ = test(model, val_loader, generator, train = True, validation=True, optimizer = optimizer, device = device)
         val_accs.append(val_acc)
 
@@ -248,12 +218,6 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
                 indice_batch[i].append(data.edge_index)
                 batch_batch[i].append(data.batch)
                 ys_batch[i].append(data.y)
-                #print("loader: ", data, len(data))
-
-        #if validation:
-        #    print("validation batch: ", len(xs_batch[0]))
-        #else:
-        #    print("test batch: ", len(xs_batch[0]))
 
         #Second pass: process the data 
         generator.set_state(init)
@@ -283,7 +247,6 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
 
     return total_loss, acc, all_pred, all_y
 
-
 def modify_loss(out, actual):
     predictions = out.argmax(dim=1)
     new_out = out.clone()
@@ -300,7 +263,6 @@ def modify_loss(out, actual):
                     new_out[i][pred_2] *= 2.00
                 
             else:
-                #print("calling?", predictions[i], actual[i])
                 #Make incorrect prediction WAY wronger
                 pred_1 = 0
                 pred_2 = 1
@@ -321,3 +283,93 @@ def modify_loss(out, actual):
                 elif pred_2 == 0:
                     new_out[i][pred_2] *= 2.00      
     return new_out
+
+def unfold_3s_dataset(data, joint_output):
+    rel_data = []
+    vel_data = []
+    bones_data = []
+
+    for frame in data:
+        rel_frame = frame[0:6]
+        vel_frame = frame[0:6]
+        bones_frame = frame[0:6]
+        for i, coord in enumerate(frame):
+            if i > 5:
+                rel_frame.append(coord[0:3])
+                vel_frame.append(coord[3:6])
+                bones_frame.append(coord[6:])
+        rel_data.append(rel_frame)
+        vel_data.append(vel_frame)
+        bones_data.append(bones_frame)
+    
+    Utilities.save_dataset(rel_data, joint_output + "_rel")
+    Utilities.save_dataset(vel_data, joint_output + "_vel")
+    Utilities.save_dataset(bones_data, joint_output + "_bone")
+
+def load_whole_dataset(folder_names, file_name):
+    data = []
+    for name in folder_names:
+        print("loading: ", "./Code/Datasets/Joint_Data/" + str(name) + str(file_name) + "/raw/"+ str(file_name) + ".csv")
+        abs_joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(name) + str(file_name) + "/raw/"+ str(file_name) + ".csv", None,
+                                                                cols=Utilities.colnames_nohead, ignore_depth=False)
+        data.append(abs_joint_data)
+    return data
+
+#Make 9 class solution 
+def change_to_ensemble_classes():
+    joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/big/no_subtracted/2_people/raw/2_people.csv",
+                                                            None, cols=Utilities.colnames_nohead, ignore_depth=False)
+    Creator.convert_person_to_type(joint_data, joint_output="./Code/Datasets/Joint_Data/big/2_people_Ensemble")
+
+#Split data by body part region 
+def create_regions_data(data, folder):
+    regions_data_2 = Creator.create_2_regions_dataset(data,
+                                                       joint_output="./Code/Datasets/Joint_Data/"  + str(folder)  + "/2_region", images=None)
+    regions_data_5 = Creator.create_5_regions_dataset(data, 
+                                                      joint_output="./Code/Datasets/Joint_Data/"  + str(folder)  + "/5_region", images=None)
+
+#Unfold the ensemble data
+def extract_ensemble_data():
+    joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/big/2_people/raw/2_people.csv",
+                                                            None, cols=Utilities.colnames_nohead, ignore_depth=False)
+    print("data loaded")
+    create_regions_data(joint_data, "big")
+    print("region data completed")
+    unfold_3s_dataset(joint_data, joint_output="./Code/Datasets/Joint_Data/big/2_people/raw/2_people")
+    print("unfolding completed")
+
+#Remove one individual and create their own dataset for leave one out testing
+def extract_single_person(data, joint_output, person = 0):
+    single_person = []
+    full_dataset = []
+    for i, row in enumerate(data):
+        if row[5] == person:
+            single_person.append(row)
+        else:
+            full_dataset.append(row)
+
+    Utilities.save_dataset(single_person, joint_output + "_single")
+    Utilities.save_dataset(full_dataset, joint_output + "_full")
+
+#Stitch up datasets of individuals to create a full dataset
+def stitch_dataset(folder_names):
+    file_name = '/20_Combined_Data_Noise'
+    datasets = load_whole_dataset(folder_names, file_name)
+    whole_dataset = datasets[0]
+    current_instance = whole_dataset[-1][0]
+    for i, dataset in enumerate(datasets):
+        if i > 0:
+            current_instance, whole_dataset = Creator.assign_person_number(whole_dataset, dataset, 
+                                                                       "./Code/Datasets/Joint_Data/Big/" + str(i + 1) + "_people",
+                                                                       i, current_instance)
+    print("completed.")
+
+#Compress datasets by removing 0s
+def reduce_dataset(data, joint_output):
+    for i, row in enumerate(data):
+        for j, value in enumerate(row):
+            if j > 5:
+                if all(item == 0 for item in value):
+                    data[i][j] = ""
+                    
+    Utilities.save_dataset(data, joint_output)

@@ -7,7 +7,6 @@ import csv
 import pandas as pd
 from ast import literal_eval
 
-#from Programs.Data_Processing.Model_Based.Utilities import *
 import Programs.Data_Processing.Model_Based.Utilities as Utilities
 from Programs.Data_Processing.Model_Based.Render import *
 from Programs.Machine_Learning.Model_Based.Simple_HigherHRNet import SimpleHigherHRNet

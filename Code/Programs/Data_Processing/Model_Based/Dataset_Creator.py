@@ -6,26 +6,19 @@ from tqdm import tqdm
 import math
 import numpy as np
 import copy 
-
-from sklearn.preprocessing import normalize
 from sklearn.preprocessing import StandardScaler
 
+#Scale HCF data
 def normalize_hcf(data, joint_output):
-    # create scaler
     scaler = StandardScaler()
-    # fit scaler on data
     scaler.fit(data)
-    # apply transform
     standardized = scaler.transform(data)
     Utilities.save_dataset(standardized, joint_output)
     return standardized
 
+#Scale regular joint data
 def new_normalize_values(data, joint_output, joint_size):
-    # create scaler
     scaler = StandardScaler()
-    # fit scaler on data
-
-    print("data: ", len(data), len(data[0]))
     meta_data = []
     joint_info = []
     for row in data:
@@ -40,8 +33,7 @@ def new_normalize_values(data, joint_output, joint_size):
         meta_data.append(meta_row)
         joint_info.append(joint_row)
     
-    print("lens: ", len(meta_data), len(meta_data[0]), len(joint_info), len(joint_info[0]))
-            
+    #Unravel for the scaler
     unravelled_joints = []
     for row in joint_info:
         unravelled_row = []
@@ -50,15 +42,8 @@ def new_normalize_values(data, joint_output, joint_size):
                 unravelled_row.append(value)
         unravelled_joints.append(unravelled_row)
 
-    print("lens:", len(unravelled_joints), len(unravelled_joints[0]))
-
     scaler.fit(unravelled_joints)
-
-    # apply transform
     standardized = scaler.transform(unravelled_joints)
-
-    print("should be the same:", len(standardized), len(standardized[0]))
-
 
     #Re-ravel
     ravelled = []
@@ -73,8 +58,6 @@ def new_normalize_values(data, joint_output, joint_size):
                 full_coord.append(coord)
         ravelled_row.append(copy.deepcopy(full_coord))
         ravelled.append(ravelled_row)
-    
-    print("final ravel: ", len(ravelled), len(ravelled[0]))
 
     Utilities.save_dataset(ravelled, joint_output)
     return ravelled
@@ -96,7 +79,6 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joints_output, meta
     rel_data, images = Utilities.process_data_input(rel_data, images)
     vel_data, _ = Utilities.process_data_input(vel_data, None)
     angle_data, _ = Utilities.process_data_input(angle_data, None)
-    print("combine lens: ", len(rel_data), len(vel_data), len(angle_data), len(rel_data[0]), len(vel_data[0]), len(angle_data[0]))
     combined_dataset = []
     for i, row in enumerate(tqdm(rel_data)):
         #Metadata is the same as usual
@@ -125,7 +107,6 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joints_output, meta
 def process_empty_frames(joint_file, image_file, joint_output, image_output):
     print("\nProcessing Empty frames...")
     joint_data, image_data = Utilities.process_data_input(joint_file, image_file, cols=Utilities.colnames)
-    print(len(joint_data), len(image_data))
 
     joint_data, image_data = Data_Correction.remove_empty_frames(joint_data, image_data)
     Utilities.save_dataset(joint_data, joint_output)
@@ -142,7 +123,6 @@ def process_trimmed_frames(joint_file, image_file, joint_output, image_output, t
     Utilities.save_images(joint_data, image_data, image_output)
     print("Trimmed frame processing complete.")
     return joint_data, image_data
-
     
 def create_relative_dataset(abs_data, image_data, joint_output, meta = 5):
     print("\nCreating relative value dataset...")
@@ -150,8 +130,6 @@ def create_relative_dataset(abs_data, image_data, joint_output, meta = 5):
     rel_data = []
     for i, joints in enumerate(tqdm(abs_data)):
         rel_row = []
-        #print("before")
-        #Render.render_joints(image_data[i], joints, True)
         for j, coord in enumerate(joints):
             #Ignore metadata
             origin = joints[meta + 1]
@@ -165,11 +143,7 @@ def create_relative_dataset(abs_data, image_data, joint_output, meta = 5):
                 rel_row.append([coord[0] - origin[0],
                                 coord[1] - origin[1],
                                 coord[2] - origin[2]])
-
         rel_data.append(rel_row)
-        #print("after")
-        #Render.render_joints(image_data[i], rel_row, True)
-        #Render.plot3D_joints(rel_row, x_rot=-90, y_rot=180)
 
     Utilities.save_dataset(rel_data, joint_output)
     print("relative dataset completed.")
@@ -225,15 +199,11 @@ def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output, meta 
     original_len = len(sequence_data)
     flipped_sequences = []
     for i, seq in enumerate(tqdm(rel_sequence_data)):
-
-
         #Get first and last head positions (absolute values)
         first = sequence_data[i][1]
         last = sequence_data[i][-1]
-
         #This is going from right to left: the ones we want to flip
         if (first[meta+1][1] > last[meta+1][1] and double_size == False) or double_size == True:
-
             #First append regular data:
             if double_size:
                 for joints in seq:
@@ -259,7 +229,6 @@ def create_flipped_joint_dataset(rel_data, abs_data, images, joint_output, meta 
     #Illustrate results
     print("illustrating results: ")
     print("size after flip: ", len(flipped_data))
-
     for k, joints in enumerate(flipped_data):
         if k > 20 and k < 50:
             pass
@@ -296,7 +265,6 @@ def append_midhip(abs_data, images, joint_output):
         midhip_row = list(joints)
         midhip_row.append(Utilities.midpoint(joints[14], joints[15]))
         midhip_dataset.append(midhip_row)
-    
         #Display results
         #Render.render_joints(images[i], midhip_row, delay=True)
     
@@ -318,7 +286,6 @@ def create_bone_dataset(abs_data, images, joint_output, meta = 6):
                         tmp_vector = [joints[bone_pair[1] + meta][0] - coords[0],
                                     joints[bone_pair[1] + meta][1] - coords[1],
                                     joints[bone_pair[1] + meta][2] - coords[2]]
-                        
                         #Then normalize
                         norm = math.sqrt(tmp_vector[0] ** 2 + tmp_vector[1] ** 2 + tmp_vector[2] ** 2)
                         if norm == 0:
@@ -328,7 +295,6 @@ def create_bone_dataset(abs_data, images, joint_output, meta = 6):
                         tmp_vector = [0,0,0]
                     bone_row.append(tmp_vector)
         bone_dataset.append(bone_row)
-
         #Check solution
         #Render.render_velocities(abs_data[i], bone_row, images[i])
 
@@ -373,6 +339,7 @@ def create_2_regions_dataset(abs_data, joint_output, images, meta = 6, size = 9)
     print("Regions dataset (top and bottom) completed.")
     return top_dataset, bottom_dataset
 
+#Utility function for adding certain body parts to array
 def append_specific_joints(my_list, joints, indices, size = 9):
     empties = list(np.zeros(size))
     for i in range(len(joints)):
@@ -425,7 +392,6 @@ def create_5_regions_dataset(abs_data, joint_output, images, meta = 5, size = 9)
     print("Regions dataset (5-tier) completed.")
     return region_datasets
                 
-
 def set_gait_cycles(data, preset_cycle):
     new_cycles = []
     data_iter = 0
@@ -433,7 +399,6 @@ def set_gait_cycles(data, preset_cycle):
     for i, cycle in enumerate(preset_cycle):
         new_cycle = []
         for j, frame in enumerate(cycle):
-            #print("data iter: ", data_iter, len(preset_cycle), len(cycle))
             new_cycle.append(data[data_iter])
             data_iter += 1
         new_cycles.append(new_cycle)
@@ -453,10 +418,9 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
     rel_gait_cycles = set_gait_cycles(rel_joint_data, pre_gait_cycles)
 
     print("gait cycle lens: ", len(pre_gait_cycles), len(gait_cycles), len(rel_gait_cycles))
-    #trend = hcf.get_knee_chart_polynomial(knee_data_cycles)
     knee_data_cycles = Utilities.build_knee_joint_data(pre_gait_cycles, images)
     knee_data_coeffs = Render.chart_knee_data(knee_data_cycles, False)
-
+    trend = hcf.get_knee_chart_polynomial(knee_data_cycles)
 
     #print("number of total gait cycles: ", len(gait_cycles))
     #Then for every gait cycle create a new instance with the following features: 
@@ -514,17 +478,14 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
     print("HCF dataset completed.")
     return gait_cycles_dataset
 
-
+#Create dummy frames by applying gaussian noises to the original frames
 def create_dummy_dataset(data, output_name):
-    #Get single datapoint of all 3 classes
     data, _ = Utilities.process_data_input(data, None)
-
-    #Apply gaussian noise to each 1000*
-    mean = 0  # Mean of the Gaussian distribution
+    mean = 0 
     std_dev = 1 
-
     sequences = []
     sequence = []
+
     for i, example in enumerate(data):
         #Just add the first one as usual
         if i == 0:
@@ -539,25 +500,20 @@ def create_dummy_dataset(data, output_name):
                 sequence.append(example)
 
     sequences.append(sequence)
-
     noise_sequences = []
     novel_sequences = []
-
-    print("info: ", len(sequences), len(sequences[0]))
-
     #Get total number of people
     no_people = sequences[-1][0][5]
     if no_people <= 0:
         no_people =1
-    print("should be 16: ", no_people)
 
     scaling_factors = [0 for i in range(no_people)]
     frame_counts = [0 for i in range(no_people)]
-    #Minimum number of examples you want per person in frames
+    #Minimum number of examples you want per person in frames, this is taken from the best of the original 15 participants in terms
+    #of raw accuracy
     threshold = 13000
 
     for sequence in sequences:
-
         for frame in sequence:
             #Add -1 for weightgait
             #Edge case: producing single person datasets sets person to -1
@@ -566,19 +522,11 @@ def create_dummy_dataset(data, output_name):
             #print("what is this: ", frame[5], len(frame_counts), frame_counts)
             frame_counts[frame[5]-1] += 1
 
-    print("final frame counts per person: ", frame_counts)
-    print("total frames: ", sum(frame_counts))
-
     for i, factor in enumerate(scaling_factors):
         #Calculate what I need to multiply by to reach a minimum of 13000 frames (or 2200ish sequences of 6)
-        #5 (chris) should be close to 5, Erin 12 and Elisa 10
         scaling_factors[i] = int(threshold /frame_counts[i])
 
-    print("scaling factors: ", scaling_factors)
-    #done = 5/0
-
     scaling_iter = 0
-    print("Num sequences should be 1917", len(sequences))
     original_len = len(sequences)
     for i, sequence in enumerate(sequences):
         #First: Add the original frames
@@ -586,10 +534,6 @@ def create_dummy_dataset(data, output_name):
             scaling_iter +=1
             if scaling_iter > len(scaling_factors)-1:
                 scaling_iter = 0
-            print("changing scale iter: ", i, len(sequences), len(scaling_factors))
-            print("factor now " ,scaling_factors[scaling_iter])
-        if i %100 == 0:
-            print("whats i right now: ", i)
 
         for frame_index, frame in enumerate(sequence):
             noise_sequences.append(frame)
@@ -609,15 +553,11 @@ def create_dummy_dataset(data, output_name):
                 #Unravel the denoised frame and attach to the metadata
                 for f in noisy_frame:
                     frame_metadata.append(f)
-
                 novel_sequences.append(frame_metadata)
-    
-    print("length aFTER ADDING ALL NORmal: ", len(noise_sequences))
+
     for frame in novel_sequences:
         noise_sequences.append(frame)
 
-    print("final number of fake examples: ", len(noise_sequences))
-    #stop = 5/0
     Utilities.save_dataset(noise_sequences, output_name)
     return noise_sequences
 
@@ -625,10 +565,7 @@ def create_dummy_dataset(data, output_name):
 def interpolate_gait_cycle(data_cycles, joint_output, step = 5, restrict_cycle = False):
     inter_cycles = []
     min_cycle_count = min(len(sub_list) for sub_list in data_cycles) - 1
-
-    print("len data cycles: ", len(data_cycles))
     for a, cycle in enumerate(data_cycles):
-        
         inter_cycle = []
         #print("original cycle length: ", len(cycle))
         for i, frame in enumerate(cycle):
@@ -644,8 +581,7 @@ def interpolate_gait_cycle(data_cycles, joint_output, step = 5, restrict_cycle =
                         inter_cycle.append(inter_frames[j])
 
         inter_cycles.append(inter_cycle)
-    
-    print("cycle length should be same: ", len(inter_cycles), len(data_cycles))
+
     save_cycles = []
     for c in inter_cycles:
         for f in c:
@@ -670,14 +606,13 @@ def interpolate_coords(start_frame, end_frame, step):
                 #print("\ninterpolated coord 2: ", type(listed), listed)
                 inter_frame[j] = listed
         inter_frames.append(inter_frame)
-       
     return inter_frames
 
 def check_within_radius(point1, point2, radius):
     if len(point1) != 3 or len(point2) != 3:
         raise ValueError("Both points should have exactly 3 dimensions.")
     
-    #3D is no good for this
+    #3D is no good for this, too much noise
     distance = math.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)# + (point1[2] - point2[2])**2)
     return distance <= radius
 
@@ -700,20 +635,19 @@ def get_average_sequence(data):
                             result[j][k] = [x + y for x, y in zip(result[j][k], new_addition)]
                         except:
                             pass
-    
     return result
                     
 def subtract_skeleton(rel_data, joint_output, base_output):
-
     rel_sequences = Utilities.convert_to_sequences(rel_data)
+    rel_sequences = interpolate_gait_cycle(rel_sequences, base_output, 0, restrict_cycle=False) 
 
-    rel_sequences = interpolate_gait_cycle(rel_sequences, base_output, 0, restrict_cycle=False) # try just cutting all to minimum size first, then by padding
-
+    #Extract an overlay sequence for each individual
     overlay_sequences = [s for i, s in enumerate(rel_sequences) if i % 60 == 0]
     for i, sequence in enumerate(rel_sequences):
         if i % 60 == 0:
             overlay_sequences.append(get_average_sequence(rel_sequences[i:i+10]))
 
+    #Subtract the data by the mask
     overlay_iter = 0
     sequence_counter = 0
     for i, sequence in enumerate(rel_sequences):
@@ -722,27 +656,23 @@ def subtract_skeleton(rel_data, joint_output, base_output):
                 if k> 5:
                     #Check if coord and overlay[j][k] are within a radius of eachother, ignoring the first 10
                     try:
-                        if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 0):# results were on 50. minor was 15
+                        if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 30):# results were on 50. minor was 15
                             #print("detected within raidus: ", coord, overlay_sequence[j][k])
-                            pass
-                            #rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
+                            rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
                     except:
                         pass
         if i % 60 == 0 and i != 0:
             overlay_iter += 1
-            print("overlay iter: ", overlay_iter)
             sequence_counter = 0
         else:
             sequence_counter += 1
         
-
     #Unwrap sequences
     final_data = []
     for i, sequence in enumerate(rel_sequences):
         for frame in sequence:
             final_data.append(frame)
             #Render.plot3D_joints(frame, metadata=6)
-
     Utilities.save_dataset(final_data, joint_output)
     return final_data
 
@@ -758,53 +688,51 @@ def convert_person_to_type(data, joint_output):
         #Class 2, freeze 0, obstacle 0 = 6
         #Class 2, freeze 1, obstacle 0 = 7
         #Class 2, freeze 0, obstacle 1 = 8
-
         if row[2] == 0:
             #Freeze 0
             if row[3] == 0:
                 #Obstacle 0
                 if row[4] == 0:
                     #Class 0, freeze 0, obstacle 0 = 0
-                    data[i][5] = 0
+                    data[i][2] = 0
                 else:
                     #Class 0, freeze 0, obstacle 0 = 1
-                    data[i][5] = 2
+                    data[i][2] = 2
             else:
-                data[i][5] = 1
+                data[i][2] = 1
         elif row[2] == 1:
             #Freeze 0
             if row[3] == 0:
                 #Obstacle 0
                 if row[4] == 0:
                     #Class 1, freeze 0, obstacle 0 = 0
-                    data[i][5] = 3
+                    data[i][2] = 3
                 else:
                     #Class 1, freeze 0, obstacle 0 = 1
-                    data[i][5] = 5
+                    data[i][2] = 5
             else:
-                data[i][5] = 4
+                data[i][2] = 4
         elif row[2] == 2:
             #Freeze 0
             if row[3] == 0:
                 #Obstacle 0
                 if row[4] == 0:
                     #Class 0, freeze 0, obstacle 0 = 0
-                    data[i][5] = 6
+                    data[i][2] = 6
                 else:
                     #Class 0, freeze 0, obstacle 0 = 1
-                    data[i][5] = 8
+                    data[i][2] = 8
             else:
-                data[i][5] = 7
+                data[i][2] = 7
 
     Utilities.save_dataset(data, joint_output)
     return data
 
-
+#Cut 9D into 3D streams
 def split_into_streams(data, joint_output_r, joint_output_v, joint_output_b):
     rel_data = []
     vel_data = []
     bone_data = []
-
     for i, row in enumerate(data):
         rel_row = row[0:6]
         vel_row = row[0:6]
@@ -819,13 +747,11 @@ def split_into_streams(data, joint_output_r, joint_output_v, joint_output_b):
         rel_data.append(rel_row)
         vel_data.append(vel_row)
         bone_data.append(bone_row)
-
     Utilities.save_dataset(rel_data, joint_output_r)
     Utilities.save_dataset(vel_data, joint_output_v)
     Utilities.save_dataset(bone_data, joint_output_b)
     
-
-
+#Utility function for changing class labels
 def assign_person_number(data_to_append, data, joint_output, no, start_instance):
     current_instance = start_instance + 1
     for i, row in enumerate(data):
