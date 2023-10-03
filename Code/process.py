@@ -149,8 +149,8 @@ def load_datasets(types, folder):
         #Type 1: Normal, full dataset
         if t == 1:  
             #9D-1-Stream
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/15_people',
-                                                    '15_people.csv',
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/2_people',
+                                                    '2_people.csv',
                                                   joint_connections=Render.joint_connections_n_head))
             
             #9D-1-Stream: Leave_one_out
@@ -280,7 +280,7 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
     dim_out = 3
     print("\nCreating {} datasets: ".format(len(datasets)))
     print("going in: ", datasets[0].num_node_features)
-    model = stgcn.MultiInputSTGACN(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=dim_out, n_inputs=num_datasets,
+    model = stgcn.GraphNetwork(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=dim_out, n_inputs=num_datasets,
                                 data_dims=data_dims, batch_size=batch_size, hcf=hcf,
                                 max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph, device = device)
     
