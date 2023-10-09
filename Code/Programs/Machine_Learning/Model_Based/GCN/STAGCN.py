@@ -12,7 +12,7 @@ import torch.nn as nn
 #because forward takes multiple inputs which causes problem even in custom sequential implementations.
 class GATBlock(torch.nn.Module):
     def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, spatial_size, device, first = False):
-        super(STGCNBlock, self).__init__()
+        super(GATBlock, self).__init__()
         #Layers
         self.b0 = BatchNorm1d(in_channels).to(device)
         self.spatial_conv = GATv2Conv(in_channels, dim_h, heads=2).to(device)
@@ -64,12 +64,12 @@ class STGCNBlock(torch.nn.Module):
         self.spatial_conv = ChebConv(in_channels, dim_h, 1).to("cuda")
         double_dim = int(dim_h * 2)
 
-        self.b1 = BatchNorm1d(double_dim).to(device)
+        self.b1 = BatchNorm1d(dim_h).to(device)
         self.b2 = BatchNorm1d(dim_h).to(device)
-        self.temporal_conv2 = torch.nn.Conv1d(double_dim, int(double_dim/1), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
+        self.temporal_conv2 = torch.nn.Conv1d(dim_h, int(dim_h), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
         self.relu = ReLU()
         self.dropout = torch.nn.Dropout(0.1)
-        self.skip_connection = torch.nn.Conv1d(in_channels, int(double_dim/2), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
+        self.skip_connection = torch.nn.Conv1d(in_channels, int(dim_h), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
 
         #Shape Info
         self.batch_size = batch_size
@@ -79,6 +79,7 @@ class STGCNBlock(torch.nn.Module):
         #print("in forward: ", x.shape)
         if self.batch_size > 1:
             x = self.b0(x)
+
         residual = x
         #print("skip connection and residual", self.skip_connection, residual.shape)
         residual = self.relu(self.skip_connection(residual))
@@ -104,7 +105,7 @@ class STGCNBlock(torch.nn.Module):
 #because forward takes multiple inputs which causes problem even in custom sequential implementations.
 class STAGCNBlock(torch.nn.Module):
     def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, spatial_size, device, first = False):
-        super(STGCNBlock, self).__init__()
+        super(STAGCNBlock, self).__init__()
         #Layers
         self.b0 = BatchNorm1d(in_channels).to(device)  
         self.spatial_conv = GATv2Conv(in_channels, dim_h, heads=2).to(device)
@@ -112,10 +113,10 @@ class STAGCNBlock(torch.nn.Module):
 
         self.b1 = BatchNorm1d(double_dim).to(device)
         self.b2 = BatchNorm1d(dim_h).to(device)
-        self.temporal_conv2 = torch.nn.Conv1d(double_dim, int(double_dim/1), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
+        self.temporal_conv2 = torch.nn.Conv1d(double_dim, int(dim_h), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
         self.relu = ReLU()
         self.dropout = torch.nn.Dropout(0.1)
-        self.skip_connection = torch.nn.Conv1d(in_channels, int(double_dim/2), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
+        self.skip_connection = torch.nn.Conv1d(in_channels, int(dim_h), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
 
         #Shape Info
         self.batch_size = batch_size

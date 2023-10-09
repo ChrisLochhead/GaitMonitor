@@ -282,7 +282,7 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
     print("going in: ", datasets[0].num_node_features)
     model = stgcn.GraphNetwork(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=dim_out, n_inputs=num_datasets,
                                 data_dims=data_dims, batch_size=batch_size, hcf=hcf,
-                                max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph, device = device)
+                                max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph, device = device, type=2)
     
     if load != None:
         print("loading model")
