@@ -541,7 +541,7 @@ def blacken_frame(frame):
     blank_frame = np.zeros((dimensions[0],dimensions[1], 3), dtype= np.uint8)
     return blank_frame
 
-def save_images(joint_data, image_data, directory):
+def save_images(joint_data, image_data, directory, include_joints = False, aux_joints = None):
     print("Saving images")
     for i, row in enumerate((pbar := tqdm(joint_data))):
 
@@ -551,6 +551,13 @@ def save_images(joint_data, image_data, directory):
             file_no = str(0) + str(row[1])
         else:
             file_no = str(row[1])
+
+        if include_joints:
+            if aux_joints != None:
+                image_data[i] = Render.draw_joints_on_frame(image_data[i], joint_data[i], aux_joints=aux_joints[i])
+            else:
+                image_data[i] = Render.draw_joints_on_frame(image_data[i], joint_data[i], aux_joints=None)
+
 
         folder = str(directory) + "Instance_" + str(float(row[0]))
         #print("saving: ", folder + "/" + file_no + ".jpg")

@@ -38,6 +38,8 @@ def process_data(folder = "Chris"):
     print("\nStage 3:  Trimming sequences")
     #render_joints_series(image_data, abs_joint_data, size=15)
     #render_joints_series(image_data, abs_joint_data, size=15, plot_3D=True)
+    #abs_joint_data, image_data = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/2_Absolute_Data(empty frames removed)/raw/2_Absolute_Data(empty frames removed).csv",
+    #                                                          "./Code/Datasets/" + str(folder) + "/2_Empty Frames Removed/", cols=Utilities.colnames, ignore_depth=False)
     
     #Trim start and end frames where joints get confused by image borders
     #abs_joint_data, image_data =Creator.process_trimmed_frames(abs_joint_data, image_data,
@@ -46,23 +48,32 @@ def process_data(folder = "Chris"):
 
     print("\nStage 4: Reloading data into memory (shortcut)")
     abs_joint_data, image_data = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)/raw/3_Absolute_Data(trimmed instances).csv",
-                                                              "./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
-    #render_joints_series(image_data, abs_joint_data, size=10)
+                                                              "./Code/Datasets/Individuals/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
+
+    
+    #Utilities.save_images(abs_joint_data, copy.deepcopy(image_data), directory="./Code/Datasets/PaperImages/Imperfect" + str(folder) + "/", 
+    #                      include_joints=True, aux_joints=abs_joint_data)
 
     print("\nStage 5: Adding midhip data")
     abs_joint_data = Creator.append_midhip(abs_joint_data, image_data, 
                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(midhip)")
     #render_joints_series(image_data, abs_joint_data, size=25)
-
+    imperfect_joints = copy.deepcopy(abs_joint_data)
+    
     #Removes various types of outliers
     print("\nStage 5: Normalizing outliers")
-    abs_joint_data = Creator.create_normalized_dataset(abs_joint_data, None, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(norm)")
+    abs_joint_data = Creator.create_normalized_dataset(abs_joint_data, image_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(norm)")
     #render_joints_series(image_data, abs_joint_data, size=25)
+
+    print("saving images: ")
+    #Utilities.save_images(abs_joint_data, copy.deepcopy(image_data), directory="./Code/Datasets/PaperImages/" + str(folder) + "/", include_joints=True, aux_joints = imperfect_joints)
+    #done = 5/0
 
     print("\nStage 6: Standardizing data scales")
     abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, None, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
-    #render_joints_series(image_data, abs_joint_data, size=10)
-
+    render_joints_series(image_data, abs_joint_data, size=10)
+    Utilities.save_images(abs_joint_data, copy.deepcopy(image_data), directory="./Code/Datasets/PaperImages/Scaled/" + str(folder) + "/", include_joints=True, aux_joints = None)
+    done = 5/0
 
     #Create relative dataset
     print("\nStage 7: Relativizing data")
@@ -297,6 +308,30 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
 
+def convert_to_video(image_folder, output):
+
+    # Get the list of image files in the directory
+    images = [img for img in os.listdir(image_folder) if img.endswith(".jpg")]
+
+    # Sort the images in the desired order (if needed)
+    #images.sort()
+
+    frame = cv2.imread(os.path.join(image_folder, images[0]))
+    height, width, layers = frame.shape
+
+    # Define the output video file name and codec
+    video_name = output + '.mp4'
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    video = cv2.VideoWriter(video_name, fourcc, 4, (width, height))
+
+    for image in images:
+        image_path = os.path.join(image_folder, image)
+        frame = cv2.imread(image_path)
+        video.write(frame)
+
+    cv2.destroyAllWindows()
+    video.release()
+
 if __name__ == '__main__':
 
     #Assign person numbers and uniform instance counts:
@@ -312,6 +347,15 @@ if __name__ == '__main__':
     #                           joint_output_v='./Code/Datasets/Joint_Data/Big/no_subtracted/15_vel',
     #                           joint_output_b='./Code/Datasets/Joint_Data/Big/no_subtracted/15_bone')
 
+    
+    #convert_to_video('./Code/Datasets/PaperImages/ImperfectChris/Instance_0.0', './Code/Datasets/PaperImages/Videos/Chris_imperf_0')
+    convert_to_video('./Code/Datasets/PaperImages/Scaled/Chris/Instance_0.0', './Code/Datasets/PaperImages/Videos/Chris_0')
+
+    #process_data('Chris')
+
+    #abs_joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/Chris/6_Relative_Data(relative)/raw/6_Relative_Data(relative).csv",
+    #                                                          None, cols=Utilities.colnames_midhip, ignore_depth=False)
+    #Creator.compute_joint_stats(abs_joint_data)
 
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
@@ -327,14 +371,35 @@ if __name__ == '__main__':
     #Leave_one_out: indicates whether using normally split data or data split by person
     #Person: full dataset only, denotes which person to extract otherwise 0 or none.
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
-    start = time.time()
-    run_model(dataset_types= [1], hcf=False,
-           batch_size = 64, epochs = 50, folder="big/subtracted", save ='15_weights_1s', load=None, leave_one_out = False)
+    #start = time.time()
+    #run_model(dataset_types= [1], hcf=False,
+    #       batch_size = 64, epochs = 50, folder="big/subtracted", save ='15_weights_1s', load=None, leave_one_out = False)#
 
-    end = time.time()
-    print("time elapsed: ", end - start)
+    #end = time.time()
+    #print("time elapsed: ", end - start)
 
 
+
+
+    #TODO to turn this into a regression problem paper
+    #replace output with 2 values softmaxxed, probabilities of belonging to 0 or 1
+    #if it doesn't work immidiately, experiment with autoencoder to embed all models into lower latent space and reduce required data and resources
+        #Maybe ST-GCN autoencoder to encode temporal elements, add attention too?
+        #Use autoencoder to fling in HCF data like time of day and speed
+
+    #implement way to decide which joints have the most impact on classification
+    #record new metadata such as time of day
+    #implement how to show how far into gait cycle an issue is detected and draw the result
+    #aim to predict time of day, whether fall is legitimate or caused by environment
+    #chart speed, gait length 
+    #Build average of two discerned classes and chart differences in speed, gait length, frequencies of issues, TOD walking etc as a visible chart
+    #Use as a regressor between closer to which assessment period
+
+    #Once this is done, write final technical paper on novel ST-GCN with autoencoder using HCF
+    #DONE :D
+
+    #Ask Bob: How Do I ensure there is a difference between the 2? artificially change them i.e. how many times walking at night in 1 vs other, simulate recovering from an injury
+    #in the second one?
 
 
 

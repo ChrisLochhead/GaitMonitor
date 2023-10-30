@@ -225,8 +225,10 @@ def render_joints_series(image_source, joints, size, delay = True, use_depth = T
                 print("len iamges: ", len(images))
                 print("\njoints: ", joints[i])
                 render_joints(images[0], joints[i], delay, use_depth)
+                print("saving image:")
             else:
                 render_joints(images[i], joints[i], delay, use_depth)  
+            
 
             cv2.destroyWindow("Joint Utilities Image")
 
@@ -266,7 +268,7 @@ def click_event(event, x, y, flags, params):
     if event == cv2.EVENT_RBUTTONDOWN:
         quit()
 
-def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 6, colour = (0, 150, 200)):
+def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 6, colour = (0, 150, 200), check_leg = False, aux_joints = None):
     tmp_frame = copy.deepcopy(frame)
     tmp_joints = copy.deepcopy(joints)
     connections = joint_connections
@@ -294,7 +296,7 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
             start = [int(float(tmp_a[1])), int(float(tmp_a[0]))]
             end = [int(float(tmp_b[1])), int(float(tmp_b[0]))]
 
-            cv2.line(tmp_frame, start, end, color = (255,0,0), thickness = 1) 
+            cv2.line(tmp_frame, start, end, color = (255,255,255), thickness = 2) 
 
     for i, joint in enumerate(tmp_joints):
 
@@ -308,12 +310,18 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
             joint[0] = 239
         if joint[1] >= 424:
             joint[1] = 423
+
+        #Check for auxillary joints:
+        if aux_joints != None:
+            #if aux_joints[i][0] != joint[0] or aux_joints[i][1] != joint[1]:
+                  tmp_frame = cv2.circle(tmp_frame, (int(float(aux_joints[i][1])),int(float(aux_joints[i][0]))), radius=1, color=(0,0,255), thickness=10)    
         
-        if i == 17 or i == 19 or i == 21:
+        if i == 17 and check_leg == True or i == 19 and check_leg == True or i == 21 and check_leg == True:
             tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(255,255,255), thickness=4)
         elif use_depth_as_colour == False:
-            tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=colour, thickness=4)
+            tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(0,255,255), thickness=6)
         else:
             tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(150, 100, joint[2]), thickness=4)
-
+      
+    
     return tmp_frame

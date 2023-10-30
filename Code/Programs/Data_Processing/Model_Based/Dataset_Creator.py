@@ -157,7 +157,7 @@ def create_normalized_dataset(joint_data, image_data, joint_output):
     #Normalize outlier values
     joint_data = Data_Correction.normalize_outlier_values(joint_data, image_data, 100)
     #Smooth values that are visually a bit haywire on the arms and legs
-    joint_data = Data_Correction.smooth_unlikely_values(joint_data)
+    joint_data = Data_Correction.smooth_unlikely_values(joint_data, image_data)
     Utilities.save_dataset(joint_data, joint_output)
     print("Data normalization complete.")
     return joint_data
@@ -769,3 +769,22 @@ def assign_person_number(data_to_append, data, joint_output, no, start_instance)
 
     Utilities.save_dataset(data_to_append, joint_output)
     return current_instance, data_to_append 
+
+
+def compute_joint_stats(dataset):
+    # Extract the coordinate data columns
+    no_metadata = []
+    for row in dataset:
+        no_metadata.append(row[6:])
+
+    print("no: ", no_metadata[0])
+    no_metadata = np.array(no_metadata)
+
+    coordinate_data = no_metadata[:, 5:]  # Assuming coordinate data starts from column index 5
+
+    # Calculate the mean and standard deviation for each joint across the dataset
+    mean_per_joint = np.mean(coordinate_data, axis=1)
+    std_dev_per_joint = np.std(coordinate_data, axis=1)
+    print("means: ", mean_per_joint)
+    print("stdevs: ", std_dev_per_joint)
+    return mean_per_joint, std_dev_per_joint

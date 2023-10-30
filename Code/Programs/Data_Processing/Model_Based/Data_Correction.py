@@ -24,16 +24,19 @@ def calculate_distance(x1, y1, x2, y2):
 
     return distance
 
-def smooth_unlikely_values(joint_data):
+def smooth_unlikely_values(joint_data, image_data):
     for i, frame in enumerate(joint_data):
         #Ignore first frame
         if i > 0:
+            tmp = copy.deepcopy(image_data[i])
+            #render_joints(tmp, joint_data[i], delay = True, use_depth=False)
             for j, coord in enumerate(frame):
                 #Ignore metadata and head co-ordinates
-                if j > 9: 
-                    if calculate_distance(coord[0], coord[1], joint_data[i - 1][j][0], joint_data[i-1][j][1]) > 50:
+                if j > 5:
+                    if calculate_distance(coord[0], coord[1], joint_data[i - 1][j][0], joint_data[i-1][j][1]) > 100:
                         #Just reset any odd values to its previous value
                         joint_data[i][j] = joint_data[i-1][j]
+            #render_joints(image_data[i], joint_data[i], delay = True, use_depth=False)
     
     return joint_data
 
@@ -97,7 +100,7 @@ def trim_frames(joint_data, image_data, trim):
         pbar.set_postfix_str(i)
         #General case
         found_end = False
-        if i < len(joint_data) - trim - 1:
+        if i < len(joint_data) - trim:
             for j in range(trim):
                 if joint_data[i][1] > joint_data[i+j][1]:
                     found_end = True
@@ -142,12 +145,13 @@ def normalize_outlier_values(joint_data, image_data, tolerance = 100, meta = 5):
     joint_data, image_data = Utilities.process_data_input(joint_data, image_data)
 
     for i, row in enumerate(tqdm(joint_data)):
+
         #Get row median to distinguish which of joint pairs are the outlier
         x_coords = [coord[0] for j, coord in enumerate(row) if j > meta]
         y_coords = [coord[1] for k, coord in enumerate(row) if k > meta]
         med_coord = [np.median(x_coords), np.median(y_coords)]
 
-        #render_joints(image_data[i], joint_data[i], delay = True)
+        #render_joints(image_data[i], joint_data[i], delay = True, use_depth=False)
         for l, coord in enumerate(row):
             #Ignore metadata
             if l > meta:
@@ -158,6 +162,7 @@ def normalize_outlier_values(joint_data, image_data, tolerance = 100, meta = 5):
                     joint_1_coord = [row[j_index[1] + meta + 1][0], row[j_index[1] + meta + 1][1]]
                     if l - meta - 1 == j_index[0] or l - meta - 1 == j_index[1]:
                         if math.dist(joint_0_coord, joint_1_coord) > tolerance:
+                            print("one above changes: ", math.dist(joint_0_coord, joint_1_coord))
                             #Work out which of the two is the outlier
                             if math.dist(med_coord, joint_0_coord) > math.dist(med_coord, joint_1_coord):
                                 #Just set outlier to it's neighbour to reduce damage done by outlier without getting rid of frame
@@ -172,7 +177,7 @@ def normalize_outlier_values(joint_data, image_data, tolerance = 100, meta = 5):
                     if outlier_reassigned:
                         break
 
-        #render_joints(image_data[i], joint_data[i], delay = True)               
+        #render_joints(image_data[i], joint_data[i], delay = True, use_depth=False)               
     return joint_data
     
 def normalize_outlier_depths(joints_data, image_data, plot3d = True, meta = 5):
