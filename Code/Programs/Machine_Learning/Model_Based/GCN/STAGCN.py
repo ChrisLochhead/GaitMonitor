@@ -107,42 +107,77 @@ class STAGCNBlock(torch.nn.Module):
     def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, spatial_size, device, first = False):
         super(STAGCNBlock, self).__init__()
         #Layers
-        self.b0 = BatchNorm1d(in_channels).to(device)  
-        self.spatial_conv = GATv2Conv(in_channels, dim_h, heads=2).to(device)
+        if first:
+            self.b0 = BatchNorm1d(in_channels).to(device)  
+            self.spatial_conv = GATv2Conv(in_channels, dim_h, heads=2).to(device)
+            self.skip_connection = torch.nn.Conv1d(in_channels, int(dim_h), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
+            self.temp_att = GATv2Conv(int(dim_h*2), int(dim_h*2), heads=1).to(device)
+        else:
+            self.b0 = BatchNorm1d(int(in_channels * 2)).to(device)  
+            self.spatial_conv = GATv2Conv(int(in_channels * 2), dim_h, heads=2).to(device)
+            self.skip_connection = torch.nn.Conv1d(int(in_channels*2), int(dim_h), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)           
+            self.temp_att = GATv2Conv(int(dim_h*2), int(dim_h*2), heads=1).to(device)
+        
+
         double_dim = int(dim_h * 2)
 
         self.b1 = BatchNorm1d(double_dim).to(device)
-        self.b2 = BatchNorm1d(dim_h).to(device)
-        self.temporal_conv2 = torch.nn.Conv1d(double_dim, int(dim_h), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
+        self.b2 = BatchNorm1d(cycle_size).to(device)
+        self.b3 = BatchNorm1d(int(dim_h)).to(device)
+        self.temporal_conv2 = torch.nn.Conv1d(cycle_size, cycle_size, kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
         self.relu = ReLU()
         self.dropout = torch.nn.Dropout(0.1)
-        self.skip_connection = torch.nn.Conv1d(in_channels, int(dim_h), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
-
+        self.in_channels = in_channels
         #Shape Info
         self.batch_size = batch_size
         self.cycle_size = cycle_size
 
+
     def forward(self, x, edge_index, train):
+       # print("initial x: ", x.shape, self.in_channels)
         if self.batch_size > 1:
             x = self.b0(x)
+
+
         residual = x
         #print("skip connection and residual", self.skip_connection, residual.shape)
         residual = self.relu(self.skip_connection(residual))
+        #print("after residual process", x.shape)
+
         #Convert to 2D representation for GAT layer (Batch * Cycle, Channel)
         x = x.view(x.shape[2] * x.shape[0], x.shape[1])
+        #print("and here: ", x.shape)
         x = self.relu(self.b1(self.spatial_conv(x, edge_index)))
 
         #Convert to 3D representation for Temporal layer (Batch, Channel, Cycle)
+       # print("herea: ", x.shape)
         x = x.view(self.batch_size, x.shape[1], self.cycle_size)
-        x = torch.permute(x, (1, 0, 2))
-        x = torch.transpose(x, 0, 1)
+        residual = x
+        #print("hereb: ", x.shape)
+        x = torch.permute(x, (0, 2, 1))
 
+        #print("herec: ", x.shape)
+        #Normal ST-GCN
         x = self.relu(self.b2(self.temporal_conv2(x)))
-        x = torch.permute(x, (1, 0, 2))
-        x = torch.transpose(x, 0, 1)
+        #TEMPORAL ATTENTION ST-GCN
+        #print("here1: ", x.shape)
+        x = x.view(x.shape[0] * x.shape[1], x.shape[2])
+        #print("here2: ", x.shape, self.temp_att)
+        x = self.relu(self.b1(self.temp_att(x, edge_index)))
+        #print("here3: ", x.shape)
+        x = x.view(self.batch_size, x.shape[1], self.cycle_size,)
+        #print("here4: ", x.shape, residual.shape)
+        #END OF TEMPORAL PART
 
+       # print("hered: ", x.shape)
+        #print("heree: ", x.shape, residual.shape, self.skip_connection)
+        #THIS IS NEEDED WHEN USING NORMAL NON-TEMPORAL
+        #x = torch.permute(x, (0, 2, 1))
+
+       #print("heref: ", x.shape, residual.shape, self.skip_connection)       
         x = residual + x
         x = self.dropout(x)
+        #print("done", x.shape)
         return x
 
 class GraphNetwork(torch.nn.Module):
@@ -219,8 +254,9 @@ class GraphNetwork(torch.nn.Module):
                 linear_input += dim_8th
             else:
                 linear_input = dim_8th
-            
-        print("Final: ", linear_input)
+        
+        linear_input = int(linear_input * 2)
+        #print("Final: ", linear_input)
 
         self.avg_pool = nn.AvgPool2d(4, 4)
         self.combination_layer = torch.nn.Sequential(

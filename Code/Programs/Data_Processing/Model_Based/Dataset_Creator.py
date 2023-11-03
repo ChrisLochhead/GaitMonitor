@@ -78,7 +78,7 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joints_output, meta
     print("Combining datasets...")
     rel_data, images = Utilities.process_data_input(rel_data, images)
     vel_data, _ = Utilities.process_data_input(vel_data, None)
-    angle_data, _ = Utilities.process_data_input(angle_data, None)
+    #angle_data, _ = Utilities.process_data_input(angle_data, None)
     combined_dataset = []
     for i, row in enumerate(tqdm(rel_data)):
         #Metadata is the same as usual
@@ -88,15 +88,15 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joints_output, meta
                 if j == meta + 1:
                     avg_joint = avg_coord(row[meta + 2: meta + 9])
                     avg_vel = avg_coord(vel_data[i][meta + 2: meta + 9])
-                    avg_ang = avg_coord(angle_data[i][meta + 2: meta + 9])
+                    #avg_ang = avg_coord(angle_data[i][meta + 2: meta + 9])
 
                     combined_row.append([avg_joint[0], avg_joint[1], avg_joint[2],
-                    avg_vel[0], avg_vel[1], avg_vel[2], 
-                    avg_ang[0], avg_ang[1], avg_ang[2] ])
+                    avg_vel[0], avg_vel[1], avg_vel[2]]), 
+                    #avg_ang[0], avg_ang[1], avg_ang[2] ])
                 elif j > 10:
                     combined_row.append([joint[0], joint[1], joint[2],
-                                        vel_data[i][j][0], vel_data[i][j][1], vel_data[i][j][2], 
-                                        angle_data[i][j][0], angle_data[i][j][1], angle_data[i][j][2] ])
+                                        vel_data[i][j][0], vel_data[i][j][1], vel_data[i][j][2]]) 
+                                        #angle_data[i][j][0], angle_data[i][j][1], angle_data[i][j][2] ])
 
         combined_dataset.append(combined_row)
     

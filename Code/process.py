@@ -71,15 +71,18 @@ def process_data(folder = "Chris"):
 
     print("\nStage 6: Standardizing data scales")
     abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, None, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
-    render_joints_series(image_data, abs_joint_data, size=10)
-    Utilities.save_images(abs_joint_data, copy.deepcopy(image_data), directory="./Code/Datasets/PaperImages/Scaled/" + str(folder) + "/", include_joints=True, aux_joints = None)
-    done = 5/0
+    #render_joints_series(image_data, abs_joint_data, size=10)
+    #Utilities.save_images(abs_joint_data, copy.deepcopy(image_data), directory="./Code/Datasets/PaperImages/Scaled/" + str(folder) + "/", include_joints=True, aux_joints = None)
+
 
     #Create relative dataset
     print("\nStage 7: Relativizing data")
     relative_joint_data = Creator.create_relative_dataset(abs_joint_data, image_data,
                                                  joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/6_Relative_Data(relative)")
 
+    rel_dum_data = Creator.create_dummy_dataset(relative_joint_data, 
+                                                 output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/6_5_Rel_Data_Noise")
+    
     #Flip all the joints to be facing one way to prepare for background skeleton subtraction
     print("\nStage 8: Subtraction and flipping: relative data.")
     relative_joint_data = Creator.create_flipped_joint_dataset(relative_joint_data, abs_joint_data, None,
@@ -99,6 +102,10 @@ def process_data(folder = "Chris"):
     print("\nStage 9: Subtraction and flipping: velocity data.")
     velocity_data = Creator.create_velocity_dataset(abs_joint_data, image_data, 
                                                     joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Velocity_Data(velocity)")
+    
+    vel_dum_data = Creator.create_dummy_dataset(relative_joint_data, 
+                                                output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/13_5_Vel_Data_Noise")
+    
     #Flip all the joints to be facing one way to prepare for background skeleton subtraction
     velocity_data = Creator.create_flipped_joint_dataset(velocity_data, abs_joint_data, None,
                                                                 joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/13_Vel_Flipped(same_way)", double_size=False)
@@ -115,6 +122,11 @@ def process_data(folder = "Chris"):
     print("\nStage 10: Subtraction and flipping: bones data.")
     joint_bones_data = Creator.create_bone_dataset(abs_joint_data, image_data, 
                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/15_Bones_Data(integrated)")
+    
+
+    bone_dum_data = Creator.create_dummy_dataset(joint_bones_data, 
+                                                 output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/15_5_Rel_Data_Noise")
+    
     #Flip all the joints to be facing one way to prepare for background skeleton subtraction
     joint_bones_data = Creator.create_flipped_joint_dataset(joint_bones_data, abs_joint_data, None,
                                                                 joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/14_Bone_Flipped(same_way)", double_size=False)
@@ -128,11 +140,14 @@ def process_data(folder = "Chris"):
                                                                 double_size=True, already_sequences=True)
 
     print("\nStage 11: Create 9D-1-Stream dataset")
-    combined_data = Creator.combine_datasets(relative_joint_data, velocity_data, joint_bones_data, image_data,
-                                             joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/19_Combined_Data")
+    #combined_data = Creator.combine_datasets(relative_joint_data, velocity_data, joint_bones_data, image_data,
+    #                                         joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/19_Combined_Data")
 
-    combined_data = Creator.create_dummy_dataset(combined_data, 
-                                                 output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Combined_Data_Noise")
+    com_dum_data = Creator.combine_datasets(rel_dum_data, bone_dum_data, None, image_data,
+                                             joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/19_5_Combined_Data")
+    
+    #combined_data = Creator.create_dummy_dataset(combined_data, 
+    #                                             output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Combined_Data_Noise")
 
 #Currently unused: Load data in by body part
 def load_region_data(folder, type):
@@ -151,7 +166,7 @@ def load_region_data(folder, type):
 
 #Types are 1 = normal, 2 = HCF, 3 = 2 region, 4 = 5 region, 5 = Dummy. Pass types as an array of type numbers, always put hcf (2) at the END if including. If including HCF, you MUST include
 #as cycles = True
-def load_datasets(types, folder):
+def load_datasets(types, folder, multi_dim = False):
     datasets = []
     print("loading datasets...")
         
@@ -160,18 +175,9 @@ def load_datasets(types, folder):
         #Type 1: Normal, full dataset
         if t == 1:  
             #9D-1-Stream
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/2_people',
-                                                    '2_people.csv',
-                                                  joint_connections=Render.joint_connections_n_head))
-            
-            #9D-1-Stream: Leave_one_out
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/leave_one_out_15_norm/_full/',
-            #                                '_full.csv',
-            #                            joint_connections=Render.joint_connections_n_head))
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/leave_one_out_15_norm/_single/',
-            #                                '_single.csv',
-            #                            joint_connections=Render.joint_connections_n_head))
-            
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/5_people',
+                                                    '5_people.csv',             
+                                                  joint_connections=Render.joint_connections_n_head))          
             
             #3D-3-Stream
             #Experimental
@@ -194,6 +200,10 @@ def load_datasets(types, folder):
                 datasets.append(data)
 
     print("datasets loaded.")
+    if multi_dim:
+        for index, dataset in enumerate(datasets):
+            datasets[index] = Creator.convert_person_to_type(dataset, None)
+
     #Return requested datasets
     return datasets
 
@@ -264,9 +274,9 @@ def process_results(train_scores, val_scores, test_scores):
     mean, var = Utilities.mean_var(test_scores)
     print("mean, std and variance: {:.2f}%, {:.2f}% {:.5f}".format(mean, math.sqrt(var), var))
 
-def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load = None, leave_one_out = False):
+def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load = None, leave_one_out = False, multi_dim = False):
     #Load the full dataset
-    datasets = load_datasets(dataset_types, folder)
+    datasets = load_datasets(dataset_types, folder, multi_dim)
     print("datasets here: ", datasets)
     #Concatenate data dimensions for ST-GCN
     data_dims = []
@@ -289,6 +299,8 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
         num_datasets = len(datasets)
 
     dim_out = 3
+    if multi_dim:
+        dim_out = 9
     print("\nCreating {} datasets: ".format(len(datasets)))
     print("going in: ", datasets[0].num_node_features)
     model = stgcn.GraphNetwork(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=dim_out, n_inputs=num_datasets,
@@ -334,11 +346,16 @@ def convert_to_video(image_folder, output):
 
 if __name__ == '__main__':
 
+    #process_data('bob')
+    #process_data('cade')
+    #process_data('emma')
+    #process_data('scarlett')
+    #process_data('sean c')
+    #process_data('sean g')
     #Assign person numbers and uniform instance counts:
-    #folder_names = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9',
-    #                'p10', 'p11', 'p12', 'p13', 'p14', 'p15']
-    # 
-    # stitch_dataset(folder_names=folder_names)
+    folder_names = ['bob', 'cade', 'emma', 'scarlett', 'sean c', 'sean g']
+     
+    #graph_utils.stitch_dataset(folder_names=folder_names)
     #data, _ = Utilities.process_data_input('./Code/Datasets/Joint_Data/Big/no_subtracted/15_people/raw/15_people.csv', None, 
     #                                       cols=Utilities.colnames_nohead, ignore_depth=False)
 
@@ -349,9 +366,9 @@ if __name__ == '__main__':
 
     
     #convert_to_video('./Code/Datasets/PaperImages/ImperfectChris/Instance_0.0', './Code/Datasets/PaperImages/Videos/Chris_imperf_0')
-    convert_to_video('./Code/Datasets/PaperImages/Scaled/Chris/Instance_0.0', './Code/Datasets/PaperImages/Videos/Chris_0')
+    #convert_to_video('./Code/Datasets/PaperImages/Scaled/Chris/Instance_0.0', './Code/Datasets/PaperImages/Videos/Chris_0')
 
-    #process_data('Chris')
+    #process_data('bob')
 
     #abs_joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/Chris/6_Relative_Data(relative)/raw/6_Relative_Data(relative).csv",
     #                                                          None, cols=Utilities.colnames_midhip, ignore_depth=False)
@@ -372,13 +389,16 @@ if __name__ == '__main__':
     #Person: full dataset only, denotes which person to extract otherwise 0 or none.
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
     #start = time.time()
-    #run_model(dataset_types= [1], hcf=False,
-    #       batch_size = 64, epochs = 50, folder="big/subtracted", save ='15_weights_1s', load=None, leave_one_out = False)#
+    run_model(dataset_types= [1], hcf=False,
+           batch_size = 64, epochs = 150, folder="big", save =None, load=None, leave_one_out = False, multi_dim=False)#
 
     #end = time.time()
     #print("time elapsed: ", end - start)
 
 
+    #2s Instant fusing might work per that other 2s work, showing 3s is shit novel part of network p1 and novel representation
+    # Novel network joint attention, but needs one other thing I think
+    #3 is weightgait which is strong
 
 
     #TODO to turn this into a regression problem paper

@@ -151,8 +151,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size,
             data_b = [batch_batch[i][index] for i in range(len(loader))]
             data_y =  [ys_batch[i][index] for i in range(len(loader))]
             out = model(data_x, data_i, data_b, train=True)
-            #First data batch with Y has to have the right outputs
-            out = modify_loss(out, data_y[0])
+
             loss = criterion(out, data_y[0]) / len(loader[0])
             total_loss = total_loss + loss
             acc =  acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loader[0])
@@ -234,8 +233,6 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
                 y_classes[d.item()] += 1
 
             out = model(data_x, data_i, data_b, train)
-            #out = F.softmax(out, dim=1)
-            out = modify_loss(out, data_y[0])
             loss = criterion(out, data_y[0]) / len(loaders[0]) 
             total_loss = total_loss + loss
 
@@ -258,9 +255,9 @@ def modify_loss(out, actual):
                 pred_1 = 0
                 pred_2 = 2
                 if predictions[i].item() == 2:
-                    new_out[i][pred_1] *= 2.00
+                    new_out[i][pred_1] *= 1.00
                 else:
-                    new_out[i][pred_2] *= 2.00
+                    new_out[i][pred_2] *= 1.00
                 
             else:
                 #Make incorrect prediction WAY wronger
@@ -277,11 +274,11 @@ def modify_loss(out, actual):
                 #the less pronounced are the features of the class, you therefor want to progressively punish misclassifications of the harder-
                 #to-classify classes, being 1 and 0.
                 if pred_1 == 0:
-                    new_out[i][pred_1] *= 2.00
+                    new_out[i][pred_1] *= 1.2
                 if pred_1 == 1:
-                    new_out[i][pred_1] *= 1.5
+                    new_out[i][pred_1] *= 1.1
                 elif pred_2 == 0:
-                    new_out[i][pred_2] *= 2.00      
+                    new_out[i][pred_2] *= 1.2     
     return new_out
 
 def unfold_3s_dataset(data, joint_output):
@@ -353,7 +350,7 @@ def extract_single_person(data, joint_output, person = 0):
 
 #Stitch up datasets of individuals to create a full dataset
 def stitch_dataset(folder_names):
-    file_name = '/20_Combined_Data_Noise'
+    file_name = '/19_5_Combined_Data'
     datasets = load_whole_dataset(folder_names, file_name)
     whole_dataset = datasets[0]
     current_instance = whole_dataset[-1][0]
