@@ -390,12 +390,12 @@ if __name__ == '__main__':
     #Leave_one_out: indicates whether using normally split data or data split by person
     #Person: full dataset only, denotes which person to extract otherwise 0 or none.
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
-    #start = time.time()
+    start = time.time()
     run_model(dataset_types= [1], hcf=False,
            batch_size = 64, epochs = 150, folder="big", save =None, load=None, leave_one_out = False, multi_dim=False)#
 
-    #end = time.time()
-    #print("time elapsed: ", end - start)
+    end = time.time()
+    print("time elapsed: ", end - start)
 
 
     #TESTS:
