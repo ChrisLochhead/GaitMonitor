@@ -175,10 +175,12 @@ def load_datasets(types, folder, multi_dim = False):
         #Type 1: Normal, full dataset
         if t == 1:  
             #9D-1-Stream
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/5_people',
-                                                    '5_people.csv',             
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/6_people',
+                                                    '6_people.csv',             
                                                   joint_connections=Render.joint_connections_n_head))          
-            
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/6_Relative_Data(relative)',
+            #                                        '6_Relative_Data(relative).csv',             
+            #                                      joint_connections=Render.joint_connections_n_head))       
             #3D-3-Stream
             #Experimental
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/no_subtracted/15_rel', '15_rel.csv',
@@ -396,9 +398,51 @@ if __name__ == '__main__':
     #print("time elapsed: ", end - start)
 
 
-    #2s Instant fusing might work per that other 2s work, showing 3s is shit novel part of network p1 and novel representation
-    # Novel network joint attention, but needs one other thing I think
-    #3 is weightgait which is strong
+    #TESTS:
+    
+    #Test on 6 people: ST-GCN, ST-AGCN, ST-AGCN w/ temp attention 2D solution
+    #ST-GCN: 
+    #ST-AGCN: 95.51% 
+    #ST-AGCN w/temp attention: 95.51%
+
+    #Process and stitch 2D dataset
+    #Test on 14 people: ST-GCN, ST-AGCN, ST-AGCN w/ temp attention
+    #ST-GCN: 
+    #ST-AGCN:
+    #ST-AGCN w/temp attention
+
+    #Test on 6 people:
+    #ST-GCN 1D
+    #ST-GCN 2D (my version)
+    #ST-GCN 3D (multi-streams) (may need work) (get names for dummy files for each individual stream)
+
+    #From these tests Hopefully 2D is best and temp-attention is best. If so
+    #need the following (RECORD ALL TEST EPOCHS 10-50 AND TIME)
+    #14 person
+    #1 stream ST-GCN
+    #1 stream ST-AGCN
+    #1 stream ST-AAGCN
+    #2 stream ST-GCN
+    #2 stream ST-AGCN
+    #2 stream ST-AAGCN
+    #3 stream ST-GCN
+    #3 stream ST-AGCN
+    #3 stream ST-AAGCN
+
+
+    #GAT W/2 STREAM 
+    #LOGREG W/2 STREAM (JUST LEAVE AS IS)
+    #K-MEANS W/2 STREAM (JUST LEAVE AS IS)
+
+    #T-SNE of Subtracted 1D vs not
+
+    #Main table
+    #Bar chart 2D with 1, 2, 3 STREAM STAAGCN (test best representation)
+    #CONVERGENCE 1, 2, 3 STREAM METHODS ON ST-AAGCN (test convergence and speed)
+    #LAST COMPARISON, K-MEANS, LOGREG, ST-GCN, AGCN, AAGCN (test best model)
+
+    #Change chart to remove reference to loss
+    #redraft to include findings and remove loss section
 
 
     #TODO to turn this into a regression problem paper

@@ -108,13 +108,14 @@ class STAGCNBlock(torch.nn.Module):
         super(STAGCNBlock, self).__init__()
         #Layers
         if first:
-            self.b0 = BatchNorm1d(in_channels).to(device)  
+            self.b0 = BatchNorm1d(in_channels).to(device) 
+            self.spatial_conv = ChebConv(in_channels, int(dim_h*2), 1).to(device) 
             self.spatial_conv = GATv2Conv(in_channels, dim_h, heads=2).to(device)
             self.skip_connection = torch.nn.Conv1d(in_channels, int(dim_h), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
             self.temp_att = GATv2Conv(int(dim_h*2), int(dim_h*2), heads=1).to(device)
         else:
             self.b0 = BatchNorm1d(int(in_channels * 2)).to(device)  
-            self.spatial_conv = GATv2Conv(int(in_channels * 2), dim_h, heads=2).to(device)
+            self.spatial_conv = ChebConv(int(in_channels*2), int(dim_h*2), 1).to(device) 
             self.skip_connection = torch.nn.Conv1d(int(in_channels*2), int(dim_h), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)           
             self.temp_att = GATv2Conv(int(dim_h*2), int(dim_h*2), heads=1).to(device)
         
@@ -161,18 +162,18 @@ class STAGCNBlock(torch.nn.Module):
         x = self.relu(self.b2(self.temporal_conv2(x)))
         #TEMPORAL ATTENTION ST-GCN
         #print("here1: ", x.shape)
-        x = x.view(x.shape[0] * x.shape[1], x.shape[2])
+        #x = x.view(x.shape[0] * x.shape[1], x.shape[2])
         #print("here2: ", x.shape, self.temp_att)
-        x = self.relu(self.b1(self.temp_att(x, edge_index)))
+        #x = self.relu(self.b1(self.temp_att(x, edge_index)))
         #print("here3: ", x.shape)
-        x = x.view(self.batch_size, x.shape[1], self.cycle_size,)
+        #x = x.view(self.batch_size, x.shape[1], self.cycle_size,)
         #print("here4: ", x.shape, residual.shape)
         #END OF TEMPORAL PART
 
        # print("hered: ", x.shape)
         #print("heree: ", x.shape, residual.shape, self.skip_connection)
         #THIS IS NEEDED WHEN USING NORMAL NON-TEMPORAL
-        #x = torch.permute(x, (0, 2, 1))
+        x = torch.permute(x, (0, 2, 1))
 
        #print("heref: ", x.shape, residual.shape, self.skip_connection)       
         x = residual + x
