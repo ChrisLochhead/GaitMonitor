@@ -116,6 +116,7 @@ class STAGCNBlock(torch.nn.Module):
         else:
             self.b0 = BatchNorm1d(int(in_channels * 2)).to(device)  
             self.spatial_conv = ChebConv(int(in_channels*2), int(dim_h*2), 1).to(device) 
+            self.spatial_conv = GATv2Conv(int(in_channels*2), int(dim_h*2), heads=2).to(device) 
             self.skip_connection = torch.nn.Conv1d(int(in_channels*2), int(dim_h), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)           
             self.temp_att = GATv2Conv(int(dim_h*2), int(dim_h*2), heads=1).to(device)
         
