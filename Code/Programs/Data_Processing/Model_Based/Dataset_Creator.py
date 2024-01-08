@@ -88,15 +88,26 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joints_output, meta
                 if j == meta + 1:
                     avg_joint = avg_coord(row[meta + 2: meta + 9])
                     avg_vel = avg_coord(vel_data[i][meta + 2: meta + 9])
-                    #avg_ang = avg_coord(angle_data[i][meta + 2: meta + 9])
 
-                    combined_row.append([avg_joint[0], avg_joint[1], avg_joint[2],
-                    avg_vel[0], avg_vel[1], avg_vel[2]]), 
-                    #avg_ang[0], avg_ang[1], avg_ang[2] ])
+                    if angle_data:
+                        avg_ang = avg_coord(angle_data[i][meta + 2: meta + 9])
+
+                    if angle_data:
+                        combined_row.append([avg_joint[0], avg_joint[1], avg_joint[2],
+                        avg_vel[0], avg_vel[1], avg_vel[2],
+                        avg_ang[0], avg_ang[1], avg_ang[2] ])
+                    else:
+                        combined_row.append([avg_joint[0], avg_joint[1], avg_joint[2],
+                        avg_vel[0], avg_vel[1], avg_vel[2]])
+
                 elif j > 10:
-                    combined_row.append([joint[0], joint[1], joint[2],
+                    if angle_data:
+                        combined_row.append([joint[0], joint[1], joint[2],
+                                        vel_data[i][j][0], vel_data[i][j][1], vel_data[i][j][2],
+                                        angle_data[i][j][0], angle_data[i][j][1], angle_data[i][j][2] ])
+                    else:
+                        combined_row.append([joint[0], joint[1], joint[2],
                                         vel_data[i][j][0], vel_data[i][j][1], vel_data[i][j][2]]) 
-                                        #angle_data[i][j][0], angle_data[i][j][1], angle_data[i][j][2] ])
 
         combined_dataset.append(combined_row)
     
@@ -656,9 +667,10 @@ def subtract_skeleton(rel_data, joint_output, base_output):
                 if k> 5:
                     #Check if coord and overlay[j][k] are within a radius of eachother, ignoring the first 10
                     try:
-                        if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 30):# results were on 50. minor was 15
+                        if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 5):# results were on 50. minor was 15
                             #print("detected within raidus: ", coord, overlay_sequence[j][k])
-                            rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
+                            #rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
+                            nothing = 0
                     except:
                         pass
         if i % 60 == 0 and i != 0:
@@ -688,6 +700,7 @@ def convert_person_to_type(data, joint_output):
         #Class 2, freeze 0, obstacle 0 = 6
         #Class 2, freeze 1, obstacle 0 = 7
         #Class 2, freeze 0, obstacle 1 = 8
+        print("row:", row)
         if row[2] == 0:
             #Freeze 0
             if row[3] == 0:

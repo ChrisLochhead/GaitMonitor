@@ -8,6 +8,8 @@ import copy
 import Programs.Data_Processing.Model_Based.Utilities as Utilities
 import Programs.Data_Processing.Model_Based.Dataset_Creator as Creator
 from sklearn.metrics import confusion_matrix
+import time
+
 
 def assess_data(dataset):
     print("Dataset type: ", type(dataset), type(dataset[0]))
@@ -57,6 +59,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
     total_preds = []
     total_ys = []
     for fold in range(k_fold):
+        start = time.time()
         print("Fold: ", fold)
         train_loaders = []
         val_loaders = []
@@ -68,7 +71,7 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         #Restrict validation and testing batch sizes to be one batch
         val_sample = RandomSampler(folded_val[0][fold], generator=G)
         test_sample = RandomSampler(test_dataset[0], generator=G)
-        init = G.get_state()
+        #init = G.get_state()
         for i, dataset in enumerate(datasets):
             test_set = test_dataset[i]
             train_set = folded_train[i][fold]
@@ -82,8 +85,8 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
             if make_loaders:
                 return train_loaders, val_loaders, test_loaders
             #Reset the generator so every dataset gets the same sampling 
-            G.set_state(init)
-        G.set_state(init)
+            #G.set_state(init)
+       # G.set_state(init)
 
         model = copy.deepcopy(MY_model)
         model = model.to(device)
@@ -94,9 +97,12 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         train_score.append(accuracies[-1])
         val_score.append(vals[-1])
         test_score.append(tests[-1])
+        end = time.time()
+        print("time elapsed: ",fold,  end - start)
+        break
 
-    print("final confusion: ")
-    print(confusion_matrix(total_ys, total_preds))
+    #print("final confusion: ")
+    #print(confusion_matrix(total_ys, total_preds))
     f1 = f1_score(total_ys, total_preds, average='weighted')
     print("f1 score: ", f1)
     
@@ -152,6 +158,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size,
             data_y =  [ys_batch[i][index] for i in range(len(loader))]
             out = model(data_x, data_i, data_b, train=True)
 
+            #print("data ys all the same: ", len(data_y), len(out))
             loss = criterion(out, data_y[0]) / len(loader[0])
             total_loss = total_loss + loss
             acc =  acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loader[0])
@@ -336,11 +343,11 @@ def extract_ensemble_data():
     print("unfolding completed")
 
 #Remove one individual and create their own dataset for leave one out testing
-def extract_single_person(data, joint_output, person = 0):
+def extract_single_person(data, joint_output, person = [0,1,2]):
     single_person = []
     full_dataset = []
     for i, row in enumerate(data):
-        if row[5] == person:
+        if row[5] in person:
             single_person.append(row)
         else:
             full_dataset.append(row)
@@ -349,15 +356,23 @@ def extract_single_person(data, joint_output, person = 0):
     Utilities.save_dataset(full_dataset, joint_output + "_full")
 
 #Stitch up datasets of individuals to create a full dataset
-def stitch_dataset(folder_names):
-    file_name = '/19_5_Combined_Data'
+def stitch_dataset(folder_names, stream = 1):
+    #1s file
+    if stream == 1:
+        file_name = '/1_s_data'
+    elif stream == 2:
+        file_name = '/2_s_data'
+    elif stream == 3:
+        file_name = '/3_s_data'
+
+
     datasets = load_whole_dataset(folder_names, file_name)
     whole_dataset = datasets[0]
     current_instance = whole_dataset[-1][0]
     for i, dataset in enumerate(datasets):
         if i > 0:
             current_instance, whole_dataset = Creator.assign_person_number(whole_dataset, dataset, 
-                                                                       "./Code/Datasets/Joint_Data/Big/" + str(i + 1) + "_people",
+                                                                       "./Code/Datasets/Joint_Data/Big/no_Sub" + str(stream) + "_stream/" + str(i + 1) + "_people",
                                                                        i, current_instance)
     print("completed.")
 

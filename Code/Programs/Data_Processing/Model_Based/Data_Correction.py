@@ -28,7 +28,7 @@ def smooth_unlikely_values(joint_data, image_data):
     for i, frame in enumerate(joint_data):
         #Ignore first frame
         if i > 0:
-            tmp = copy.deepcopy(image_data[i])
+            #tmp = copy.deepcopy(image_data[i])
             #render_joints(tmp, joint_data[i], delay = True, use_depth=False)
             for j, coord in enumerate(frame):
                 #Ignore metadata and head co-ordinates

@@ -65,7 +65,7 @@ hcf_colnames = ["Instance", "No_In_Sequence", "Class", 'Freeze', 'Obstacle', 'Pe
 fused_colnames = ['Instance', 'No_In_Sequence', 'Class', 'Freeze', 'Obstacle', 'Person', 'Head','L_arm','R_arm','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', "M_hip"] 
 
                 #Head goes to hip, all other head joints go to nothing because they will be dropped
-bone_connections =[[0, 17], [1, -1], [2, -1], [3, -1], [4, -1],
+bone_connections =[[0, 17], [1, 0], [2, 1], [3, 0], [4, 3],
                     #Right arm (extremities like hands and feet go to 0)
                     [5, 7], [7, 9], [9, -1],
                     #Left arm
@@ -578,7 +578,7 @@ def save(joints, name):
 def load(file = "image_data.csv", metadata = True, colnames = colnames_midhip):
     joints = []
     #Load in as a pandas dataset
-    dataset = pd.read_csv(file, names=colnames, header=None)
+    dataset = pd.read_csv(file, names=None, header=None)
 
     print("dataset head: ", dataset.head())
     #Convert all data to literals
