@@ -1,4 +1,3 @@
-#import init_directories
 from Programs.Data_Processing.Model_Based.Demo import *
 import Programs.Data_Processing.Model_Based.Dataset_Creator as Creator
 import Programs.Machine_Learning.Model_Based.GCN.Dataset_Obj as Dataset_Obj
@@ -6,7 +5,6 @@ import Programs.Data_Processing.Model_Based.Render as Render
 import Programs.Machine_Learning.Model_Based.GCN.GAT as gat
 import Programs.Machine_Learning.Model_Based.GCN.STAGCN as stgcn
 import Programs.Machine_Learning.Model_Based.GCN.Utilities as graph_utils
-
 import time
 import torch
 torch.manual_seed(42)
@@ -19,13 +17,13 @@ def process_data(folder = "Chris"):
 ############################################# PIPELINE ##################################################################
 
     #Extract joints from images
-    print("\nStage 1: Extracting images ")
-    #run_images("./Code/Datasets/Individuals/" + str(folder) + "/Full_Dataset", out_folder="./Code/Datasets/Joint_Data/" + str(folder) + "/", exclude_2D=False, 
+    #print("\nStage 1: Extracting images ")
+    #run_images("./Code/Datasets/WeightGait/Full_Dataset/", out_folder="./Code/Datasets/Joint_Data/" + str(folder) + "/", exclude_2D=False, 
     #          start_point=0)
-    
+
     #Display first 2 instances of results 
     #render_joints_series("./Code/Datasets/WeightGait/Raw_Images", joints=abs_joint_data,
-    #                     size = 20, delay=True, use_depth=True)
+    #                    size = 20, delay=True, use_depth=True)
 
     #Remove empty frames
     print("\nStage 2: Removing empty frames.")
@@ -42,10 +40,11 @@ def process_data(folder = "Chris"):
     #                                                          "./Code/Datasets/" + str(folder) + "/2_Empty Frames Removed/", cols=Utilities.colnames, ignore_depth=False)
     
     #Trim start and end frames where joints get confused by image borders
-    #abs_joint_data, image_data =Creator.process_trimmed_frames(abs_joint_data, image_data,
-    #                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)",
-    #                                                     image_output="./Code/Datasets/Individuals/" + str(folder) + "/3_Trimmed Instances/", trim = 5)
+    abs_joint_data, image_data =Creator.process_trimmed_frames(abs_joint_data, image_data,
+                                                        joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)",
+                                                         image_output="./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", trim = 5, include_joints=True)
 
+    return
     print("\nStage 4: Reloading data into memory (shortcut)")
     #abs_joint_data, image_data = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)/raw/3_Absolute_Data(trimmed instances).csv",
     #                                                          "./Code/Datasets/Individuals/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
@@ -149,6 +148,54 @@ def process_data(folder = "Chris"):
     #combined_data = Creator.create_dummy_dataset(combined_data, 
     #                                             output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Combined_Data_Noise")
 
+import shutil
+def convert_to_single_data_folder(base_directory):
+    # Get a list of all folders in the base directory
+    folders = [f for f in os.listdir(base_directory) if os.path.isdir(os.path.join(base_directory, f))]
+    print("folders : ", folders)
+    # Iterate through each folder
+    # Get a list of all folders in the base directory
+    folders = [f for f in os.listdir(base_directory) if os.path.isdir(os.path.join(base_directory, f))]
+
+    # Iterate through each folder
+    folder_count = 0
+    for folder in folders:
+        folder_path = os.path.join(base_directory, folder)
+
+        # Check if the folder contains subdirectories
+        subdirectories = [subdir for subdir in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, subdir))]
+        print("len subdirs: ", len(subdirectories))
+        print("subdirs before: ", subdirectories)
+        subdirectories.sort(key=lambda x: int(x.split("_")[1].split(".")[0]))
+        print("after: ", subdirectories)
+
+        # Iterate through each subdirectory
+        for subdirectory in subdirectories:
+            subdirectory_path = os.path.join(folder_path, subdirectory)
+
+            # Check if the subdirectory name matches the pattern "Instance_y.0"
+            if subdirectory.startswith("Instance_"):
+                # Extract the value of y from the subdirectory name
+                y_value = int(subdirectory.split("_")[1].split(".")[0])
+
+                # Calculate the new subdirectory name
+                new_subdirectory_name = "Instance_" + str(folder_count) + ".0" # f"Instance_{y_value}.{subdirectories.index(subdirectory)}"
+                folder_count += 1
+
+                # Create the new subdirectory path
+                new_subdirectory_path = os.path.join(base_directory, new_subdirectory_name)
+
+                # Move and rename the subdirectory
+                shutil.move(subdirectory_path, new_subdirectory_path)
+
+    # Remove empty parent folders
+    for folder in folders:
+        folder_path = os.path.join(base_directory, folder)
+        if os.path.isdir(folder_path) and not os.listdir(folder_path):
+            os.rmdir(folder_path)
+
+    print("rejigging complete")
+    
 #Currently unused: Load data in by body part
 def load_region_data(folder, type):
     if type == 3:
@@ -327,30 +374,89 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
     #Process and display results
     #process_results(train_scores, val_scores, test_scores)
 
-def convert_to_video(image_folder, output):
+def convert_directory_to_videos(parent_folder, output, depth = False):
+    image_data = []
+    directory = os.fsencode(parent_folder)
+    for subdir_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
+        dirs.sort(key=Utilities.numericalSort)
+        split = str.split(subdir.decode('utf-8'), '/')
+
+        #avoid empty leading folders
+        print("split: ", split)
+        if split[-1] != "":
+            print("converting to vid")
+            convert_to_video(subdir.decode('utf-8'), output + split[-1], split[-1], depth=depth)
+
+
+def convert_to_video(image_folder, output, file, depth = False):
 
     # Get the list of image files in the directory
-    images = [img for img in os.listdir(image_folder) if img.endswith(".jpg")]
+    images = [img for img in os.listdir(image_folder) if str(img).split(".")[-1] == "jpg"]
 
-    # Sort the images in the desired order (if needed)
-    #images.sort()
-
+    os.makedirs(output, exist_ok = True)
     frame = cv2.imread(os.path.join(image_folder, images[0]))
     height, width, layers = frame.shape
 
     # Define the output video file name and codec
-    video_name = output + '.mp4'
+    video_name = output + '/' + file + '.mp4'
+    print("video name: ", video_name)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    video = cv2.VideoWriter(video_name, fourcc, 4, (width, height))
+    video = cv2.VideoWriter(video_name, fourcc, 7, (width, height))
+    d_video = None
+    if depth:
+        d_video_name = output + '/' + file + '_depth.mp4'
+        print("video name: ", d_video_name)
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        d_video = cv2.VideoWriter(d_video_name, fourcc, 7, (width, height))
 
-    for image in images:
-        image_path = os.path.join(image_folder, image)
-        frame = cv2.imread(image_path)
-        video.write(frame)
+    for iter,  image in enumerate(images):
+        if iter < len(images) / 2 or depth == False:
+            image_path = os.path.join(image_folder, image)
+            frame = cv2.imread(image_path)
+            video.write(frame)
+        else:
+            #add frames to a depth video to go into the same folder destination
+            image_path = os.path.join(image_folder, image)
+            frame = cv2.imread(image_path)
+            d_video.write(frame)
 
     cv2.destroyAllWindows()
     video.release()
 
+    if d_video:
+        d_video.release()
+
+
+def fix(abs_data, output):
+    person = 0
+
+    for i, row in enumerate(abs_data):
+        if i > 0:
+            if row[0] % 60 == 0 and row[1] < abs_data[i-1][1]:
+                person += 1
+
+        
+        abs_data[i][5] = person
+    
+    Utilities.save_dataset(abs_data, output)
+
+def get_clip_length(joint_data, start = 0):
+    for i, row in enumerate(joint_data):
+        if i > start:
+            if row[1] < joint_data[i-1][1]:
+                print("row 1: ", row[1], joint_data[i-1][1])
+                return i
+            
+def get_instance_start(joint_data, n, weights = [0,0,0]):
+    num_in_ims = 0
+    for i, row in enumerate(joint_data):
+        if i > 0:
+            if row[5] == n and row[2:5] == weights:
+                print("row 2: ", row[0])
+                return i, num_in_ims
+            elif row[5] == n:
+                num_in_ims += 1
+            
 if __name__ == '__main__':
 
     convert_to_video('./code/Datasets/PaperImages/Scaled/bob/Instance_1.0', './code/datasets/paperimages/videos/scaled')

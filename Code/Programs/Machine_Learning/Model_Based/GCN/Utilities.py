@@ -251,43 +251,6 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
 
     return total_loss, acc, all_pred, all_y
 
-def modify_loss(out, actual):
-    predictions = out.argmax(dim=1)
-    new_out = out.clone()
-    for i, row in enumerate(new_out):
-        if actual[i] != predictions[i]:
-            #If 0 and 2 gettting mixed up, doesn't matter
-            if actual[i] == 0 and predictions[i] == 2 or actual[i] == 2 and predictions[i] == 0:
-                tmp = 0
-                pred_1 = 0
-                pred_2 = 2
-                if predictions[i].item() == 2:
-                    new_out[i][pred_1] *= 1.00
-                else:
-                    new_out[i][pred_2] *= 1.00
-                
-            else:
-                #Make incorrect prediction WAY wronger
-                pred_1 = 0
-                pred_2 = 1
-                if predictions[i].item() == 0:
-                    pred_1 = 1
-                    pred_2 = 2
-                elif predictions[i].item() == 1:
-                    pred_1 = 0
-                    pred_2 = 2
-                
-                #The idea here is that classification 2 is easier after background subtraction, but the closer to "Normal" you get,
-                #the less pronounced are the features of the class, you therefor want to progressively punish misclassifications of the harder-
-                #to-classify classes, being 1 and 0.
-                if pred_1 == 0:
-                    new_out[i][pred_1] *= 1.2
-                if pred_1 == 1:
-                    new_out[i][pred_1] *= 1.1
-                elif pred_2 == 0:
-                    new_out[i][pred_2] *= 1.2     
-    return new_out
-
 def unfold_3s_dataset(data, joint_output):
     rel_data = []
     vel_data = []
@@ -310,12 +273,17 @@ def unfold_3s_dataset(data, joint_output):
     Utilities.save_dataset(vel_data, joint_output + "_vel")
     Utilities.save_dataset(bones_data, joint_output + "_bone")
 
-def load_whole_dataset(folder_names, file_name):
+def load_whole_dataset(folder_names, file_name, col_names = Utilities.colnames_midhip, override = False):
     data = []
     for name in folder_names:
         print("loading: ", "./Code/Datasets/Joint_Data/" + str(name) + str(file_name) + "/raw/"+ str(file_name) + ".csv")
-        abs_joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(name) + str(file_name) + "/raw/"+ str(file_name) + ".csv", None,
-                                                                cols=Utilities.colnames_nohead, ignore_depth=False)
+        if override == False:
+            abs_joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(name) + str(file_name) + "/raw/"+ str(file_name) + ".csv", None,
+                                                                    cols=col_names, ignore_depth=False)
+        else:
+            #Override to load raw data which is in a different format
+            abs_joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(name) + str(file_name) + ".csv", None,
+                                                                    cols=Utilities.colnames, ignore_depth=False)
         data.append(abs_joint_data)
     return data
 
@@ -370,6 +338,9 @@ def stitch_dataset(folder_names, stream = 1):
     whole_dataset = datasets[0]
     current_instance = whole_dataset[-1][0]
     for i, dataset in enumerate(datasets):
+        save = False
+        if i >= len(datasets) - 1:
+            save = True
         if i > 0:
             current_instance, whole_dataset = Creator.assign_person_number(whole_dataset, dataset, 
                                                                        "./Code/Datasets/Joint_Data/Big/no_Sub" + str(stream) + "_stream/" + str(i + 1) + "_people",
