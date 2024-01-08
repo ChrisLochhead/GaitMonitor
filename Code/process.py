@@ -1,4 +1,3 @@
-#import init_directories
 from Programs.Data_Processing.Model_Based.Demo import *
 import Programs.Data_Processing.Model_Based.Dataset_Creator as Creator
 import Programs.Machine_Learning.Model_Based.GCN.Dataset_Obj as Dataset_Obj
@@ -6,7 +5,6 @@ import Programs.Data_Processing.Model_Based.Render as Render
 import Programs.Machine_Learning.Model_Based.GCN.GAT as gat
 import Programs.Machine_Learning.Model_Based.GCN.STAGCN as stgcn
 import Programs.Machine_Learning.Model_Based.GCN.Utilities as graph_utils
-
 import time
 import torch
 torch.manual_seed(42)
@@ -19,20 +17,20 @@ def process_data(folder = "Chris"):
 ############################################# PIPELINE ##################################################################
 
     #Extract joints from images
-    print("\nStage 1: Extracting images ")
-    #run_images("./Code/Datasets/Individuals/" + str(folder) + "/Full_Dataset", out_folder="./Code/Datasets/Joint_Data/" + str(folder) + "/", exclude_2D=False, 
+    #print("\nStage 1: Extracting images ")
+    #run_images("./Code/Datasets/WeightGait/Full_Dataset/", out_folder="./Code/Datasets/Joint_Data/" + str(folder) + "/", exclude_2D=False, 
     #          start_point=0)
-    
+
     #Display first 2 instances of results 
     #render_joints_series("./Code/Datasets/WeightGait/Raw_Images", joints=abs_joint_data,
-    #                     size = 20, delay=True, use_depth=True)
+    #                    size = 20, delay=True, use_depth=True)
 
     #Remove empty frames
     print("\nStage 2: Removing empty frames.")
-    #abs_joint_data, image_data = Creator.process_empty_frames(joint_file="./Code/Datasets/Joint_Data/" + str(folder) + "/Absolute_Data.csv",
-    #                                             image_file="./Code/Datasets/Individuals/" + str(folder) + "/Full_Dataset/",
-    #                                             joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/2_Absolute_Data(empty frames removed)",
-    #                                             image_output="./Code/Datasets/Individuals/" + str(folder) + "/2_Empty Frames Removed/")
+    abs_joint_data, image_data = Creator.process_empty_frames(joint_file="./Code/Datasets/Joint_Data/" + str(folder) + "/Absolute_Data.csv",
+                                                 image_file="./Code/Datasets/WeightGait_Names/Full_Dataset/"+ str(folder) + "/",
+                                                 joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/2_Absolute_Data(empty frames removed)",
+                                                 image_output="./Code/Datasets/"+ str(folder) + "/2_Empty Frames Removed/")
 
     #Display first 2 instances of results
     print("\nStage 3:  Trimming sequences")
@@ -42,13 +40,14 @@ def process_data(folder = "Chris"):
     #                                                          "./Code/Datasets/" + str(folder) + "/2_Empty Frames Removed/", cols=Utilities.colnames, ignore_depth=False)
     
     #Trim start and end frames where joints get confused by image borders
-    #abs_joint_data, image_data =Creator.process_trimmed_frames(abs_joint_data, image_data,
-    #                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)",
-    #                                                     image_output="./Code/Datasets/Individuals/" + str(folder) + "/3_Trimmed Instances/", trim = 5)
+    abs_joint_data, image_data =Creator.process_trimmed_frames(abs_joint_data, image_data,
+                                                        joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)",
+                                                         image_output="./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", trim = 5, include_joints=True)
 
+    return
     print("\nStage 4: Reloading data into memory (shortcut)")
-    abs_joint_data, image_data = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)/raw/3_Absolute_Data(trimmed instances).csv",
-                                                              "./Code/Datasets/Individuals/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
+    #abs_joint_data, image_data = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)/raw/3_Absolute_Data(trimmed instances).csv",
+    #                                                          "./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
 
     
     #Utilities.save_images(abs_joint_data, copy.deepcopy(image_data), directory="./Code/Datasets/PaperImages/Imperfect" + str(folder) + "/", 
@@ -149,6 +148,54 @@ def process_data(folder = "Chris"):
     #combined_data = Creator.create_dummy_dataset(combined_data, 
     #                                             output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/20_Combined_Data_Noise")
 
+import shutil
+def convert_to_single_data_folder(base_directory):
+    # Get a list of all folders in the base directory
+    folders = [f for f in os.listdir(base_directory) if os.path.isdir(os.path.join(base_directory, f))]
+    print("folders : ", folders)
+    # Iterate through each folder
+    # Get a list of all folders in the base directory
+    folders = [f for f in os.listdir(base_directory) if os.path.isdir(os.path.join(base_directory, f))]
+
+    # Iterate through each folder
+    folder_count = 0
+    for folder in folders:
+        folder_path = os.path.join(base_directory, folder)
+
+        # Check if the folder contains subdirectories
+        subdirectories = [subdir for subdir in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, subdir))]
+        print("len subdirs: ", len(subdirectories))
+        print("subdirs before: ", subdirectories)
+        subdirectories.sort(key=lambda x: int(x.split("_")[1].split(".")[0]))
+        print("after: ", subdirectories)
+
+        # Iterate through each subdirectory
+        for subdirectory in subdirectories:
+            subdirectory_path = os.path.join(folder_path, subdirectory)
+
+            # Check if the subdirectory name matches the pattern "Instance_y.0"
+            if subdirectory.startswith("Instance_"):
+                # Extract the value of y from the subdirectory name
+                y_value = int(subdirectory.split("_")[1].split(".")[0])
+
+                # Calculate the new subdirectory name
+                new_subdirectory_name = "Instance_" + str(folder_count) + ".0" # f"Instance_{y_value}.{subdirectories.index(subdirectory)}"
+                folder_count += 1
+
+                # Create the new subdirectory path
+                new_subdirectory_path = os.path.join(base_directory, new_subdirectory_name)
+
+                # Move and rename the subdirectory
+                shutil.move(subdirectory_path, new_subdirectory_path)
+
+    # Remove empty parent folders
+    for folder in folders:
+        folder_path = os.path.join(base_directory, folder)
+        if os.path.isdir(folder_path) and not os.listdir(folder_path):
+            os.rmdir(folder_path)
+
+    print("rejigging complete")
+    
 #Currently unused: Load data in by body part
 def load_region_data(folder, type):
     if type == 3:
@@ -175,8 +222,8 @@ def load_datasets(types, folder, multi_dim = False):
         #Type 1: Normal, full dataset
         if t == 1:  
             #9D-1-Stream
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/6_people',
-                                                    '6_people.csv',             
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/14_people',
+                                                    '14_people.csv',             
                                                   joint_connections=Render.joint_connections_n_head))          
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/6_Relative_Data(relative)',
             #                                        '6_Relative_Data(relative).csv',             
@@ -322,59 +369,112 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
 
-def convert_to_video(image_folder, output):
+def convert_directory_to_videos(parent_folder, output, depth = False):
+    image_data = []
+    directory = os.fsencode(parent_folder)
+    for subdir_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
+        dirs.sort(key=Utilities.numericalSort)
+        split = str.split(subdir.decode('utf-8'), '/')
+
+        #avoid empty leading folders
+        print("split: ", split)
+        if split[-1] != "":
+            print("converting to vid")
+            convert_to_video(subdir.decode('utf-8'), output + split[-1], split[-1], depth=depth)
+
+
+def convert_to_video(image_folder, output, file, depth = False):
 
     # Get the list of image files in the directory
-    images = [img for img in os.listdir(image_folder) if img.endswith(".jpg")]
+    images = [img for img in os.listdir(image_folder) if str(img).split(".")[-1] == "jpg"]
 
-    # Sort the images in the desired order (if needed)
-    #images.sort()
-
+    os.makedirs(output, exist_ok = True)
     frame = cv2.imread(os.path.join(image_folder, images[0]))
     height, width, layers = frame.shape
 
     # Define the output video file name and codec
-    video_name = output + '.mp4'
+    video_name = output + '/' + file + '.mp4'
+    print("video name: ", video_name)
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    video = cv2.VideoWriter(video_name, fourcc, 4, (width, height))
+    video = cv2.VideoWriter(video_name, fourcc, 7, (width, height))
+    d_video = None
+    if depth:
+        d_video_name = output + '/' + file + '_depth.mp4'
+        print("video name: ", d_video_name)
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        d_video = cv2.VideoWriter(d_video_name, fourcc, 7, (width, height))
 
-    for image in images:
-        image_path = os.path.join(image_folder, image)
-        frame = cv2.imread(image_path)
-        video.write(frame)
+    for iter,  image in enumerate(images):
+        if iter < len(images) / 2 or depth == False:
+            image_path = os.path.join(image_folder, image)
+            frame = cv2.imread(image_path)
+            video.write(frame)
+        else:
+            #add frames to a depth video to go into the same folder destination
+            image_path = os.path.join(image_folder, image)
+            frame = cv2.imread(image_path)
+            d_video.write(frame)
 
     cv2.destroyAllWindows()
     video.release()
 
+    if d_video:
+        d_video.release()
+
+
+def fix(abs_data, output):
+    person = 0
+
+    for i, row in enumerate(abs_data):
+        if i > 0:
+            if row[0] % 60 == 0 and row[1] < abs_data[i-1][1]:
+                person += 1
+
+        
+        abs_data[i][5] = person
+    
+    Utilities.save_dataset(abs_data, output)
+
+def get_clip_length(joint_data, start = 0):
+    for i, row in enumerate(joint_data):
+        if i > start:
+            if row[1] < joint_data[i-1][1]:
+                print("row 1: ", row[1], joint_data[i-1][1])
+                return i
+            
+def get_instance_start(joint_data, n, weights = [0,0,0]):
+    num_in_ims = 0
+    for i, row in enumerate(joint_data):
+        if i > 0:
+            if row[5] == n and row[2:5] == weights:
+                print("row 2: ", row[0])
+                return i, num_in_ims
+            elif row[5] == n:
+                num_in_ims += 1
+            
 if __name__ == '__main__':
 
-    #process_data('bob')
-    #process_data('cade')
-    #process_data('emma')
-    #process_data('scarlett')
-    #process_data('sean c')
-    #process_data('sean g')
+    #convert_to_single_data_folder('./Code/Datasets/Weightgait_Test/Full_Dataset')
+
     #Assign person numbers and uniform instance counts:
-    folder_names = ['bob', 'cade', 'emma', 'scarlett', 'sean c', 'sean g']
+    folder_names = ['ahmed', 'alex', 'amy', 'AmyS', 'Anna', 'ash', 'bob', 'cade',
+                    'Cameron', 'Chris', 'Dan', 'Elisa', 'ellie', 'emma', 'Erin', 
+                     'Gordon', 'grant', 'Harry', 'james', 'joe', 'Josh', 'Kai', 'Longfei', 'Max',
+                      'melody', 'pheobe', 'Robynn', 'Scarlett', 'Sean C', 'Sean G', 'Sidra',
+                       'Wanok' ]
      
+
+     #TODO
+     #make 9 example videos with skeletal overlay
+     #fix last table and website is done
+     #re-factor code-base
+
     #graph_utils.stitch_dataset(folder_names=folder_names)
-    #data, _ = Utilities.process_data_input('./Code/Datasets/Joint_Data/Big/no_subtracted/15_people/raw/15_people.csv', None, 
-    #                                       cols=Utilities.colnames_nohead, ignore_depth=False)
 
-    #Split 9D into 3 stream representation
-    #Creator.split_into_streams(data, joint_output_r='./Code/Datasets/Joint_Data/Big/no_subtracted/15_rel',
-    #                           joint_output_v='./Code/Datasets/Joint_Data/Big/no_subtracted/15_vel',
-    #                           joint_output_b='./Code/Datasets/Joint_Data/Big/no_subtracted/15_bone')
+    #Convert all frames into sequences of videos
+    #convert_directory_to_videos('./Code/Datasets/Ahmed/3_Trimmed Instances/Instance_0.0', './Code/Datasets/WeightGait_Videos/Ahmed/')
 
-    
-    #convert_to_video('./Code/Datasets/PaperImages/ImperfectChris/Instance_0.0', './Code/Datasets/PaperImages/Videos/Chris_imperf_0')
-    #convert_to_video('./Code/Datasets/PaperImages/Scaled/Chris/Instance_0.0', './Code/Datasets/PaperImages/Videos/Chris_0')
 
-    #process_data('bob')
-
-    #abs_joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/Chris/6_Relative_Data(relative)/raw/6_Relative_Data(relative).csv",
-    #                                                          None, cols=Utilities.colnames_midhip, ignore_depth=False)
-    #Creator.compute_joint_stats(abs_joint_data)
 
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
@@ -392,79 +492,10 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
     start = time.time()
     run_model(dataset_types= [1], hcf=False,
-           batch_size = 64, epochs = 150, folder="big", save =None, load=None, leave_one_out = False, multi_dim=False)#
+           batch_size = 64, epochs = 50, folder="big", save =None, load=None, leave_one_out = False, multi_dim=False)#
 
     end = time.time()
     print("time elapsed: ", end - start)
-
-
-    #TESTS:
-    
-    #Test on 6 people: ST-GCN, ST-AGCN, ST-AGCN w/ temp attention 2D solution
-    #ST-GCN: 
-    #ST-AGCN: 95.51% 
-    #ST-AGCN w/temp attention: 95.51%
-
-    #Process and stitch 2D dataset
-    #Test on 14 people: ST-GCN, ST-AGCN, ST-AGCN w/ temp attention
-    #ST-GCN: 
-    #ST-AGCN:
-    #ST-AGCN w/temp attention
-
-    #Test on 6 people:
-    #ST-GCN 1D
-    #ST-GCN 2D (my version)
-    #ST-GCN 3D (multi-streams) (may need work) (get names for dummy files for each individual stream)
-
-    #From these tests Hopefully 2D is best and temp-attention is best. If so
-    #need the following (RECORD ALL TEST EPOCHS 10-50 AND TIME)
-    #14 person
-    #1 stream ST-GCN
-    #1 stream ST-AGCN
-    #1 stream ST-AAGCN
-    #2 stream ST-GCN
-    #2 stream ST-AGCN
-    #2 stream ST-AAGCN
-    #3 stream ST-GCN
-    #3 stream ST-AGCN
-    #3 stream ST-AAGCN
-
-
-    #GAT W/2 STREAM 
-    #LOGREG W/2 STREAM (JUST LEAVE AS IS)
-    #K-MEANS W/2 STREAM (JUST LEAVE AS IS)
-
-    #T-SNE of Subtracted 1D vs not
-
-    #Main table
-    #Bar chart 2D with 1, 2, 3 STREAM STAAGCN (test best representation)
-    #CONVERGENCE 1, 2, 3 STREAM METHODS ON ST-AAGCN (test convergence and speed)
-    #LAST COMPARISON, K-MEANS, LOGREG, ST-GCN, AGCN, AAGCN (test best model)
-
-    #Change chart to remove reference to loss
-    #redraft to include findings and remove loss section
-
-
-    #TODO to turn this into a regression problem paper
-    #replace output with 2 values softmaxxed, probabilities of belonging to 0 or 1
-    #if it doesn't work immidiately, experiment with autoencoder to embed all models into lower latent space and reduce required data and resources
-        #Maybe ST-GCN autoencoder to encode temporal elements, add attention too?
-        #Use autoencoder to fling in HCF data like time of day and speed
-
-    #implement way to decide which joints have the most impact on classification
-    #record new metadata such as time of day
-    #implement how to show how far into gait cycle an issue is detected and draw the result
-    #aim to predict time of day, whether fall is legitimate or caused by environment
-    #chart speed, gait length 
-    #Build average of two discerned classes and chart differences in speed, gait length, frequencies of issues, TOD walking etc as a visible chart
-    #Use as a regressor between closer to which assessment period
-
-    #Once this is done, write final technical paper on novel ST-GCN with autoencoder using HCF
-    #DONE :D
-
-    #Ask Bob: How Do I ensure there is a difference between the 2? artificially change them i.e. how many times walking at night in 1 vs other, simulate recovering from an injury
-    #in the second one?
-
 
 
     

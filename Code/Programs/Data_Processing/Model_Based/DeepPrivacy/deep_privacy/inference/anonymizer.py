@@ -58,11 +58,9 @@ class Anonymizer:
                               save_paths: typing.List[pathlib.Path],
                               im_bboxes=None):
         images = [cv2.imread(str(p))[:, :, ::-1] for p in image_paths]
-        print("making it here? 1")
         anonymized_images, image_annotations = self.detect_and_anonymize_images(
             images, im_bboxes, return_annotations=True)
 
-        print("making it here? 2")
         for image_idx, (new_path, anon_im) in enumerate(
                 zip(save_paths, anonymized_images)):
             new_path.parent.mkdir(exist_ok=True, parents=True)
@@ -70,7 +68,6 @@ class Anonymizer:
             annotated_im = images[image_idx]
             for face_idx in range(len(annotation)):
                 annotated_im = annotated_im * annotation.get_mask(face_idx)[:, :, None]
-            print("making it here? 3")
             annotated_im = vis_utils.draw_faces_with_keypoints(
                 annotated_im,
                 annotation.bbox_XYXY,
@@ -78,8 +75,6 @@ class Anonymizer:
             )
 
             cv2.imwrite(str(new_path), anon_im[:, :, ::-1])
-            print("Saving to:", new_path)
-
             to_save = np.concatenate((annotated_im, anon_im), axis=1)
             new_name = new_path.stem + "_detected_left_anonymized_right.jpg"
             debug_impath = new_path.parent.joinpath(new_name)

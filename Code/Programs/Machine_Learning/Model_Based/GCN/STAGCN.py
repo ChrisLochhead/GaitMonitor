@@ -109,14 +109,17 @@ class STAGCNBlock(torch.nn.Module):
         #Layers
         if first:
             self.b0 = BatchNorm1d(in_channels).to(device) 
-            self.spatial_conv = ChebConv(in_channels, int(dim_h*2), 1).to(device) 
+            #self.spatial_conv = ChebConv(in_channels, int(dim_h*2), 1).to(device) 
             self.spatial_conv = GATv2Conv(in_channels, dim_h, heads=2).to(device)
             self.skip_connection = torch.nn.Conv1d(in_channels, int(dim_h), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
             self.temp_att = GATv2Conv(int(dim_h*2), int(dim_h*2), heads=1).to(device)
         else:
             self.b0 = BatchNorm1d(int(in_channels * 2)).to(device)  
-            self.spatial_conv = ChebConv(int(in_channels*2), int(dim_h*2), 1).to(device) 
-            self.spatial_conv = GATv2Conv(int(in_channels*2), int(dim_h*2), heads=2).to(device) 
+            #self.spatial_conv = ChebConv(int(in_channels*2), int(dim_h*2), 1).to(device) 
+            #NORMAL ST-GCN Only
+            #self.spatial_conv = GATv2Conv(int(in_channels*2), int(dim_h*2), heads=2).to(device) 
+            #ST-AGCN OR AAGCN
+            self.spatial_conv = GATv2Conv(int(in_channels*2), dim_h, heads=2).to(device)             
             self.skip_connection = torch.nn.Conv1d(int(in_channels*2), int(dim_h), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)           
             self.temp_att = GATv2Conv(int(dim_h*2), int(dim_h*2), heads=1).to(device)
         

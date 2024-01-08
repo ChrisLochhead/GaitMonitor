@@ -300,6 +300,7 @@ def run_images(folder_name, out_folder, exclude_2D = False, write_mode = "w+", s
 
         #Save to .csv
         print("SAVING", write_mode)
+        os.makedirs(out_folder, exist_ok=True)
 
         with open( out_folder + "Absolute_Data.csv", write_mode, newline='') as my_csv:
             csvWriter = csv.writer(my_csv,delimiter=',')

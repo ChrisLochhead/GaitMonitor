@@ -162,7 +162,7 @@ def normalize_outlier_values(joint_data, image_data, tolerance = 100, meta = 5):
                     joint_1_coord = [row[j_index[1] + meta + 1][0], row[j_index[1] + meta + 1][1]]
                     if l - meta - 1 == j_index[0] or l - meta - 1 == j_index[1]:
                         if math.dist(joint_0_coord, joint_1_coord) > tolerance:
-                            print("one above changes: ", math.dist(joint_0_coord, joint_1_coord))
+                            #print("one above changes: ", math.dist(joint_0_coord, joint_1_coord))
                             #Work out which of the two is the outlier
                             if math.dist(med_coord, joint_0_coord) > math.dist(med_coord, joint_1_coord):
                                 #Just set outlier to it's neighbour to reduce damage done by outlier without getting rid of frame

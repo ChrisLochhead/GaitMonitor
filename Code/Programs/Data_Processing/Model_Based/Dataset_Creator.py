@@ -106,7 +106,7 @@ def combine_datasets(rel_data, vel_data, angle_data, images, joints_output, meta
 
 def process_empty_frames(joint_file, image_file, joint_output, image_output):
     print("\nProcessing Empty frames...")
-    joint_data, image_data = Utilities.process_data_input(joint_file, image_file, cols=Utilities.colnames)
+    joint_data, image_data = Utilities.process_data_input(joint_file, image_file, cols=Utilities.colnames, ignore_depth=True)
 
     joint_data, image_data = Data_Correction.remove_empty_frames(joint_data, image_data)
     Utilities.save_dataset(joint_data, joint_output)
@@ -115,12 +115,12 @@ def process_empty_frames(joint_file, image_file, joint_output, image_output):
 
     return joint_data, image_data
 
-def process_trimmed_frames(joint_file, image_file, joint_output, image_output, trim):
+def process_trimmed_frames(joint_file, image_file, joint_output, image_output, trim, include_joints = False):
     print("\nProcessing trimmed frames...")
     joint_data, image_data = Utilities.process_data_input(joint_file, image_file)
     joint_data, image_data = Data_Correction.trim_frames(joint_data, image_data, trim = trim)
     Utilities.save_dataset(joint_data, joint_output)
-    Utilities.save_images(joint_data, image_data, image_output)
+    Utilities.save_images(joint_data, image_data, image_output, include_joints=include_joints)
     print("Trimmed frame processing complete.")
     return joint_data, image_data
     
@@ -752,7 +752,7 @@ def split_into_streams(data, joint_output_r, joint_output_v, joint_output_b):
     Utilities.save_dataset(bone_data, joint_output_b)
     
 #Utility function for changing class labels
-def assign_person_number(data_to_append, data, joint_output, no, start_instance):
+def assign_person_number(data_to_append, data, joint_output, no, start_instance, save = False):
     current_instance = start_instance + 1
     for i, row in enumerate(data):
         data[i][5] = no
@@ -766,8 +766,8 @@ def assign_person_number(data_to_append, data, joint_output, no, start_instance)
         #Append to a master dataset
         for d in data:
             data_to_append.append(d)
-
-    Utilities.save_dataset(data_to_append, joint_output)
+    if save:
+        Utilities.save_dataset(data_to_append, joint_output)
     return current_instance, data_to_append 
 
 

@@ -235,11 +235,8 @@ def interpolate_knee_data(x, y, scale = 5000):
     return inter_data, inter_indices
 
 def split_by_class_and_instance(data):
-    print("data before split: ", data[0])
     norm, limp, stag = split_by_class(data)
-    print("data after split 1: ", norm[0])
     normal_instances = split_class_by_instance(norm)
-    print("data after split 2: ", normal_instances[0])
     limp_instances = split_class_by_instance(limp)
     stagger_instances = split_class_by_instance(stag)
 
@@ -251,7 +248,6 @@ def split_class_by_instance(data):
     instance = []
     current_frame = 0
     last_frame = 0
-    print("length of data: ", len(data))
     for i, row in enumerate(data):
         last_frame = current_frame
         current_frame = data[i][1]
@@ -556,6 +552,7 @@ def save_images(joint_data, image_data, directory, include_joints = False, aux_j
             if aux_joints != None:
                 image_data[i] = Render.draw_joints_on_frame(image_data[i], joint_data[i], aux_joints=aux_joints[i])
             else:
+                print("len: ", len(image_data), len(joint_data))
                 image_data[i] = Render.draw_joints_on_frame(image_data[i], joint_data[i], aux_joints=None)
 
 
