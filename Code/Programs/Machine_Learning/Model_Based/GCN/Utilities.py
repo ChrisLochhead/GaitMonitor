@@ -343,7 +343,7 @@ def stitch_dataset(folder_names, stream = 1):
             save = True
         if i > 0:
             current_instance, whole_dataset = Creator.assign_person_number(whole_dataset, dataset, 
-                                                                       "./Code/Datasets/Joint_Data/Big/no_Sub" + str(stream) + "_stream/" + str(i + 1) + "_people",
+                                                                       "./Code/Datasets/Joint_Data/Big/no_Sub_" + str(stream) + "_stream/" + str(i + 1) + "_people",
                                                                        i, current_instance)
     print("completed.")
 

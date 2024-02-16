@@ -338,6 +338,7 @@ class GraphNetwork(torch.nn.Module):
         self.c3d_out4 = torch.nn.Sequential(
         self.conv5a, self.conv5b, torch.nn.Dropout(0.5)
         )
+    '''
     #C3D Forward
     def forward(self, data, edge_indices, batches, train):
         #Stage 1: Process the individual input streams
@@ -380,7 +381,7 @@ class GraphNetwork(torch.nn.Module):
         #print("h out: ", h.size())
         return h
     
-    '''
+    
     #DNN forward
     def forward(self, data, edge_indices, batches, train):
         #Stage 1: Process the individual input streams
@@ -408,7 +409,7 @@ class GraphNetwork(torch.nn.Module):
         return h
     '''
     #Normal forward
-    '''def forward(self, data, edge_indices, batches, train):
+    def forward(self, data, edge_indices, batches, train):
 
         #Stage 1: Process the individual input streams
         hidden_layers = []
@@ -447,11 +448,11 @@ class GraphNetwork(torch.nn.Module):
         #h = h.view(h.shape[0], 14, -1)
         #print("size before: ", h.size())
         #h = self.avg_pool(h)
-        print("now: ", h.size())
+        #print("now: ", h.size())
         #h = h.view(h.shape[0], -1)
         # Combine the results and pass them through the combination layer
         #To compress them into classification
         h = self.combination_layer(h)
-        print("h out: ", h.size())
+        #print("h out: ", h.size())
         return h
-        '''
+        

@@ -27,10 +27,10 @@ def process_data(folder = "Chris"):
 
     #Remove empty frames
     print("\nStage 2: Removing empty frames.")
-    abs_joint_data, image_data = Creator.process_empty_frames(joint_file="./Code/Datasets/Joint_Data/" + str(folder) + "/Absolute_Data.csv",
-                                                 image_file="./Code/Datasets/Individuals/" + str(folder) + "/Full_Dataset/",
-                                                 joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/2_Absolute_Data(empty frames removed)",
-                                                 image_output="./Code/Datasets/Individuals/" + str(folder) + "/2_Empty Frames Removed/")
+    #abs_joint_data, image_data = Creator.process_empty_frames(joint_file="./Code/Datasets/Joint_Data/" + str(folder) + "/Absolute_Data.csv",
+    #                                             image_file="./Code/Datasets/Individuals/" + str(folder) + "/Full_Dataset/",
+    #                                             joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/2_Absolute_Data(empty frames removed)",
+    #                                              image_output="./Code/Datasets/Individuals/" + str(folder) + "/2_Empty Frames Removed/")
 
     #Display first 2 instances of results
     print("\nStage 3:  Trimming sequences")
@@ -40,11 +40,10 @@ def process_data(folder = "Chris"):
     #                                                          "./Code/Datasets/" + str(folder) + "/2_Empty Frames Removed/", cols=Utilities.colnames, ignore_depth=False)
     
     #Trim start and end frames where joints get confused by image borders
-    abs_joint_data, image_data =Creator.process_trimmed_frames(abs_joint_data, image_data,
-                                                        joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)",
-                                                         image_output="./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", trim = 5, include_joints=True)
+    #abs_joint_data, image_data =Creator.process_trimmed_frames(abs_joint_data, image_data,
+    #                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)",
+    #                                                     image_output="./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", trim = 5, include_joints=True)
 
-    return
     print("\nStage 4: Reloading data into memory (shortcut)")
     #abs_joint_data, image_data = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)/raw/3_Absolute_Data(trimmed instances).csv",
     #                                                          "./Code/Datasets/Individuals/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
@@ -228,13 +227,13 @@ def load_datasets(types, folder, multi_dim = False):
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/Leave_one_out/_single',
             #                                        '_single.csv',             
             #                                      joint_connections=Render.joint_connections_n_head))     
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/14_people', 
-            #                                        '14_people.csv',             
-            #                                         joint_connections=Render.joint_connections_n_head))          
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/1_s_data',
-                                                   '1_s_data.csv',             
-                                                  joint_connections=Render.joint_connections_n_head))
-            6#datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/9d_1_s_14p_data',
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/3_people', 
+                                                    '3_people.csv',             
+                                                     joint_connections=Render.joint_connections_n_head))          
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/1_s_data',
+            #                                       '1_s_data.csv',             
+            #                                      joint_connections=Render.joint_connections_n_head))
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/9d_1_s_14p_data',
             #                                       '9d_1_s_14p_data.csv',             
             #                                      joint_connections=Render.joint_connections_n_head))
 
@@ -459,8 +458,6 @@ def get_instance_start(joint_data, n, weights = [0,0,0]):
             
 if __name__ == '__main__':
 
-    convert_to_video('./code/Datasets/PaperImages/Scaled/bob/Instance_1.0', './code/datasets/paperimages/videos/scaled')
-    done = 5/0
     #process_data('bob')
     #process_data('cade')
     #process_data('emma')
@@ -526,7 +523,7 @@ if __name__ == '__main__':
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
     start = time.time()
     run_model(dataset_types= [1], hcf=False,
-           batch_size = 64, epochs = 50, folder="bob", save =None, load=None, leave_one_out = False, multi_dim=False)#
+           batch_size = 64, epochs = 50, folder="big/no_sub_1_stream", save =None, load=None, leave_one_out = False, multi_dim=False)#
     end = time.time()
     print("time elapsed: ", end - start)
 

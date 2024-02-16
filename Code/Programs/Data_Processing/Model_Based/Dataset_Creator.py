@@ -765,7 +765,7 @@ def split_into_streams(data, joint_output_r, joint_output_v, joint_output_b):
     Utilities.save_dataset(bone_data, joint_output_b)
     
 #Utility function for changing class labels
-def assign_person_number(data_to_append, data, joint_output, no, start_instance, save = False):
+def assign_person_number(data_to_append, data, joint_output, no, start_instance, save = True):
     current_instance = start_instance + 1
     for i, row in enumerate(data):
         data[i][5] = no
