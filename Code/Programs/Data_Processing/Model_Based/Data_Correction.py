@@ -25,6 +25,7 @@ def calculate_distance(x1, y1, x2, y2):
     return distance
 
 def smooth_unlikely_values(joint_data, image_data):
+    consta = copy.deepcopy(joint_data)
     for i, frame in enumerate(joint_data):
         #Ignore first frame
         if i > 0:
@@ -35,7 +36,7 @@ def smooth_unlikely_values(joint_data, image_data):
                 if j > 5:
                     if calculate_distance(coord[0], coord[1], joint_data[i - 1][j][0], joint_data[i-1][j][1]) > 100:
                         #Just reset any odd values to its previous value
-                        joint_data[i][j] = joint_data[i-1][j]
+                        joint_data[i][j] = consta[i-1][j]
             #render_joints(image_data[i], joint_data[i], delay = True, use_depth=False)
     
     return joint_data

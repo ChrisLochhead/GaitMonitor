@@ -2,7 +2,7 @@ import torch
 torch.manual_seed(42)
 from sklearn.metrics import f1_score
 from torch_geometric.loader import DataLoader as GeoLoader
-from torch.utils.data import RandomSampler
+from torch.utils.data import RandomSampler, SubsetRandomSampler
 from sklearn.model_selection import StratifiedKFold
 import copy
 import Programs.Data_Processing.Model_Based.Utilities as Utilities
@@ -66,18 +66,26 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         test_loaders = []
 
         #Set up so identical seed is used
-        G = torch.Generator()
-        train_sample = RandomSampler(folded_train[0][fold], generator=G)
-        #Restrict validation and testing batch sizes to be one batch
-        val_sample = RandomSampler(folded_val[0][fold], generator=G)
-        test_sample = RandomSampler(test_dataset[0], generator=G)
+        #G = torch.Generator()
+        #train_sample = RandomSampler(folded_train[0][fold], generator=G,)
+        ##Restrict validation and testing batch sizes to be one batch
+        #val_sample = RandomSampler(folded_val[0][fold], generator=G)
+        #test_sample = RandomSampler(test_dataset[0], generator=G)
+
         #init = G.get_state()
+        print("whats i go up to here: ", len(datasets))
         for i, dataset in enumerate(datasets):
+            G = torch.Generator()
+            train_sample = RandomSampler(folded_train[i][fold], generator=G,)
+            #Restrict validation and testing batch sizes to be one batch
+            val_sample = RandomSampler(folded_val[i][fold], generator=G)
+            test_sample = RandomSampler(test_dataset[i], generator=G)
+
             test_set = test_dataset[i]
             train_set = folded_train[i][fold]
             val_set = folded_val[i][fold]
-            train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler = train_sample, drop_last = True))
 
+            train_loaders.append(GeoLoader(train_set, batch_size=batch, sampler=train_sample, drop_last = True))
             #Restrict val set to only being 1 batch, so the same batch and hence the same data is always picked for testing
             val_loaders.append(GeoLoader(val_set, batch_size=batch, sampler = val_sample, drop_last = True))
             test_loaders.append(GeoLoader(test_set, batch_size=batch, sampler = test_sample, drop_last = True))
@@ -174,7 +182,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size,
         val_accs.append(val_acc)
 
         # Print metrics every 10 epochs
-        if (epoch % 10 == 0):
+        if (epoch % 1 == 0):
             print(f'Epoch {epoch:>3} | Train Loss: {total_loss:.2f} '
                 f'| Train Acc: {acc * 100:>5.2f}% '
                 f'| Val Loss: {val_loss:.2f} '
@@ -276,7 +284,7 @@ def unfold_3s_dataset(data, joint_output):
 def load_whole_dataset(folder_names, file_name, col_names = Utilities.colnames_midhip, override = False):
     data = []
     for name in folder_names:
-        print("loading: ", "./Code/Datasets/Joint_Data/" + str(name) + str(file_name) + "/raw/"+ str(file_name) + ".csv")
+        print("loading: ", "./Code/Datasets/Joint_Data/" + str(name) + '/' + str(file_name) + "/raw/"+ str(file_name) + ".csv")
         if override == False:
             abs_joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(name) + str(file_name) + "/raw/"+ str(file_name) + ".csv", None,
                                                                     cols=col_names, ignore_depth=False)
@@ -326,12 +334,14 @@ def extract_single_person(data, joint_output, person = [0,1,2]):
 #Stitch up datasets of individuals to create a full dataset
 def stitch_dataset(folder_names, stream = 1):
     #1s file
-    if stream == 1:
-        file_name = '/1_s_data'
-    elif stream == 2:
-        file_name = '/2_s_data'
-    elif stream == 3:
-        file_name = '/3_s_data'
+    if stream == 1: # rel
+        file_name = '/rel_data'
+    elif stream == 2: # bone
+        file_name = '/bone_data'
+    elif stream == 3: # all 
+        file_name = '/comb_data'
+    else: # vel
+        file_name = '/vel_data'
 
 
     datasets = load_whole_dataset(folder_names, file_name)

@@ -11,8 +11,8 @@ import pyrealsense2 as rs
 import re
 from tqdm import tqdm
 import math
-#from Render import render_joints, plot3D_joints 
 import Programs.Data_Processing.Model_Based.Render as Render
+
 '''order of joints:
 
 0,1,2 are meta data:
@@ -504,7 +504,7 @@ def get_unit_vector(vector):
         magnitude = 1
 
     unit_vector = [vector[0] / magnitude, vector[1] / magnitude, vector[2] / magnitude]
-    return unit_vector
+    return vector# unit_vector
 
 def add_lists(list1, list2, change_type = False):
     return list((np.array(list1) + np.array(list2)).astype(int))

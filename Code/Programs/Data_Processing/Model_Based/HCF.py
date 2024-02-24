@@ -1,6 +1,7 @@
 import copy
 import math
 import numpy as np
+import random
 import matplotlib.pyplot as plt
 import Programs.Data_Processing.Model_Based.Render as Render
 
@@ -384,8 +385,8 @@ def sample_gait_cycles(data_cycles):
     min_length = min(len(sublist) for sublist in cycles)
 
     for i, cycle in enumerate(cycles):
-        cycles[i] = cycles[i][0:min_length]
-
+        #cycles[i] = cycles[i][0:min_length]
+        cycles[i] = random.sample(cycles[i], min_length)
     print("lens 2: ", len(cycles[0]),len(cycles[1]),len(cycles[2]))   
     
     #Agglomerate into one list:

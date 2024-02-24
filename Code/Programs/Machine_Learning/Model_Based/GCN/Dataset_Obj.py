@@ -134,13 +134,13 @@ class JointDataset(Dataset):
         return self.data.shape[0]
 
     def get(self, idx):
-        if self.cycles:
-            frame_count = 0
-            for i, c in enumerate(self.cycle_indices):
-                if idx <= frame_count:
-                    break
-                else:
-                    frame_count += c
+        #if self.cycles:
+        #    frame_count = 0
+        #    for i, c in enumerate(self.cycle_indices):
+        #        if idx <= frame_count:
+        #            break
+        #        else:
+        #            frame_count += c
 
         if self.test:
             data = torch.load(os.path.join(self.processed_dir, 
@@ -204,22 +204,23 @@ def convert_to_literals(data, meta = 5):
 def data_to_graph(row, coo_matrix, meta = 5, ensemble = False):
     gait_cycle = []
     y_arr = []
+    per_arr = []
     for cycle_part in row:
         refined_row = cycle_part[meta + 1 :]   
         row_as_array = np.array(refined_row)  
-
         y = int(cycle_part[2])  
+        per_arr = int(cycle_part[5])
         y_arr.append(y)
         if len(gait_cycle) <= 0:
             gait_cycle = row_as_array
         else:   
             gait_cycle = np.concatenate((gait_cycle, row_as_array), axis=0)
-
     #Verify gait cycle is calculated correctly:
     #Pass entire cycle as single graph
     data = Data(x=torch.tensor(list(gait_cycle), dtype=torch.float),
         y=torch.tensor([y], dtype=torch.long),
         edge_index=torch.tensor(coo_matrix, dtype=torch.long),
+        person = per_arr
         )
     return data
 

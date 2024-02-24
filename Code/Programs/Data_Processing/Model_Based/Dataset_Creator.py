@@ -301,7 +301,7 @@ def create_bone_dataset(abs_data, images, joint_output, meta = 6):
                         norm = math.sqrt(tmp_vector[0] ** 2 + tmp_vector[1] ** 2 + tmp_vector[2] ** 2)
                         if norm == 0:
                             norm = 1
-                        tmp_vector = [tmp_vector[0] / norm, tmp_vector[1] / norm, tmp_vector[2] / norm]
+                        #tmp_vector = [tmp_vector[0] / norm, tmp_vector[1] / norm, tmp_vector[2] / norm]
                     else:
                         tmp_vector = [0,0,0]
                     bone_row.append(tmp_vector)
@@ -493,7 +493,7 @@ def create_hcf_dataset(pre_abs_joints, abs_joints, rel_joints, abs_veljoints, im
 def create_dummy_dataset(data, output_name):
     data, _ = Utilities.process_data_input(data, None)
     mean = 0 
-    std_dev = 1 
+    std_dev = 0.1
     sequences = []
     sequence = []
 
@@ -667,7 +667,7 @@ def subtract_skeleton(rel_data, joint_output, base_output):
                 if k> 5:
                     #Check if coord and overlay[j][k] are within a radius of eachother, ignoring the first 10
                     try:
-                        if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 5):# results were on 50. minor was 15
+                        if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 15):# results were on 50. minor was 15
                             #print("detected within raidus: ", coord, overlay_sequence[j][k])
                             #rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
                             nothing = 0
@@ -780,6 +780,7 @@ def assign_person_number(data_to_append, data, joint_output, no, start_instance,
         for d in data:
             data_to_append.append(d)
     if save:
+        print("saving to : ", joint_output)
         Utilities.save_dataset(data_to_append, joint_output)
     return current_instance, data_to_append 
 
