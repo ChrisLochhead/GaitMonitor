@@ -8,6 +8,7 @@ import Programs.Machine_Learning.Model_Based.GCN.Utilities as graph_utils
 
 import time
 import random
+import math
 random.seed(42)
 
 import torch
@@ -49,7 +50,7 @@ def process_images_into_joints(folder):
     return abs_joint_data, image_data
 
 
-def process_joint_normalization(folder, abs_joint_data, image_data):
+def process_joint_normalization(folder, abs_joint_data, image_data, scale_joints, norm_joints):
     '''
     This function concerns the functions in the pre-processing pipeline that implement joint scaling and normalization, in an attempt to reduce the individuality across people, without
     sacrificing the discriminatory information provided by the gait abnormalities. It also serves to reduce the scales of the values for easier processing in a neural network.
@@ -74,11 +75,13 @@ def process_joint_normalization(folder, abs_joint_data, image_data):
     --------
     This function is not called during normalization ablations studies.
     '''
-    abs_joint_data = Creator.create_normalized_dataset(abs_joint_data, image_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(norm)")
-    abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, None, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
+    if norm_joints:
+        abs_joint_data = Creator.create_normalized_dataset(abs_joint_data, image_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(norm)")
+    if scale_joints:
+        abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, None, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
     return abs_joint_data, image_data
 
-def generate_single_stream_dataset(folder, joint_data, prefix = 'rel'):
+def generate_single_stream_dataset(folder, joint_data, prefix = 'rel', subtr = True):
     '''
     This generates a single stream dataset of either relative, joint or bone data by passing them through the skeleton-subtraction methodology for data cleaning and generates
     dummy values using isotropic gaussian noise.
@@ -100,16 +103,17 @@ def generate_single_stream_dataset(folder, joint_data, prefix = 'rel'):
         Returns the subtracted and dummied datasets
 
     '''
-    joint_data = Creator.subtract_skeleton(joint_data, 
-                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/" + str(prefix) + "_Subtracted",
-                                                      base_output="./Code/Datasets/Joint_Data/" + str(folder) + "/" + str(prefix) +"_base")
+    if subtr:
+        joint_data = Creator.subtract_skeleton(joint_data, 
+                                                        joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/" + str(prefix) + "_Subtracted",
+                                                        base_output="./Code/Datasets/Joint_Data/" + str(folder) + "/" + str(prefix) +"_base")
 
     dum_data = Creator.create_dummy_dataset(joint_data, 
                                                  output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/" + str(prefix) +"_data")
     
     return joint_data, dum_data
 
-def process_data(folder = "Chris", run_ims = False, norm_joints = True, subtract_and_dummy = True):
+def process_data(folder = "Chris", run_ims = False, norm_joints = True, scale_joints = True, subtract = True):
     '''
     This function calls the pre-processing pipeline that takes raw images and extracts the joint positions, then turns them into various representations and 
     datasets including relative position, velocity, joint angles among other pre-processing steps.
@@ -140,8 +144,7 @@ def process_data(folder = "Chris", run_ims = False, norm_joints = True, subtract
     #Save the un-normalized absolute joints for calculating bone angles later
     imperfect_joints = copy.deepcopy(abs_joint_data)
 
-    if norm_joints:
-        abs_joint_data, image_data = process_joint_normalization(folder, abs_joint_data, image_data)
+    abs_joint_data, image_data = process_joint_normalization(folder, abs_joint_data, image_data, scale_joints, norm_joints)
     
     #Create relative, velocity and bone datasets
     print("\nStage 7: Relativizing data")
@@ -153,17 +156,16 @@ def process_data(folder = "Chris", run_ims = False, norm_joints = True, subtract
                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/Bones_Data")
     
     #Apply subtraction and dummying
-    if subtract_and_dummy:
-        relative_joint_data, rel_dum_data = generate_single_stream_dataset(folder, relative_joint_data, prefix='rel')
-        velocity_data, vel_dum_data = generate_single_stream_dataset(folder, velocity_data, prefix='vel')
-        joint_bones_data, bone_dum_data = generate_single_stream_dataset(folder, joint_bones_data, prefix='bone')
+    relative_joint_data, rel_dum_data = generate_single_stream_dataset(folder, relative_joint_data, prefix='rel', subtr=subtract)
+    velocity_data, vel_dum_data = generate_single_stream_dataset(folder, velocity_data, prefix='vel', subtr=subtract)
+    joint_bones_data, bone_dum_data = generate_single_stream_dataset(folder, joint_bones_data, prefix='bone', subtr=subtract)
 
     #Combine datasets
     Creator.combine_datasets(vel_dum_data, bone_dum_data, None, image_data,
                                              joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data")
 
 
-def load_datasets(types, folder, multi_dim = False):
+def load_datasets(types, folder, multi_dim = False, num_people = 3):
     '''
     This loads in datasets selected datasets for training.
 
@@ -190,8 +192,8 @@ def load_datasets(types, folder, multi_dim = False):
         print("loading dataset {} of {}. ".format(i + 1, len(types)), t)
         #Type 1: Normal, full dataset
         if t == 1:  
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/6_people', 
-                                                    '6_people.csv',             
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + f'/{num_people}_people', 
+                                                    f'{num_people}_people.csv',             
                                                      joint_connections=Render.joint_connections_n_head))      
 
         #Type 2: HCF dataset (unused)
@@ -259,9 +261,9 @@ def process_results(train_scores, val_scores, test_scores):
     mean, var = Utilities.mean_var(test_scores)
     print("mean, std and variance: {:.2f}%, {:.2f}% {:.5f}".format(mean, math.sqrt(var), var))
 
-def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load = None, leave_one_out = False, multi_dim = False):
+def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load = None, leave_one_out = False, multi_dim = False, num_people=3):
     #Load the full dataset
-    datasets = load_datasets(dataset_types, folder, False)
+    datasets = load_datasets(dataset_types, folder, False, num_people)
     print("datasets here: ", datasets)
     #Concatenate data dimensions for ST-GCN
     data_dims = []
@@ -295,7 +297,7 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
 
     model = model.to(device)
     model, train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                     k_fold=5, batch=batch_size, epochs=epochs, device = device)
+                                                                     k_fold=3, batch=batch_size, epochs=epochs, device = device)
     if save != None:
         print("saving model")
         torch.save(model.state_dict(), './Code/Datasets/Weights/' + str(save) + '.pth')
@@ -355,18 +357,24 @@ def convert_to_video(image_folder, output, file, depth = False):
         d_video.release()
 
 
+def create_datasets():
+        #Assign person numbers and uniform instance counts:
+    folder_names = ['ahmed', 'Amy', 'Anna', 'bob', 'cade', 'emma', 'erin', 
+                    'grant', 'pheobe', 'scarlett', 'sean c', 'sean g', 'wanok']
+    for p in folder_names:
+        #Current run: 0, 0, 0
+        process_data(p, run_ims=False, norm_joints=True, scale_joints=True, subtract=True)
+    graph_utils.stitch_dataset(folder_names=folder_names, stream=1)
+    graph_utils.stitch_dataset(folder_names=folder_names, stream=2)
+    graph_utils.stitch_dataset(folder_names=folder_names, stream=3)
+    graph_utils.stitch_dataset(folder_names=folder_names, stream=4)
+    done = 5/0
+
 
 if __name__ == '__main__':
-    #Assign person numbers and uniform instance counts:
-    #folder_names = ['ahmed', 'Amy', 'Anna', 'bob', 'cade', 'emma', 'erin', 
-    #                'grant', 'pheobe', 'scarlett', 'sean c', 'sean g', 'wanok']
-    #for p in folder_names:
-    #    process_data(p)
-    #graph_utils.stitch_dataset(folder_names=folder_names, stream=1)
-    #graph_utils.stitch_dataset(folder_names=folder_names, stream=2)
-    #graph_utils.stitch_dataset(folder_names=folder_names, stream=3)
-    #graph_utils.stitch_dataset(folder_names=folder_names, stream=4)
-    #done = 5/0
+
+    #Dataset creator
+    #create_datasets()
 
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
@@ -386,38 +394,45 @@ if __name__ == '__main__':
     #ablation folder is "big/test"
     start = time.time()
     run_model(dataset_types= [1], hcf=False,
-           batch_size = 64, epochs = 150, folder="big/no_sub_3_stream", save =None, load=None, leave_one_out =False, multi_dim=False)#
+           batch_size = 64, epochs = 80, folder="big/Scale_0_Norm_0_Subtr_0/no_sub_3_stream",
+             save =None, load=None, leave_one_out=False, multi_dim=False, num_people=13)
     end = time.time()
     print("time elapsed: ", end - start)
 
-    #todo
-    #Just do leave-one-out cross validation on batches, not people. Nothing in the use-case implies that person invariance is necessary, if anything it only has to work on a single
-    #worth of data reliably
+    #Save all outputs to files for f1 calcs etc
+    
+    #Need comparisons between (all dummy, all bone + vels so comb data ) 1 day
+        # None, 6 person: Epoch  20 | Train Loss: 0.10 | Train Acc: 98.14% | Val Loss: 0.16 | Val Acc: 95.39%
+                            #Test Loss: 0.14 | Test Acc: 96.02%
+        #14 person
+        #scaling, 6 person: Epoch  20 | Train Loss: 0.04 | Train Acc: 99.67% | Val Loss: 0.08 | Val Acc: 98.03%
+                            #Test Loss: 0.08 | Test Acc: 98.19%
+    
+        # scaling + norm, 6 person: 
+        # scaling + norm + subtraction 6 person: 
 
-    #Bone + vel is far more consistent 
-
-    #Need comparisons between (all dummy)
-        # scaling,
-        # scaling + norm,
-        # scaling + norm + subtraction
-
-    #So my best version: bone + vel needs to compete with: (all early-fusion)
+    #So my best version: bone + vel needs to compete with: (all early-fusion) (w best of scaling, norm and subtraction) (1 day)
         #rel 
         #vel
         #bone
-        #rel + vel + bone
-        #rel + vel
+        #rel + vel ( need to make new one for this specially)
+        #vel + bone
     
-    #Then my best version of these needs to be tested with
+    #Then my best version of these needs to be tested with (bone + vel, scaling norm and subtr) (1 day)
         #st-gcn (just a different model)
         #st-jagcn (early fusion)
         #2-st-gcn (2 separate streams)
         #Mine
     
-    #Then my results on best version have to compete with
+    #Then my results on best version have to compete with (1 week)
         #Azure datasets
+            #normal
+            #leave-one-out
         #Foot platform dataset
+            #normal
+            # leave one out
     
+    #DONE
     #Then I need one ablation to make sure it generalizes to different ailments for each person
-        #Results are: 
+        #Results are: 50% on 3 person, 55% on 4 people, 57% on 5 people 61.2% on 13 people (leaving one out) 
         

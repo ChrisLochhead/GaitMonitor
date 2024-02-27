@@ -667,10 +667,10 @@ def subtract_skeleton(rel_data, joint_output, base_output):
                 if k> 5:
                     #Check if coord and overlay[j][k] are within a radius of eachother, ignoring the first 10
                     try:
-                        if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 15):# results were on 50. minor was 15
+                        if check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 10):
                             #print("detected within raidus: ", coord, overlay_sequence[j][k])
-                            #rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
-                            nothing = 0
+                            rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
+                            #nothing = 0
                     except:
                         pass
         if i % 60 == 0 and i != 0:

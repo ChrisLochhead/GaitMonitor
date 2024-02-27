@@ -107,7 +107,6 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         test_score.append(tests[-1])
         end = time.time()
         print("time elapsed: ",fold,  end - start)
-        break
 
     #print("final confusion: ")
     #print(confusion_matrix(total_ys, total_preds))
@@ -145,10 +144,10 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size,
 
     for epoch in range(epochs + 1):
         #Reduce by 0.1 times at 10th and 60th epoch
-        if epoch == 40:
+        if epoch == 20:
             #print("reducing learing rate")
             optimizer.param_groups[0]['lr'] = 0.01
-        elif epoch == 80:
+        elif epoch == 60:
             #print("reducing learning rate again")
             optimizer.param_groups[0]['lr'] = 0.001
 
@@ -182,7 +181,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size,
         val_accs.append(val_acc)
 
         # Print metrics every 10 epochs
-        if (epoch % 1 == 0):
+        if (epoch % 5 == 0):
             print(f'Epoch {epoch:>3} | Train Loss: {total_loss:.2f} '
                 f'| Train Acc: {acc * 100:>5.2f}% '
                 f'| Val Loss: {val_loss:.2f} '
