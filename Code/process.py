@@ -370,7 +370,6 @@ def create_datasets():
     graph_utils.stitch_dataset(folder_names=folder_names, stream=4)
     done = 5/0
 
-
 if __name__ == '__main__':
 
     #Dataset creator
@@ -394,7 +393,7 @@ if __name__ == '__main__':
     #ablation folder is "big/test"
     start = time.time()
     run_model(dataset_types= [1], hcf=False,
-           batch_size = 64, epochs = 80, folder="big/Scale_0_Norm_0_Subtr_0/no_sub_3_stream",
+           batch_size = 128, epochs = 80, folder="big/Scale_1_Norm_1_Subtr_1/no_sub_3_stream",
              save =None, load=None, leave_one_out=False, multi_dim=False, num_people=13)
     end = time.time()
     print("time elapsed: ", end - start)
@@ -402,17 +401,12 @@ if __name__ == '__main__':
     #Save all outputs to files for f1 calcs etc
     
     #Need comparisons between (all dummy, all bone + vels so comb data ) 1 day
-        # None, 6 person: Epoch  20 | Train Loss: 0.10 | Train Acc: 98.14% | Val Loss: 0.16 | Val Acc: 95.39%
-                            #Test Loss: 0.14 | Test Acc: 96.02%
-        #14 person
-        #scaling, 6 person: Epoch  20 | Train Loss: 0.04 | Train Acc: 99.67% | Val Loss: 0.08 | Val Acc: 98.03%
-                            #Test Loss: 0.08 | Test Acc: 98.19%
-    
+        #none
         # scaling + norm, 6 person: 
         # scaling + norm + subtraction 6 person: 
 
     #So my best version: bone + vel needs to compete with: (all early-fusion) (w best of scaling, norm and subtraction) (1 day)
-        #rel 
+        #rel: doing now:
         #vel
         #bone
         #rel + vel ( need to make new one for this specially)

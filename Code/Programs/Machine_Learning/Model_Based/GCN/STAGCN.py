@@ -193,7 +193,7 @@ class STAGCNBlock(torch.nn.Module):
         return x
 
 class GraphNetwork(torch.nn.Module):
-    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 3, stgcn_filters = [64, 128, 256], 
+    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 3, stgcn_filters = [64, 64, 128], 
                  max_cycle = 49, num_nodes_per_graph = 18, device = 'cuda', type = 0):
         super(GraphNetwork, self).__init__()
 
