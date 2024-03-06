@@ -337,10 +337,14 @@ def stitch_dataset(folder_names, stream = 1):
         file_name = '/rel_data'
     elif stream == 2: # bone
         file_name = '/bone_data'
-    elif stream == 3: # all 
+    elif stream == 3: # vel bone
         file_name = '/comb_data'
-    else: # vel
+    elif stream == 4: # vel
         file_name = '/vel_data'
+    elif stream == 5: #rel vel 
+        file_name = '/comb_data_rel_vel'
+    elif stream == 6: #rel vel bone
+        file_name = '/comb_data_rel_vel_bone'
 
 
     datasets = load_whole_dataset(folder_names, file_name)

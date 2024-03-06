@@ -108,33 +108,63 @@ class STAGCNBlock(torch.nn.Module):
     def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, spatial_size, device, first = False):
         super(STAGCNBlock, self).__init__()
         #Layers
+        self.first = first
         if first:
             self.b0 = BatchNorm1d(in_channels).to(device) 
             #self.spatial_conv = GraphConv(in_channels, int(dim_h*2)).to(device) 
-            #self.spatial_conv = GATv2Conv(in_channels, dim_h, heads=2).to(device)
-            self.spatial_conv = ChebConv(in_channels, int(dim_h*2), 1).to(device)
+            self.spatial_conv = GATv2Conv(in_channels, dim_h, heads=2).to(device)
+            #self.spatial_conv = ChebConv(in_channels, int(dim_h*2), 1).to(device)
             self.skip_connection = torch.nn.Conv1d(in_channels, int(dim_h*2), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
             #self.temp_att = GATv2Conv(int(dim_h*2), int(dim_h*2), heads=1).to(device)
         else:
             self.b0 = BatchNorm1d(int(in_channels * 2)).to(device)  
-            self.spatial_conv = ChebConv(int(in_channels*2), int(dim_h*2), 1).to(device) 
-            #NORMAL ST-GCN AND AGCN
-            #self.spatial_conv = GATv2Conv(int(in_channels*2), int(dim_h*2), heads=1).to(device) 
-            #Temporal ST-AAGCN
+            #no attention, remove * 2 for gait graph
+            self.spatial_conv = ChebConv(int(in_channels ), int(dim_h), 1).to(device) 
+            #spatial attention
             #self.spatial_conv = GATv2Conv(int(in_channels*2), int(dim_h*2), heads=1).to(device) 
 
             self.skip_connection = torch.nn.Conv1d(int(in_channels*2), int(dim_h*2), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)           
         
+
         #For ablation studies
         #self.temp_att = GATv2Conv(int(dim_h*2), int(dim_h*2), heads=1).to(device)
         #self.temp_att2 = GATv2Conv(int(dim_h*2), int(dim_h*2), heads=1).to(device)
+            
+        #for Gaitgraph2
+        check = dim_h == int(in_channels *2)
+        if check:
+            dim_h = int(dim_h/2)
+
+        self.spatial_bottleneck = ChebConv(int(in_channels*2), int(dim_h), 1).to(device)
+        self.spatial_expand = ChebConv(int(int(dim_h)), int(dim_h*2), 1).to(device)            
+        self.temporal_bottleneck = ChebConv(int(dim_h*2), int(int(dim_h)), 1).to(device)
+        self.temporal_expand = ChebConv(int(dim_h), int(dim_h*2), 1).to(device)
+              
+        #custom ST-GCN
+        #self.spatial_conv_2 = ChebConv(int(dim_h*2), int(dim_h*2), 1).to(device)
+
+        #regular st-gcn temporal
+        if self.first:
+            self.temp_att = ChebConv(int(dim_h*2), int(dim_h*2), 1).to(device)
+            self.temp_att2 = ChebConv(int(dim_h*2), int(dim_h*2), 1).to(device)
+        else:
+            self.temp_att = ChebConv(int(dim_h), int(dim_h), 1).to(device)
+            self.temp_att2 = ChebConv(int(dim_h), int(dim_h), 1).to(device)           
         
-        self.temp_att = AGNNConv(int(dim_h*2), int(dim_h*2)).to(device)
-        self.temp_att2 = AGNNConv(int(dim_h*2), int(dim_h*2)).to(device)
+        #ST-TAGCN
+        #self.temp_att = AGNNConv(int(dim_h*2), int(dim_h*2)).to(device)
+        #self.temp_att2 = AGNNConv(int(dim_h*2), int(dim_h*2)).to(device)
 
         double_dim = int(dim_h * 2)
 
-        self.b1 = BatchNorm1d(double_dim).to(device)
+        #gait graph comments
+        if first:
+            self.b1 = BatchNorm1d(double_dim).to(device)
+        else:
+            if check:
+                self.b1 = BatchNorm1d(int(dim_h*2)).to(device)
+            else:
+                self.b1 = BatchNorm1d(int(dim_h)).to(device)
         self.b2 = BatchNorm1d(cycle_size).to(device)
         self.b3 = BatchNorm1d(int(dim_h)).to(device)
         #Used only in st-aagcn, this compensates for the removal of a normal layer to be replaced with the attention layer on the conv layer
@@ -160,40 +190,70 @@ class STAGCNBlock(torch.nn.Module):
 
         #Convert to 2D representation for GAT layer (Batch * Cycle, Channel)
         x = x.view(x.shape[2] * x.shape[0], x.shape[1])
+        #only gaitgraph 2
+        #print("before bottleneck 1: ", x.shape, self.spatial_bottleneck)
+        if self.first == False:
+           #print("bottle necking")
+            x = self.spatial_bottleneck(x, edge_index)
+        #print("after bottleneck 1: ", x.shape)
         #Apply standard spatial convolution
+        #print("spatial conv: ", self.spatial_conv)
         x = self.relu(self.b1(self.spatial_conv(x, edge_index)))
+        #print("after spatial 1: ", x.shape)
+
+        #only cust_st-gcn
+        #x = self.relu(self.b1(self.spatial_conv_2(x, edge_index)))   
+
+        #only gaitgraph2
+        if self.first == False:
+            #print("expanding")
+            x = self.spatial_expand(x, edge_index)
+        #print("after expand 1: ", x.shape)
+        #print("x: ", residual.shape)
+        x = x.view(self.batch_size, x.shape[1], self.cycle_size)
+        x = residual + x
+        x = x.view(x.shape[2] * x.shape[0], x.shape[1])
 
         #ST-AAGCN only: apply spatial attention
         #x = self.relu(self.b1(self.temp_att(x, edge_index)))
 
-        #Switch to temporal format (keep channels for the residual)
+        #Switch to temporal format (keep channels for the residual) maybe not needed
         x = x.view(self.batch_size, x.shape[1], self.cycle_size)
-        orig_shape = x.shape
-        #residual = x
-        #change channels for the temporal convolution
         x = x.view(self.batch_size, self.cycle_size, -1)
-
-        #Apply temporal convolution
-        #x = self.relu(self.b2(self.temporal_conv2(x)))
-        #x = x.view(orig_shape[0], orig_shape[1], orig_shape[2])
 
         #ST-AAGCN W temp only
         #Put it back into 2 dims
         x = x.view(x.shape[1] * x.shape[0], x.shape[2])
+
+        #only gaitgraph2
+        #print("before bottleneck 2: ", x.shape)
+        if self.first == False:
+           x = self.temporal_bottleneck(x, edge_index)
+        #print("after bottleneck 2: ", x.shape)
+
         #Convolve w/attention in the temporal direction
         x = self.relu(self.b1(self.temp_att2(x, edge_index)))
+
+        #print("before expand 2: ", x.shape)
+        #only gaitgraph2
+        if self.first == False:
+            #print("expanding 2: ", x.shape)
+            x = self.temporal_expand(x, edge_index)
+        #print("after expand 2: ", x.shape)
+
         #Restore to temporal shape
         x = x.view(self.batch_size, x.shape[1], self.cycle_size)
-
 
         #Apply dropout and residual
         x = residual + x
         x = self.dropout(x)
+        #print("layer done \n\n")
+
         #print("done", x.shape)
         return x
 
 class GraphNetwork(torch.nn.Module):
-    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 3, stgcn_filters = [64, 64, 128], 
+    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 3, stgcn_filters = [128, 128, 128, 128], 
                  max_cycle = 49, num_nodes_per_graph = 18, device = 'cuda', type = 0):
         super(GraphNetwork, self).__init__()
 
@@ -212,7 +272,6 @@ class GraphNetwork(torch.nn.Module):
         self.device = device
         #0 = GAT, 1=ST-GCN, 2=ST-AGCN
         self.model_type = type
-        
 
         #Two sub-streams: the first contains the sequences that each input stream goes through,
         #the second is the single combined stream 

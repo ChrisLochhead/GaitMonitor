@@ -161,8 +161,12 @@ def process_data(folder = "Chris", run_ims = False, norm_joints = True, scale_jo
     joint_bones_data, bone_dum_data = generate_single_stream_dataset(folder, joint_bones_data, prefix='bone', subtr=subtract)
 
     #Combine datasets
+    Creator.combine_datasets(rel_dum_data, vel_dum_data, None, image_data,
+                                            joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data_rel_vel")
+    Creator.combine_datasets(rel_dum_data, vel_dum_data, bone_dum_data, image_data,
+                                            joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data_rel_vel_bone")
     Creator.combine_datasets(vel_dum_data, bone_dum_data, None, image_data,
-                                             joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data")
+                                             joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data_bone_vel")
 
 
 def load_datasets(types, folder, multi_dim = False, num_people = 3):
@@ -192,10 +196,36 @@ def load_datasets(types, folder, multi_dim = False, num_people = 3):
         print("loading dataset {} of {}. ".format(i + 1, len(types)), t)
         #Type 1: Normal, full dataset
         if t == 1:  
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + f'/{num_people}_people', 
-                                                    f'{num_people}_people.csv',             
-                                                     joint_connections=Render.joint_connections_n_head))      
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/Relative_Data', 
+                                        'Relative_Data.csv',             
+                                            joint_connections=Render.joint_connections_n_head))   
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/Velocity_Data', 
+            #                                        'Velocity_Data.csv',             
+            #                                         joint_connections=Render.joint_connections_n_head))      
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/Bones_Data', 
+            #                                        'Bones_Data.csv',             
+            #                                         joint_connections=Render.joint_connections_n_head))   
+            #2s ST-GCN
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "no_sub_1_stream" + f'/{num_people}_people', 
+            #                            f'{num_people}_people.csv',             
+            #                                joint_connections=Render.joint_connections_n_head))      
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "no_sub_4_stream"+ f'/{num_people}_people', 
+            #                            f'{num_people}_people.csv',             
+            #                                joint_connections=Render.joint_connections_n_head))     
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "no_sub_2_stream"+ f'/{num_people}_people', 
+            #                            f'{num_people}_people.csv',             
+            #                                joint_connections=Render.joint_connections_n_head))     
 
+            #9d
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "/multi_dim_1_13/", 
+            #                'multi_dim_1_13.csv',             
+            #                    joint_connections=Render.joint_connections_n_head))   
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "/multi_dim_2_13/", 
+            #    'multi_dim_2_13.csv',             
+            #        joint_connections=Render.joint_connections_n_head))   
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "/multi_dim_3_13/", 
+            #    'multi_dim_3_13.csv',             
+            #        joint_connections=Render.joint_connections_n_head))   
         #Type 2: HCF dataset (unused)
         elif t == 2:
             #This MUST have cycles, there's no non-cycles option
@@ -284,7 +314,7 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
 
     dim_out = 3
     if multi_dim:
-        dim_out = 9
+        dim_out = 6
     print("\nCreating {} datasets: ".format(len(datasets)))
     print("going in: ", datasets[0].num_node_features)
     model = stgcn.GraphNetwork(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=dim_out, n_inputs=num_datasets,
@@ -356,25 +386,77 @@ def convert_to_video(image_folder, output, file, depth = False):
     if d_video:
         d_video.release()
 
+def convert_to_9_class(data, joint_output):
+    data, _ = Utilities.process_data_input(data, None)
+    new_data = []
+    for i, row in enumerate(data):
+        #check row 2, 3 and 4 and place answer in row 2
+        if row[2] == 0 and row[3] == 0 and row[4] == 0:
+            row[2] = 0
+        elif row[2] == 0 and row[3] == 1 and row[4] == 0:
+            row[2] = 1
+        elif row[2] == 0 and row[3] == 0 and row[4] == 1:
+            row[2] = 2
+        
+        elif row[2] == 1 and row[3] == 0 and row[4] == 0:
+            row[2] = 3
+        elif row[2] == 1 and row[3] == 1 and row[4] == 0:
+            row[2] = 4
+        elif row[2] == 1 and row[3] == 0 and row[4] == 1:
+            row[2] = 5
 
-def create_datasets():
+        elif row[2] == 2 and row[3] == 0 and row[4] == 0:
+            row[2] = 6
+        elif row[2] == 2 and row[3] == 1 and row[4] == 0:
+            row[2] = 7
+        elif row[2] == 2 and row[3] == 0 and row[4] == 1:
+            row[2] = 8
+
+        new_data.append(row)
+    
+    Utilities.save_dataset(new_data, joint_output)
+
+def create_datasets(streams = [1,2,3,4,5,6]):
         #Assign person numbers and uniform instance counts:
     folder_names = ['ahmed', 'Amy', 'Anna', 'bob', 'cade', 'emma', 'erin', 
                     'grant', 'pheobe', 'scarlett', 'sean c', 'sean g', 'wanok']
     for p in folder_names:
         #Current run: 0, 0, 0
         process_data(p, run_ims=False, norm_joints=True, scale_joints=True, subtract=True)
-    graph_utils.stitch_dataset(folder_names=folder_names, stream=1)
-    graph_utils.stitch_dataset(folder_names=folder_names, stream=2)
-    graph_utils.stitch_dataset(folder_names=folder_names, stream=3)
-    graph_utils.stitch_dataset(folder_names=folder_names, stream=4)
-    done = 5/0
+    
+    for s in streams:
+        graph_utils.stitch_dataset(folder_names=folder_names, stream=s)
 
+def make_comb(folder, rel_path, vel_path, bone_path):
+    rel, _ = Utilities.process_data_input(rel_path, None)
+    vel, _ = Utilities.process_data_input(vel_path, None)
+    bone, _ = Utilities.process_data_input(bone_path, None)
+
+    Creator.combine_datasets(rel, vel, bone, None,
+                                                joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data_rel_vel_bone")
+    
+    Creator.combine_datasets(rel, vel, None, None,
+                                                joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data_rel_vel")
 if __name__ == '__main__':
+
+    #make 9d
+    #convert_to_9_class('./code/datasets/joint_data/big/Scale_1_Norm_1_Subtr_1/no_Sub_4_stream/13_people/raw/13_people.csv',
+     #                  "./Code/Datasets/Joint_Data/big/Scale_1_Norm_1_Subtr_1/multi_dim_3_13" )
+    #stop = 5/0
 
     #Dataset creator
     #create_datasets()
+    folder_names = ['ahmed', 'Amy', 'Anna', 'bob', 'cade', 'emma', 'erin', 
+                    'grant', 'pheobe', 'scarlett', 'sean c', 'sean g', 'wanok']
+    
+    #for f in folder_names:
+    #    make_comb(f, './code/datasets/joint_data/' + str(f) + "/rel_data/raw/rel_data.csv",
+    #              './code/datasets/joint_data/' + str(f) + "/vel_data/raw/vel_data.csv",
+    #                './code/datasets/joint_data/' + str(f) + "/bone_data/raw/bone_data.csv"  )
 
+    #graph_utils.stitch_dataset(folder_names, stream = 5)
+    #graph_utils.stitch_dataset(folder_names, stream = 6)
+    #stop = 5/0
     #Run the model:
     #Dataset types: Array of types for the datasets you want to pass through at the same time
     #   1: normal full body 9D dataset
@@ -390,32 +472,29 @@ if __name__ == '__main__':
     #Person: full dataset only, denotes which person to extract otherwise 0 or none.
     #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
 
-    #ablation folder is "big/test"
+    #WHAT AM I DOING:Cust-stgcn, then gaitgraph2 (switch to 3 streams)
+
+    #paper: add new numbers to tables, shorten to 14 pages, done :)
     start = time.time()
     run_model(dataset_types= [1], hcf=False,
-           batch_size = 128, epochs = 80, folder="big/Scale_1_Norm_1_Subtr_1/no_sub_3_stream",
-             save =None, load=None, leave_one_out=False, multi_dim=False, num_people=13)
+            batch_size = 128, epochs = 80, folder="path",
+            save =None, load=None, leave_one_out=False, multi_dim=True, num_people=13)
     end = time.time()
     print("time elapsed: ", end - start)
 
     #Save all outputs to files for f1 calcs etc
     
-    #Need comparisons between (all dummy, all bone + vels so comb data ) 1 day
-        #none
-        # scaling + norm, 6 person: 
-        # scaling + norm + subtraction 6 person: 
-
     #So my best version: bone + vel needs to compete with: (all early-fusion) (w best of scaling, norm and subtraction) (1 day)
-        #rel: doing now:
-        #vel
-        #bone
-        #rel + vel ( need to make new one for this specially)
-        #vel + bone
+        #2-stream but with st-tagcn (rel + vel)
+        #3-stream but with st-tagcn (rel + vel + bone )
     
     #Then my best version of these needs to be tested with (bone + vel, scaling norm and subtr) (1 day)
+        #Resnet
+        #SVM
+        #KNN
         #st-gcn (just a different model)
-        #st-jagcn (early fusion)
-        #2-st-gcn (2 separate streams)
+        #st-jagcn (early fusion rel + vel + bone)
+        #2-st-gcn (2 separate streams rel + vel using st-gcn)
         #Mine
     
     #Then my results on best version have to compete with (1 week)
