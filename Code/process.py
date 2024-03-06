@@ -1,10 +1,10 @@
-from Programs.Data_Processing.Model_Based.Demo import *
-import Programs.Data_Processing.Model_Based.Dataset_Creator as Creator
-import Programs.Machine_Learning.Model_Based.GCN.Dataset_Obj as Dataset_Obj
-import Programs.Data_Processing.Model_Based.Render as Render
-import Programs.Machine_Learning.Model_Based.GCN.GAT as gat
-import Programs.Machine_Learning.Model_Based.GCN.STAGCN as stgcn
-import Programs.Machine_Learning.Model_Based.GCN.Utilities as graph_utils
+from Programs.Data_Processing.Demo import *
+import Programs.Data_Processing.Dataset_Creator as Creator
+import Programs.Machine_Learning.GCN.Dataset_Obj as Dataset_Obj
+import Programs.Data_Processing.Render as Render
+import Programs.Machine_Learning.GCN.GAT as gat
+import Programs.Machine_Learning.GCN.STAGCN as stgcn
+import Programs.Machine_Learning.GCN.Utilities as graph_utils
 
 import time
 import random
@@ -74,8 +74,10 @@ def process_joint_normalization(folder, abs_joint_data, image_data, scale_joints
     See Also
     --------
     This function is not called during normalization ablations studies.
-    '''
+    ''' 
+    print("lens: ", len(image_data), len(abs_joint_data))
     if norm_joints:
+        Render.render_joints_series(image_data, abs_joint_data, 10, True)
         abs_joint_data = Creator.create_normalized_dataset(abs_joint_data, image_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(norm)")
     if scale_joints:
         abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, None, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
@@ -137,6 +139,7 @@ def process_data(folder = "Chris", run_ims = False, norm_joints = True, scale_jo
     else:
         abs_joint_data, image_data = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)/raw/3_Absolute_Data(trimmed instances).csv",
                                                               "./Code/Datasets/Individuals/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
+    
     #Add the mid-hip joint
     abs_joint_data = Creator.append_midhip(abs_joint_data, image_data, 
                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(midhip)")
@@ -445,6 +448,7 @@ if __name__ == '__main__':
     #stop = 5/0
 
     #Dataset creator
+    process_data("Anna")
     #create_datasets()
     folder_names = ['ahmed', 'Amy', 'Anna', 'bob', 'cade', 'emma', 'erin', 
                     'grant', 'pheobe', 'scarlett', 'sean c', 'sean g', 'wanok']
