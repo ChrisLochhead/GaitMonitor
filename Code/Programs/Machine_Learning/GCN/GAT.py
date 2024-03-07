@@ -1,11 +1,17 @@
+'''
+Graph Attention Network implementation
+'''
+#imports
 import torch
 from torch.nn import Linear
 import torch.nn.functional as F
 from torch_geometric.nn import global_add_pool, GATv2Conv
-from torch.nn import Linear, BatchNorm1d, AvgPool1d
+from torch.nn import Linear, BatchNorm1d
+#dependencies
 from Programs.Machine_Learning.GCN.Dataset_Obj import *
 
 class GATResNetBlock(torch.nn.Module):
+    '''Individual GAT block '''
     def __init__(self, dim_in, dim_h, dim_out, heads = [1,1]):
         super(GATResNetBlock, self).__init__()
         self.gat1 = GATv2Conv(dim_in, dim_h, heads=heads[0])
@@ -44,7 +50,6 @@ class MultiInputGAT(torch.nn.Module):
             i_stream = []
             if i == len(range(self.num_inputs)) - 1 and self.hcf == True:
                 print("Building HCF module: ,", i, dim_in) # This is a normal linear net for HCF data without graphical structure
-                
                 i_stream.append(Linear(dim_in[i], dim_h))
                 i_stream.append(BatchNorm1d(dim_h))
                 i_stream.append(Linear(dim_h, dim_half))
@@ -67,7 +72,6 @@ class MultiInputGAT(torch.nn.Module):
                 self.streams[i][j] = self.streams[i][j].to("cuda")
         
         print("number of streams built: ", len(self.streams))
-
         #Extra linear layer to compensate for more data
         total_num_layers = len(self.streams)
         if self.hcf:
@@ -79,7 +83,6 @@ class MultiInputGAT(torch.nn.Module):
         #HCF only concatenates the last (or smallest) hidden layer, GAT convs take all 4 layers
         if self.hcf:
             linear_input += dim_8th
-
         self.lin1 = Linear(40, 128)
         self.m1 = BatchNorm1d(128)
         self.lin2 = Linear(128, 64)
@@ -93,10 +96,8 @@ class MultiInputGAT(torch.nn.Module):
             if edge_indices[i] is not None:
                 edge_indices[i] = edge_indices[i].to("cuda")
             batches[i] = batches[i].to("cuda")
-
         hidden_layers = []
         h = data[i]
-
         for stream_no, stream in enumerate(self.streams):
             h = data[stream_no]
             hidden_layer_stream = []
@@ -105,22 +106,16 @@ class MultiInputGAT(torch.nn.Module):
                 if i % 2 == 0:
                     #This is the usual convolution block #if hcf, this is just a linear layer
                     if stream_no == len(self.streams) - 1 and self.hcf:
-                        #print("hcf layer: ", layer, i, self.hcf, h.shape)
                         h = F.relu(layer(h))
                     else:
-                        #print("GAT layer: ", layer, i, self.hcf, h.shape)
                         h = F.relu(layer(h, edge_indices[stream_no]))
-                   
                     #Dropout always the next one
                     h = F.dropout(h, p=0.3, training=train)
-
-
                     if self.hcf and stream_no + 1 == len(self.streams):
                         if i == len(stream) - 2:
                             hidden_layer_stream.append(h)
                     else:
                         hidden_layer_stream.append(h)
-
             hidden_layers.append(hidden_layer_stream)
             
         #After the stream is done, concatenate each streams layers
@@ -137,7 +132,5 @@ class MultiInputGAT(torch.nn.Module):
         h = F.dropout(h, p=0.5, training=train)
         h = F.relu(self.lin2(h))
         h = self.m2(h)
-        #h = F.dropout(h, p=0.1, training=train)
         h = self.lin3(h)
-
         return h

@@ -1,7 +1,12 @@
+'''
+GCN implementation
+'''
+#imports
 import torch
 from torch.nn import Linear
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, global_add_pool
+#dependencies
 from Programs.Machine_Learning.GCN.Dataset_Obj import *
 
 class GCN(torch.nn.Module):
@@ -21,14 +26,11 @@ class GCN(torch.nn.Module):
         x = x.to("cuda")
         edge_index = edge_index.to("cuda")
         batch = batch.to("cuda")
-        print("X SHAPE; ", x.shape)
         h1 = F.dropout(x, p=0.6, training=self.training)
         h1 = F.relu(self.gcn1(h1, edge_index))
-        print("h1 shape here, ", h1.shape)
         h2 = F.dropout(h1, p=0.6, training=self.training)
         h2 = F.relu(self.gcn2(h2, edge_index))
 
-        print("h1 and 2: ", h1.shape, h2.shape)
         # Graph-level readout
         h1 = global_add_pool(h1, batch)
         h2 = global_add_pool(h2, batch)
@@ -36,7 +38,6 @@ class GCN(torch.nn.Module):
         h = torch.cat((h1, h2), dim=1)
 
         # Classifier
-        print("H dimensions: ", h.shape)
         h = self.lin1(h)
         h = h.relu()
         h = F.dropout(h, p=0.5, training=self.training)

@@ -1,3 +1,7 @@
+'''
+This contains the class containing all datasets used in this research
+'''
+#imports
 import numpy as np
 import torch
 torch.manual_seed(42)
@@ -7,11 +11,14 @@ from torch_geometric.data import Dataset
 import os
 from tqdm import tqdm
 from torchvision import transforms
+import copy
+import ast 
+
+#dependencies
 from Programs.Data_Processing.Render import joint_connections_m_hip
 from Programs.Machine_Learning.GCN.Utilities import get_gait_segments
 import Programs.Data_Processing.HCF as HCF
-import copy
-import ast 
+
 
 class JointDataset(Dataset):
     def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = joint_connections_m_hip,
@@ -56,21 +63,32 @@ class JointDataset(Dataset):
 
     def download(self):
         pass
-               
+    
+
     def set_gait_cycles(self, data):
+        '''
+        Sets an unsegmented set of joints to the same shape as an already segmented set of gait cycles
+
+        Arguments
+        ---------
+        data: List(List)
+            unsegmented joint data       
+        Returns
+        -------
+        List(List())
+            The original data in the shape of the preset gait cycles.
+        '''
         new_cycles = []
         data_iter = 0
         total_size_of_preset = 0
         for c in self.preset_cycle:
             total_size_of_preset += len(c)
-        
         for i, cycle in enumerate(self.preset_cycle):
             new_cycle = []
             for j, frame in enumerate(cycle):
                 new_cycle.append(data[data_iter])
                 data_iter += 1
             new_cycles.append(new_cycle)
-        
         return new_cycles
 
     def process(self):

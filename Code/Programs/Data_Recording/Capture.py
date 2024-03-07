@@ -1,19 +1,21 @@
-from glob import glob
-from pickle import TRUE
+'''
+Controls all sub-routines related to recording and saving instances of gait walking
+'''
+#imports
 import pyrealsense2 as rs
 import os
 import time
 import cv2
 import numpy as np
-import Programs.Data_Recording.JetsonYolo_Main.models.JetsonYolo as JetsonYolo
-from PIL import Image
-from pynput.keyboard import Key, Listener, KeyCode
-import os
-import copy
-import Programs.Data_Processing.File_Decimation as File_Decimation
-#import File_Decimation
 import datetime
 import csv
+import copy
+from PIL import Image
+from pynput.keyboard import Listener
+#dependencies
+import Programs.Data_Recording.JetsonYolo_Main.models.JetsonYolo as JetsonYolo
+import Programs.Data_Processing.File_Decimation as File_Decimation
+
 
 break_program = False
 pause_program = False 
@@ -38,7 +40,6 @@ def on_press(key):
             break_program = True
         
 class Camera:
-
     def __init__(self, depth = True):
         global break_program
         break_program = False
@@ -135,7 +136,6 @@ class Camera:
 
         with Listener(on_press=on_press) as listener:
             while break_program == False:
-                
                 #Check if time is appropriate for monitoring
                 now = datetime.datetime.now()
                 morning_limit = now.replace(hour=8, minute=0, second=0, microsecond=0)
@@ -143,7 +143,6 @@ class Camera:
                 if now < morning_limit or now > evening_limit:
                     pause_program = True
                     break_program = True
-
                 #Check if data overloaded and if so conduct a purge
                 if self.file_count >= self.file_limit:
                     #Purge and upload data
@@ -153,7 +152,6 @@ class Camera:
 
                 #Record if previous frame seen a human
                 seen_human_previous = seen_human
-
                 # Wait for a coherent pair of frames: depth and color
                 if depth:
                     color_img, col_only, dep_only = self.retrieve_image()
@@ -165,14 +163,11 @@ class Camera:
                     refined_img = Image.fromarray(col_only)
                 else:
                     refined_img = Image.fromarray(color_img)
-                    
                 refined_img = refined_img.resize((480, 480))
-
 
                 #Only scan for humans every 3 frames, or 5 seconds after a human was detected.
                 if verbose > 0:
                     if i%3 == 0 and record_timer == 0.0 or time.time() - record_timer >= 10.0:
-                        
                         print(c_colours.GREEN + "Searching for Humans")
                         #Get humans
                         objs = JetsonYolo.get_objs_from_frame(np.asarray(refined_img), False)
@@ -212,7 +207,6 @@ class Camera:
                         debug_img, not_used = JetsonYolo.plot_obj_bounds(objs, np.asarray(refined_img))
 
                 refined_img = np.asarray(debug_img)
-
                 i += 1
                 #Print FPS
                 if i%10 == 0 and verbose > 0:

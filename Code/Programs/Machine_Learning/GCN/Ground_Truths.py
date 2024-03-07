@@ -7,7 +7,7 @@ import csv
 import math
 
 from Programs.Machine_Learning.GCN.Dataset_Obj import *
-from Programs.Machine_Learning.GCN.Render import *
+#from Programs.Machine_Learning.GCN.Render import *
 
 def render_joints(image, joints, delay = False, use_depth = True, metadata = 3, colour = (255, 0, 0)):
     tmp_image = copy.deepcopy(image)
