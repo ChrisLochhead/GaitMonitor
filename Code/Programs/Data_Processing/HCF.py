@@ -1,67 +1,27 @@
+'''
+This file contains all functions related to generating hand-crafted features.
+'''
+#imports
 import copy
 import math
 import numpy as np
 import random
 import matplotlib.pyplot as plt
-import Programs.Data_Processing.Render as Render
-
-
-def split_by_instance(joint_data, pad = True):
-
-    #Find longest instance first:
-    max_instance_length = 0
-    for row in joint_data:
-        if row[1] > max_instance_length:
-            max_instance_length = row[1]
-
-    #print("max length: ", max_instance_length)
-
-    #set padded sequences to 40 unless there's examples that are bigger, otherwise set it to that.
-    std_inst_length = 40
-    if max_instance_length >= std_inst_length:
-        std_inst_length = max_instance_length
-
-    gait_cycles = []
-    current_cycle = []
-    current_instance = joint_data[0][0]
-    for row in joint_data:
-        if row[0] == current_instance:
-            current_cycle.append(row)
-        else:
-            current_instance = row[0]
-            if len(current_cycle) < std_inst_length:
-                zero_row = copy.deepcopy(current_cycle[-1])
-                for i, c in enumerate(zero_row):
-                    if i > 5:
-                        zero_row[i] = list(np.zeros(len(c)))
-                
-                if pad:
-                    while len(current_cycle) < std_inst_length:
-                        current_cycle.append(zero_row)
-
-                #Appending gait cycle
-                gait_cycles.append(copy.deepcopy(current_cycle))
-                current_cycle = []
-    
-    #Appending final gait cycle
-    while len(current_cycle) < std_inst_length:
-        current_cycle.append(zero_row)
-    
-    gait_cycles.append(copy.deepcopy(current_cycle))
-
-    #Divide cycles into 3 for more examples
-    #small_cycles = []
-    #for cycle in gait_cycles:
-    #    new_cycle_length = int(len(cycle) / 3)
-    #    print("new cycle : ", len(cycle), new_cycle_length)
-    #    small_cycles.append(cycle[0:new_cycle_length])
-    #    small_cycles.append(cycle[new_cycle_length:int(new_cycle_length * 2)])
-    #    small_cycles.append(cycle[int(new_cycle_length * 2):int(new_cycle_length * 3)])       
-    #    print("size now: ", len(small_cycles))
-
-    return gait_cycles#small_cycles
 
 def get_knee_chart_polynomial(data):
+    '''
+    Plots a knee-angle chart based on a polynomial of the knee motion over the course of the gait cycle
+
+    Arguments
+    ---------
+    data: List(List())
+        List of joints for a single sequence
+       
+    Returns
+    -------
+    List(List)
+        Returns the subtracted and dummied datasets
+    '''
     trends = []
     for i in range(len(data[0])):
         trend = np.polyfit(data[0][i], data[1][i], 3)
@@ -75,6 +35,21 @@ def get_knee_chart_polynomial(data):
     return trends
 
 def get_stride_gap(gait_cycles, images):
+    '''
+    Creates a column of gaps between the two feet at every frame in an instance
+
+    Arguments
+    ---------
+    gait cycles: List(List())
+        List of joints arranged by gait cycle
+    images: List(List())
+        List of corresponding images for debugging
+       
+    Returns
+    -------
+    List(), List()
+        Returns the stride gaps in every frame and the maximum gaps per cycle
+    '''
     stride_gaps = []
     biggest_gaps = []
     image_iter = 0
@@ -95,7 +70,20 @@ def get_stride_gap(gait_cycles, images):
 
     return stride_gaps, biggest_gaps
 
-def get_stride_lengths(rel_gait_cycles, images, gait_cycles):
+def get_stride_lengths(gait_cycles):
+    '''
+    Calcutates the lengths of each leg stride per gait cycle
+
+    Arguments
+    ---------
+    gait_cycles: List(List())
+        List of joints for a single sequence
+       
+    Returns
+    -------
+    List(), List()
+        Returns the stride lengths per-leg and ratios
+    '''
     stride_lengths = []
     stride_ratios = []
     image_iter = 0
@@ -119,9 +107,20 @@ def get_stride_lengths(rel_gait_cycles, images, gait_cycles):
 
     return stride_lengths, stride_ratios
             
+def get_speed(gait_cycles):
+    '''
+    Retrieves the average speed per gait cycle
 
-def get_speed(gait_cycles, images):
+    Arguments
+    ---------
+    gait_cycles: List(List())
+        List of joints for a single sequence
        
+    Returns
+    -------
+    List()
+        Returns a list of speeds per gait cycle
+    '''
     speeds = []
     for i, cycle in enumerate(gait_cycles):
         speed = 0
@@ -135,6 +134,23 @@ def get_speed(gait_cycles, images):
     return speeds
 
 def get_time_LofG(gait_cycles, velocity_joints, images):
+    '''
+    Retrieves the amount of time per gait cycle each leg isnt touching the ground
+
+    Arguments
+    ---------
+    gait_cycles: List(List())
+        List of joints for a single sequence
+    velocity_joints: List(List())
+        List of the corresponding velocities to each gait cycle
+    images: List(List())
+        Corresponding images for debugging
+       
+    Returns
+    -------
+    List(), List()
+        Returns a column of average time off ground and a separate list for time neither foot is moving
+    '''
     frames_off_ground_array = []
     both_not_moving_array = []
     threshold = 0.55
@@ -149,8 +165,6 @@ def get_time_LofG(gait_cycles, velocity_joints, images):
                 + abs(velocity_joints[image_iter][17][0])+ abs(velocity_joints[image_iter][17][1]+ abs(velocity_joints[image_iter][17][2]))
             right_velocity = abs(velocity_joints[image_iter][22][0]) + abs(velocity_joints[image_iter][22][1])+ abs(velocity_joints[image_iter][22][2])\
                 + abs(velocity_joints[image_iter][18][0])+ abs(velocity_joints[image_iter][18][1]+ abs(velocity_joints[image_iter][18][2]))
-
-
             #print("velocities: ", left_velocity, right_velocity)
             #Left leg moving, leg is off ground
             if left_velocity > right_velocity and left_velocity >= right_velocity + threshold:
@@ -167,16 +181,27 @@ def get_time_LofG(gait_cycles, velocity_joints, images):
                 #print("neither leg off ground")
                 frames_not_moving += 1
                 #render_joints(images[image_iter], joints, delay=True, use_depth=False, colour=(0,0, 255))
-           
             image_iter += 1
-
         frames_off_ground_array.append(copy.deepcopy(frames_off_ground))
         both_not_moving_array.append(frames_not_moving)
-    
     return frames_off_ground_array, both_not_moving_array
             
-
 def get_feet_height(gait_cycles, images):
+    '''
+    Retrieves the feet height per frame then gets the average
+
+    Arguments
+    ---------
+    gait_cycles: List(List())
+        List of joints for a single sequence
+    images: List(List())
+        Corresponding images for debugging
+       
+    Returns
+    -------
+    List()
+        Returns a list of foot heights per cycle
+    '''
     feet_heights = []  
     image_iter = 0
     for i, frame in enumerate(gait_cycles):
@@ -186,7 +211,6 @@ def get_feet_height(gait_cycles, images):
             #changing height from the ground
             total_feet_height[0] += math.dist(joints[21], joints[17])
             total_feet_height[1] += math.dist(joints[22], joints[18])
-            
             #print("feet heights: ", feet_heights, total_feet_height, len(gait_cycles))
             #render_joints(images[image_iter], joints, delay=True, use_depth=False, colour=(255,0, 0))
             image_iter += 1
@@ -196,53 +220,24 @@ def get_feet_height(gait_cycles, images):
         average_feet_height[0] = total_feet_height[0] / len(gait_cycles[i])
         average_feet_height[1] = total_feet_height[1] / len(gait_cycles[i])
         feet_heights.append(copy.deepcopy(average_feet_height))
-
     return feet_heights
 
-def get_gait_segments(joint_data):
-    print("length of data in gait segments: ", len(joint_data))
-    instances = []
-    instance = []
-    current_instance = joint_data[0][0]
-    
-    #First separate the joints into individual instances
-    for joints in joint_data:
-        #Append joints as normal
-        if joints[0] == current_instance:
-            instance.append(joints)
-        else:
-            #Only add certain persons examples
-            instances.append(copy.deepcopy(instance))
-            instance = []
-            instance.append(joints)
-            current_instance = joints[0]
-    #Add the last instance hanging off missed by the loop
-    instances.append(copy.deepcopy(instance))
-
-    division_factor = 6
-    segments = []
-    for instance in instances:
-        segment = []
-        num_in_segment = int(len(instance)/division_factor)
-
-        for i, frame in enumerate(instance):
-            if i % division_factor == 0:
-                if len(segment) >0:
-                    segments.append(copy.deepcopy(segment))
-                    segment = []
-                segment.append(frame)
-
-            else:
-                segment.append(frame)
-    
-    print("segments should be ", len(segments), len(joint_data), division_factor)
-    #done= 5/0
-    return segments
-
-
-#This will only work with relative data
 def get_gait_cycles(joint_data, images):
+    '''
+    Retrieves the gait cycles by detecting foot-crossings
 
+    Arguments
+    ---------
+    joint_data: List(List())
+        Entire joint file to be segmented into gait cycles
+    images: List(List())
+        Images for debugging
+       
+    Returns
+    -------
+    List()
+        Returns a list of joints segmented into gait cycles
+    '''
     instances = []
     instance = []
     current_instance = 0
@@ -263,21 +258,15 @@ def get_gait_cycles(joint_data, images):
     t = 0
     for d in instances:
         t += len(d)
-
     gait_cycles = []
     gait_cycle = []
-
     #For each instance
     for i, inst in enumerate(instances):
-
         found_initial_direction = False
         direction = -1
         crossovers = 0
-
         row_18_previous = -1
-
         for j, row in enumerate(inst):
-
             #Only register initial direction if they aren't equal
             if found_initial_direction == False:
                 if row[-2][1] > row[-1][1]:
@@ -286,7 +275,6 @@ def get_gait_cycles(joint_data, images):
                 elif row[-2][1] < row[-1][1]:
                     direction = 1
                     found_initial_direction = True
-
             #Check for legs mixing up in frame, only need to check one leg
             #print("gap: ", abs(row_18_previous - row[-2][1]), row_18_previous, row[-1][1])
             if abs(row_18_previous - row[-2][1]) > 50 and found_initial_direction:
@@ -295,7 +283,6 @@ def get_gait_cycles(joint_data, images):
                 row_18_previous = row[-2][1]
                 #Render.render_joints(images[j], row, delay=True, use_depth=False)
                 continue
-
             row_18_previous = row[-2][1]
             #Check if the direction matches the current movement and append as appropriate
             if row[-2][1] > row[-3][1] and direction == 0:
@@ -315,7 +302,6 @@ def get_gait_cycles(joint_data, images):
             else:
                 #There is either no cross over or the rows are totally equal, in which case just add as usual
                 gait_cycle.append(row)
-
             #row 16 is right leg at crossover point
             #print("crossover count: {} and current instance length: {}, direction: {}, row 18: {}, row 19: {} ".format(crossovers, len(gait_cycle), direction, row[18], row[19]))
             #Render.render_joints(images[j], row, delay=True, use_depth=False)
@@ -327,12 +313,10 @@ def get_gait_cycles(joint_data, images):
                 crossovers = 0
                 gait_cycles.append(copy.deepcopy(gait_cycle))
                 gait_cycle = []
-
             if len(gait_cycle) > 19:
                 crossovers = 0
                 gait_cycles.append(copy.deepcopy(gait_cycle))
                 gait_cycle = [] 
-
             #Check if we are at the end of the instance and adjust the last cycle accordingly so we dont end up with length 1 gait cycles.
             if j == len(inst):
                 #If the current gait cycle isn't at least 5 frames, just append it on to the latest one
@@ -371,14 +355,24 @@ def get_gait_cycles(joint_data, images):
 
 
 def sample_gait_cycles(data_cycles):
+    '''
+    Decimates the gait cycles so they are all of equal length
+
+    Arguments
+    ---------
+    data_cycles: List(List())
+        Joints segmented by gait cycle
+
+    Returns
+    -------
+    List(List())
+        Decimated gait cycles
+    '''
     # Find the length of the biggest sublist
     cycles = [[] for i in range(6)]
     print("len gait cycles: ", len(data_cycles))
     for cycle in data_cycles:
-        #print("cycle: ", cycle[0][2], cycle[0][0], cycle[0][1])
         cycles[cycle[0][2]].append(cycle)
-
-    print("lens: ", len(cycles[0]),len(cycles[1]),len(cycles[2]))
     for c in cycles:
         print("cycle len: ", len(c))
     #done = 5/0
@@ -388,35 +382,9 @@ def sample_gait_cycles(data_cycles):
         #cycles[i] = cycles[i][0:min_length]
         cycles[i] = random.sample(cycles[i], min_length)
     print("lens 2: ", len(cycles[0]),len(cycles[1]),len(cycles[2]))   
-    
     #Agglomerate into one list:
     gait_cycles = []
     for i, lst in enumerate(cycles):
         for j, cycle in enumerate(lst):
             gait_cycles.append(cycle)
-
     return gait_cycles
-
-def normalize_gait_cycle_lengths(data_cycles):
-    max_len = -1
-    min_len = 100000
-    for cycle in data_cycles:
-        if len(cycle) > max_len:
-            max_len = len(cycle)
-        if len(cycle) < min_len:
-            min_len = len(cycle)
-          
-    for i, c in enumerate(data_cycles):
-        if len(data_cycles[i]) < max_len:
-            diff = int(max_len - len(data_cycles[i]))
-            #Append metadata
-            dummy_frame = data_cycles[i][0]
-            #Find all coords and set them to 0 for dummy frame, leaving meta data free
-            for j, d in enumerate(dummy_frame):
-                if j > 5:
-                    for k, coord in enumerate(d):
-                        dummy_frame[j][k] = 0
-                
-            for j in range(diff):
-                data_cycles[i].append(dummy_frame)
-    return data_cycles

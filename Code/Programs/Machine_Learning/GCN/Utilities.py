@@ -300,23 +300,6 @@ def change_to_ensemble_classes():
                                                             None, cols=Utilities.colnames_nohead, ignore_depth=False)
     Creator.convert_person_to_type(joint_data, joint_output="./Code/Datasets/Joint_Data/big/2_people_Ensemble")
 
-#Split data by body part region 
-def create_regions_data(data, folder):
-    regions_data_2 = Creator.create_2_regions_dataset(data,
-                                                       joint_output="./Code/Datasets/Joint_Data/"  + str(folder)  + "/2_region", images=None)
-    regions_data_5 = Creator.create_5_regions_dataset(data, 
-                                                      joint_output="./Code/Datasets/Joint_Data/"  + str(folder)  + "/5_region", images=None)
-
-#Unfold the ensemble data
-def extract_ensemble_data():
-    joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/big/2_people/raw/2_people.csv",
-                                                            None, cols=Utilities.colnames_nohead, ignore_depth=False)
-    print("data loaded")
-    create_regions_data(joint_data, "big")
-    print("region data completed")
-    unfold_3s_dataset(joint_data, joint_output="./Code/Datasets/Joint_Data/big/2_people/raw/2_people")
-    print("unfolding completed")
-
 #Remove one individual and create their own dataset for leave one out testing
 def extract_single_person(data, joint_output, person = [0,1,2]):
     single_person = []
@@ -355,7 +338,7 @@ def stitch_dataset(folder_names, stream = 1):
         if i >= len(datasets) - 1:
             save = True
         if i > 0:
-            current_instance, whole_dataset = Creator.assign_person_number(whole_dataset, dataset, 
+            current_instance, whole_dataset = Utilities.assign_person_number(whole_dataset, dataset, 
                                                                        "./Code/Datasets/Joint_Data/Big/no_Sub_" + str(stream) + "_stream/" + str(i + 1) + "_people",
                                                                        i, current_instance)
     print("completed.")
@@ -369,3 +352,42 @@ def reduce_dataset(data, joint_output):
                     data[i][j] = ""
                     
     Utilities.save_dataset(data, joint_output)
+
+
+def get_gait_segments(joint_data):
+    instances = []
+    instance = []
+    current_instance = joint_data[0][0]
+    
+    #First separate the joints into individual instances
+    for joints in joint_data:
+        #Append joints as normal
+        if joints[0] == current_instance:
+            instance.append(joints)
+        else:
+            #Only add certain persons examples
+            instances.append(copy.deepcopy(instance))
+            instance = []
+            instance.append(joints)
+            current_instance = joints[0]
+    #Add the last instance hanging off missed by the loop
+    instances.append(copy.deepcopy(instance))
+
+    division_factor = 6
+    segments = []
+    for instance in instances:
+        segment = []
+        num_in_segment = int(len(instance)/division_factor)
+
+        for i, frame in enumerate(instance):
+            if i % division_factor == 0:
+                if len(segment) >0:
+                    segments.append(copy.deepcopy(segment))
+                    segment = []
+                segment.append(frame)
+
+            else:
+                segment.append(frame)
+    
+    print("segments should be ", len(segments), len(joint_data), division_factor)
+    return segments

@@ -1,19 +1,31 @@
+'''
+This file decimates initial images to remove instances where conditions for adequate examples are not met.
+'''
+#imports
 from __future__ import print_function
-#Standard
 import cv2
 import numpy as np
 import os
 import shutil
-
-#Local files
+import os.path
+#Dependencies
 import Programs.Data_Recording.JetsonYolo_Main.models.JetsonYolo as JetsonYolo
 from Programs.Data_Processing.Utilities import numericalSort
 
-#Torch and SKlearn
-import os.path
-
-#Function to check if more than 1 person in any frames, and deleting if so
 def check_human_count(images):
+    '''
+    Function to check if more than 1 person in any frames, and deleting if so
+
+    Arguments
+    ---------
+    images : List(List())
+        List of images for processing
+
+    Returns
+    -------
+    bool
+        Indicates whether 1 or more people are detected in the frame
+    ''' 
     lesser_count = 0
     greater_count = 0
     for image in images:
@@ -27,8 +39,20 @@ def check_human_count(images):
         return False
     return True
 
-#Function to check person traverses the width of the image, else dump the files
 def check_human_traversal(images):
+    '''
+    Function to check person traverses the width of the image, else dump the files
+
+    Arguments
+    ---------
+    images : List(List())
+        List of images for processing
+
+    Returns
+    -------
+    bool
+        Indicates whether or not a human has crossed enough of the FOV of the frame for a full gait cycle
+    ''' 
     #Highest possbile pixel value is 240
     min_x = 1000
     max_x = -1000
@@ -53,7 +77,19 @@ def check_human_traversal(images):
 
 #Function to send proof-read instances to a g-mail account or google drive
 def decimate(path = './Images/CameraTest'):
+    '''
+    Function that calls all the decimation sub-functions
 
+    Arguments
+    ---------
+    path : str
+        path to the root of the image folders
+
+    Returns
+    -------
+    None
+
+    ''' 
     #Instead of deleting, flag the indices to see which ones would get decimated to ascertain if it's acceptable.
     #Load in images
     instances = []
@@ -86,9 +122,6 @@ def decimate(path = './Images/CameraTest'):
           print("image appropriate, retaining")
         else:
             #delete folder
-            delete_folder(folder_names[i])
-            
-def delete_folder(index, path = './Images/CameraTest/'):
-    deletion_folder = str(path + str(index))
-    #This will delete the folder and its contents recursively
-    shutil.rmtree(deletion_folder, ignore_errors=True)
+            deletion_folder = str(path + str(i))
+            #This will delete the folder and its contents recursively
+            shutil.rmtree(deletion_folder, ignore_errors=True)

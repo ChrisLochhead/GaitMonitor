@@ -1,28 +1,23 @@
+'''
+This file contains all of the functions for rendering joints and images and other effects.
+'''
+#imports
 import cv2
 import copy
-import re, seaborn as sns
+import seaborn as sns
+import numpy as np
+import math
 from matplotlib import pyplot as plt
 from matplotlib.patches import Arc
-from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.colors import ListedColormap
-#%%capture
-from IPython.display import display, HTML
-from matplotlib import animation
-plt.rcParams["animation.bitrate"] = 3000
-plt.rcParams['animation.ffmpeg_path'] = "C:/Users/Chris/Desktop/ffmpeg-5.1.2-full_build/bin/ffmpeg.exe"
+from mpl_toolkits.mplot3d import Axes3D
 
-import numpy as np
-import networkx as nx
-from torch_geometric.utils import to_networkx
-import math
-
+#dependencies
 import Programs.Data_Processing.Utilities as Utilities
-from IPython.display import display, HTML
-from matplotlib import animation
-plt.rcParams["animation.bitrate"] = 3000
-plt.rcParams['animation.ffmpeg_path'] = "C:/Users/Chris/Desktop/ffmpeg-5.1.2-full_build/bin/ffmpeg.exe"
 
-
+'''
+The various different joint graph connection configurations
+'''
                     #Bottom dataset
 joint_connections = [[15, 13], [13, 11], # left foot to hip 
                      [16, 14], [14, 12], # right foot to hip
@@ -80,40 +75,32 @@ head_joint_connections = [[1, 3], [2, 4], # ears to eyes
 limb_connections = [[0, 1], [1, 2]] # From the extremity to the base (i.e the foot - hip or hand - shoulder)
 
 
-def get_angle_plot(line1, line2, offset = 1, color = None, origin = [0,0], len_x_axis = 1, len_y_axis = 1):
-
-    # Angle between line1 and x-axis
-    slope1 = (line1[1][1] - line1[0][1]) / float(line1[1][0] - line1[0][0])
-    angle1 = abs(math.degrees(math.atan(slope1))) # Taking only the positive angle
-
-
-    # Angle between line2 and x-axis
-    slope2 = (line2[1][1] - line2[0][1]) / float(line2[1][0] - line2[0][0])
-    angle2 = abs(math.degrees(math.atan(slope2)))
-
-    theta1 = min(angle1, angle2)
-    theta2 = max(angle1, angle2)
-
-    angle = theta2 - theta1
-
-    return Arc(origin, len_x_axis*offset, len_y_axis*offset, 0, theta1, theta2, color='r', label = str(angle)+u"\u00b0"), angle
-
 def chart_knee_data(gait_cycles, display = False):
-    #fig = plt.figure()
-    #ax = fig.add_subplot(111)
+    '''
+    This generates a plot charting knee angle data over a gait cycle.
+
+    Arguments
+    ---------
+    gait_cycles: List(List())
+        List of joints segmented by gait cycle
+    display: bool (optional, default = False)
+        indicates whether to display the chart
+
+    Returns
+    -------
+    List()
+        List of co-efficients to describe the chart
+    '''
     hcf_coefficients = []
     for i in range(len(gait_cycles[0])):
-
         l_x = gait_cycles[0][i]
         l_y = [i for i in range(len(l_x))]
-
         r_x = gait_cycles[1][i]
         r_y = [i for i in range(len(r_x))]
 
         #Potentially add interpolation code here to give more examples for a smoother chart
         l_x, l_y = Utilities.interpolate_knee_data(l_x, l_y)
         r_x, r_y = Utilities.interpolate_knee_data(r_x, r_y)
-
         poly = np.polyfit(l_y,l_x,6)
         poly_alt = np.polyfit(r_y, r_x, 6)
         poly_l = np.poly1d(poly)(l_y)
@@ -131,47 +118,55 @@ def chart_knee_data(gait_cycles, display = False):
             plt.plot(l_y,poly_l)
             plt.plot(r_y,poly_r)
             plt.show()
-
-        #print("lens: ", len(poly), len(poly_alt), len(np.concatenate((poly, poly_alt))))
         hcf_coefficients.append(np.concatenate((poly, poly_alt)))
     return hcf_coefficients
 
-def plot_graph(data):
-    from Programs.Machine_Learning.GCN.Dataset_Obj import get_COO_matrix
-    G = process_data_to_graph(data, get_COO_matrix())
-    print("nodes: ", G.nodes(G))
-    plt.figure(figsize=(12, 12))
-    plt.axis('off')
-    plt.gca().invert_xaxis()
-    plt.gca().invert_yaxis()
 
-    nx.draw(G, nx.get_node_attributes(G, 'pos'), with_labels=True, node_size=800)
-    plt.show()
+def filter_coords(joints, index, metadata = 5):
+    '''
+    Utility function for removing meta data from all the frames and segmenting into streams by x, y and z co-ordinate
 
-def process_data_to_graph(row, coo_matrix):
-    G = nx.Graph()
+    Arguments
+    ---------
+    joints: List(List())
+        All of the joints in the file
+    index: int
+        Indicates which of x, y or z to process
+    metadata: int (optional, default = 5)
+        Indicates the amount of metadata to expect per-frame
 
-    #Add nodes
-    for i, x in enumerate(row.x.numpy()):
-        G.add_node(int(i), pos=(-x[1], x[0]))
-        #Break to avoid reading edge indices
-        #break
-    
-    #Add edges
-    for connection in joint_connections:
-        G.add_edge(connection[0], connection[1])
-
-    return G
-
-def filter_coords(joints, index, metadata = 3):
+    Returns
+    -------
+    List()
+        Returns a list of co-ords at the index
+    '''
     coords = []
     for i, j in enumerate(joints):
         if i >= metadata:
             coords.append(j[index])
-    
     return coords
 
-def plot3D_joints(joints, pixel = True, metadata = 3, x_rot = 90, y_rot = 180):
+def plot3D_joints(joints, pixel = True, metadata = 5, x_rot = 90, y_rot = 180):
+    '''
+    This renders the joints as a 3D plot.
+
+    Arguments
+    ---------
+    joints: List()
+        The joints to be rendered
+    pixel: bool (optional, default = True)
+        Indicates whether the data is pixel or cm-based
+    metadata: int (optional, default = 5)
+        Indicates the amount of metadata to expect per-frame
+    x_rot: int (optional, default = 90)
+        The x-rotation of the chart
+    y_rot: int (optional, default = 180)
+        The y-rotation of the chart
+
+    Returns
+    -------
+    None
+    '''
     # generate data
     x = filter_coords(joints, 0, metadata=metadata)
     y = filter_coords(joints, 1, metadata=metadata)
@@ -196,19 +191,15 @@ def plot3D_joints(joints, pixel = True, metadata = 3, x_rot = 90, y_rot = 180):
     if pixel:
         plt.gca().invert_yaxis()
     plt.gca().invert_zaxis()
-    #z forward -90, 180
-    #on the corner -175, 120
+
     ax.view_init(x_rot, y_rot)
-
     cmap = ListedColormap(sns.color_palette("husl", 256).as_hex())
-
     #plot connections
     for connection in joint_connections:
         ax.plot([joints[connection[0] + metadata][0], joints[connection[1] + metadata][0]], \
                 [joints[connection[0] + metadata][1], joints[connection[1] + metadata][1]], \
                 [joints[connection[0] + metadata][2], joints[connection[1] + metadata][2]], \
                     color = 'g')
-
     # plot points
     sc = ax.scatter(x, y, z, s=40, c=x, marker='o', cmap=cmap, alpha=1)
     ax.set_xlabel('X')
@@ -221,45 +212,125 @@ def plot3D_joints(joints, pixel = True, metadata = 3, x_rot = 90, y_rot = 180):
     plt.show(block=True)
 
 def render_joints_series(image_source, joints, size, delay = True, use_depth = True, plot_3D = False, x_rot = 90, y_rot= 180, background = False):
+    '''
+    This iterates over a series of images/joints and shows them in sequence
+
+    Arguments
+    ---------
+    image_source: str
+        root image folder 
+    joints: List(List) or str
+        location of or list of joints to be shown
+    size: int
+        number of instances from the frame to be shown
+    delay: bool (optional, default = True)
+        indicates whether to make each frame appear by a spacebar click or to run automatically
+    use_depth: bool (optional, default = True)
+        indicates whether to colour the joints according to their depth (2D version only)
+    plot_3D: bool (optional, default = False)
+        indicates whether to render as a 3D object instead of 2D.
+    x_rot: int (optional, default = 90)
+        The x-rotation of the chart
+    y_rot: int (optional, default = 180)
+        The y-rotation of the chart
+    background: bool (optional, default = False)
+        indicates whether to draw on a black frame or the real image (2D version only)
+
+    Returns
+    -------
+    None
+    '''
     joints, images = Utilities.process_data_input(joints, image_source)
     for i in range(size):
         if plot_3D:
             plot3D_joints(joints[i], x_rot=x_rot, y_rot=y_rot)
         else:
             if background:
-                print("len iamges: ", len(images))
-                print("\njoints: ", joints[i])
                 render_joints(images[0], joints[i], delay, use_depth)
-                print("saving image:")
             else:
-                render_joints(images[i], joints[i], delay, use_depth)  
-            
-
+                render_joints(images[i], joints[i], delay, use_depth)       
             cv2.destroyWindow("Joint Utilities Image")
 
 def render_joints(image, joints, delay = False, use_depth = True, metadata = 6, colour = (0, 255, 0)):
+    '''
+    This renders a single frame with the joints overlaid.
+
+    Arguments
+    ---------
+    image: List()
+        current image
+    joints: List(List)
+        list of joints to be shown
+    delay: bool (optional, default = True)
+        indicates whether to make each frame appear by a spacebar click or to run automatically
+    use_depth: bool (optional, default = True)
+        indicates whether to colour the joints according to their depth (2D version only)
+    metadata: int (optional, default = 6)
+        indicates the expected amount of metadata per-frame
+    colour: tuple (optional, default = (0, 255, 0))
+        indicates the colour of the joints
+
+    Returns
+    -------
+    None
+    '''
     tmp_image = copy.deepcopy(image)
     tmp_image = draw_joints_on_frame(tmp_image, joints, use_depth_as_colour=use_depth, metadata = metadata, colour=colour)
     cv2.imshow('Joint Utilities Image',tmp_image)
-
     cv2.setMouseCallback('Joint Utilities Image', click_event, tmp_image)
     if delay:
         cv2.waitKey(0) & 0xff
 
 def render_velocity_series(joint_data, velocity_data, image_data, size):
+    '''
+    Simple looping function to render a series of velocity images
+
+    Arguments
+    ---------
+    joint_data: List(List())
+        joint data to be rendered
+    velocity_data: List(List())
+        corresponding velocity vectors
+    image_data: List(List())
+        corresponding source images
+    size: int
+        Number of frames in the sequence to render
+
+    Returns
+    -------
+    None
+    '''
     for i in range(size):
         render_velocities(joint_data[i], velocity_data[i], image_data[i])
 
 def render_velocities(joint_data, velocity_data, image_data, delay = True, metadata = 6):
+    '''
+    Render an image with joints and velocity vectors
+
+    Arguments
+    ---------
+    joint_data: List(List())
+        joint data to be rendered
+    velocity_data: List(List())
+        corresponding velocity vectors
+    image_data: List(List())
+        corresponding source images
+    delay: bool (optional, default = True)
+        indicates whether to use keyboard control for the display
+    metadata: int (optional, default = 6)
+        amount of metadata to expect per-frame
+
+    Returns
+    -------
+    None
+    '''
     for i, coord in enumerate(joint_data):
         if i >= metadata:
-            #print("velocity data: ", velocity_data[i], len(velocity_data), len(velocity_data[i]), len(joint_data))
             image_direction = [int((velocity_data[i][1] * 40) + coord[1]),
                                  int((velocity_data[i][0] * 40) + coord[0])]
 
             image = cv2.arrowedLine(image_data, [int(coord[1]), int(coord[0])] , image_direction,
                                             (0,255,0), 1) 
-
     cv2.imshow('Joint Utilities Image',image)
     cv2.setMouseCallback('Joint Utilities Image', click_event, image)
     if delay:
@@ -274,6 +345,31 @@ def click_event(event, x, y, flags, params):
         quit()
 
 def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 6, colour = (0, 150, 200), check_leg = False, aux_joints = None):
+    '''
+    Function to overlay the joints onto the corresponding frame
+
+    Arguments
+    ---------
+    frame: List()
+        source frame
+    joints: List()
+        single graph skeleton to be drawn on the frame
+    use_depth_as_colour: bool (optional, default = False)
+        indicates how to colour the joints
+    metadata: int (optional, default = 6)
+        amount of metadata to expect per-frame
+    colour: tuple (optional, default = (0, 255, 0))
+        indicates the colour of the joints
+    check_leg: bool (optional, default = False)
+        indicates whether to colour the left leg to track which one the model thinks is the left
+    aux_joints: List() (optional, default = None)
+        contains any additional joints for debugging 
+        
+    Returns
+    -------
+    List()
+        Returns the frame with the joints drawn on
+    '''
     tmp_frame = copy.deepcopy(frame)
     tmp_joints = copy.deepcopy(joints)
     connections = joint_connections
@@ -318,8 +414,7 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
 
         #Check for auxillary joints:
         if aux_joints != None:
-            #if aux_joints[i][0] != joint[0] or aux_joints[i][1] != joint[1]:
-                  tmp_frame = cv2.circle(tmp_frame, (int(float(aux_joints[i][1])),int(float(aux_joints[i][0]))), radius=1, color=(0,0,255), thickness=10)    
+            tmp_frame = cv2.circle(tmp_frame, (int(float(aux_joints[i][1])),int(float(aux_joints[i][0]))), radius=1, color=(0,0,255), thickness=10)    
         
         if i == 17 and check_leg == True or i == 19 and check_leg == True or i == 21 and check_leg == True:
             tmp_frame = cv2.circle(tmp_frame, (int(float(joint[1])),int(float(joint[0]))), radius=1, color=(255,255,255), thickness=4)
@@ -330,87 +425,3 @@ def draw_joints_on_frame(frame, joints, use_depth_as_colour = False, metadata = 
       
     
     return tmp_frame
-                
-def animate(i, *fargs):
-    data = fargs[0]
-    outputs = fargs[1]
-    losses = fargs[2]
-    accuracies = fargs[3] 
-
-    G = to_networkx(data, to_undirected=True)
-    nx.draw_networkx(G,
-                    pos=nx.spring_layout(G, seed=0),
-                    with_labels=True,
-                    node_size=800,
-                    node_color="blue",#outputs[i],
-                    cmap="hsv",
-                    vmin=-2,
-                    vmax=3,
-                    width=0.8,
-                    edge_color="grey",
-                    font_size=14
-                    )
-    plt.title(f'Epoch {i} | Loss: {losses[i]:.2f} | Acc: {accuracies[i]*100:.2f}%',
-              fontsize=18, pad=20)
-
-
-def animate_alt(i, *fargs):
-    embeddings = fargs[0]
-    data = fargs[1]
-    losses = fargs[2]
-    accuracies = fargs[3]
-    ax = fargs[4]
-    train_loader = fargs[5]
-
-    embed = embeddings[i].detach().cpu().numpy()
-    ax.clear()
-
-    cols = []
-    for j, point in enumerate(train_loader):
-        for k, em in enumerate(point):
-            if k == 2: 
-                class_vals = em[1].numpy()
-                for val in class_vals:
-                    col = "blue"
-                    if val == 1:
-                        col = "red"
-                    elif val == 2:
-                        col = "green"
-                    cols.append(col)
-        
-        break
-
-    ax.scatter(embed[:, 0], embed[:, 1], embed[:, 2],
-           s=200, c=cols, cmap="hsv", vmin=-2, vmax=3)
-    plt.title(f'Epoch {i} | Loss: {losses[i]:.2f} | Acc: {accuracies[i]*100:.2f}%',
-              fontsize=18, pad=40)
-
-def run_3d_animation(fig, fargs):
-        plt.axis('off')
-        plt.tick_params(left=False,
-                        bottom=False,
-                        labelleft=False,
-                        labelbottom=False)
-
-        anim = animation.FuncAnimation(fig, animate_alt, \
-                                    np.arange(0, 200, 10), interval=800, repeat=True, fargs=fargs)
-        html = HTML(anim.to_html5_video())
-
-        plt.show()
-        display(html)
-            
-def process_data_to_graph(row, coo_matrix):
-    G = nx.Graph()
-
-    #Add nodes
-    for i, x in enumerate(row.x.numpy()):
-        G.add_node(int(i), pos=(-x[1], x[0]))
-        #Break to avoid reading edge indices
-        #break
-    
-    #Add edges
-    for connection in joint_connections:
-        G.add_edge(connection[0], connection[1])
-
-    return G
-

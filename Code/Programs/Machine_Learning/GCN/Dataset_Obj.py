@@ -8,6 +8,7 @@ import os
 from tqdm import tqdm
 from torchvision import transforms
 from Programs.Data_Processing.Render import joint_connections_m_hip
+from Programs.Machine_Learning.GCN.Utilities import get_gait_segments
 import Programs.Data_Processing.HCF as HCF
 import copy
 import ast 
@@ -89,7 +90,7 @@ class JointDataset(Dataset):
 
         #Extract the gait segment for the data points
         if self.preset_cycle == None:
-            self.base_cycles = HCF.get_gait_segments(self.data.to_numpy())
+            self.base_cycles = get_gait_segments(self.data.to_numpy())
             counter = 0
             for cycle in self.base_cycles:
                 for frame in cycle:

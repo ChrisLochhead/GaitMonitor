@@ -1,4 +1,4 @@
-from Programs.Data_Processing.Demo import *
+from Programs.Data_Processing.Image_Processor import *
 import Programs.Data_Processing.Dataset_Creator as Creator
 import Programs.Machine_Learning.GCN.Dataset_Obj as Dataset_Obj
 import Programs.Data_Processing.Render as Render

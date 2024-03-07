@@ -10,7 +10,7 @@ from PIL import Image
 from pynput.keyboard import Key, Listener, KeyCode
 import os
 import copy
-import Programs.Data_Processing.Model_Free.File_Decimation as File_Decimation
+import Programs.Data_Processing.File_Decimation as File_Decimation
 #import File_Decimation
 import datetime
 import csv
