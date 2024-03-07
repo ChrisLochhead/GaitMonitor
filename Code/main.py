@@ -1,22 +1,13 @@
-#Standard packages
+'''
+This is the file controlling the recording system, complete with a minimal GUI
+'''
+#imports
 import os
 from pynput.keyboard import Listener
 import datetime
 import torch
-import re
-
-#Torch
-import torch
-
-#MaskCNN only works on the PC version of this app, the Jetson Nano doesn't support python 3.7
-#if sys.version_info[:3] > (3, 7, 0):
-#    import Programs.Machine_Learning.Model_Free.Mask_RCNN.samples.maskcnn as maskcnn
-
-def numericalSort(value):
-    numbers = re.compile(r'(\d+)')
-    parts = numbers.split(value)
-    parts[1::2] = map(int, parts[1::2])
-    return parts
+#dependencies
+from Programs.Data_Processing.Utilities import numericalSort
 
 #Colour tags for console
 class c_colours:
@@ -32,42 +23,58 @@ capture_paused = False
 restart_time = None
 
 def reorder_folders(path):
+    '''
+    re-orders manually converted folders to make sure they all go from 0-59
+
+    Arguments
+    ---------
+    path: str
+        root folder for recorded instances
+        
+    Returns
+    -------
+    None
+    '''
     for iterator, (subdir, dirs, files) in enumerate(os.walk(path)):
         dirs.sort(key=numericalSort)
         for i, dir in enumerate(dirs):
-            print("Dir: ",i,  dir)
-            print("renaming: ", os.path.join(subdir, dir))
             os.rename(os.path.join(subdir, dir), os.path.join(subdir, str("Instance_" + str(i) + ".0")))
         
 
-
+#simple clear console command
 def clear_console():
     command = 'clear'
     if os.name in ('nt', 'dos'):  # If Machine is running on Windows, use cls
         command = 'cls'
     os.system(command)
-   
-#def run_camera(path="./Images/Instances/", v=0):
-    #try:
-    #camera = capture.Camera()
-
-    #out_condition = camera.run(path="./Images/", verbose=v)
-
- #   return out_condition
-    #except:
-    #    main("No camera detected, returning to main menu")
-    
+     
 def reset_capture_timer():
-    print("empty")
+    '''
+    Controls the automatic recording timer
+
+    Returns
+    -------
+    bool
+        Indicates whether it's too late to be recording
+    '''
     now = datetime.datetime.now()
     later = now + datetime.timedelta(seconds=5)
     return later
-    print("now: ", now)
-    print("later: ", later)
-    #morning_limit = now.replace(hour=8, minute=0, second=0, microsecond=0)
-    #evening_limit = now.replace(hour=22, minute=37, second=0, microsecond=0)
 
 def on_press(key):
+    '''
+    Controls on press argument, essentially controlling the GUI keystrokes
+
+    Arguments
+    ---------
+    key: Object
+        the pressed key
+        
+    Returns
+    -------
+    bool
+        Only returns false when ending the program
+    '''
     global current_menu
     global selected_function
     global capture_paused
@@ -110,6 +117,17 @@ def on_press(key):
 
 #Verbosity selection for camera and image processing functions
 def verbosity_selection(max_verbose = 1):
+    '''
+    Verbosity selection menu
+
+    Arguments
+    ---------
+    max_verbose: int (optional, default = 1)
+        
+    Returns
+    -------
+    None
+    '''
     clear_console()
     global current_menu
     current_menu = 2
@@ -121,10 +139,23 @@ def verbosity_selection(max_verbose = 1):
     print(str(max_verbose + 1) + ". Back")
 
 def extended_menu(index, content):
+    '''
+    Opens additional menus
+
+    Arguments
+    ---------
+    index: int
+        indicates which submenu to open
+    content: str
+        prints corresponding content
+        
+    Returns
+    -------
+    None
+    '''
     global current_menu
     current_menu = index
     clear_console()
-    print("More")
     print(content)
 
 
@@ -140,6 +171,22 @@ REGULAR FUNCTIONS
 
 
 def main(error_message = None, init = False, repeat_loop = True):
+    '''
+    main loop for the GUI menu
+
+    Arguments
+    ---------
+    error_message: str (optional, default = None)
+        string denoting any potential errors
+    init: bool (optional, default = False)
+        denotes whether this is the initial call
+    repeat_loop: bool (optional, default = True)
+        controls repeating
+        
+    Returns
+    -------
+    None
+    '''
     global current_menu
     global restart_time
     global capture_paused
@@ -183,6 +230,4 @@ def main(error_message = None, init = False, repeat_loop = True):
 
 
 if __name__ == '__main__':
-    #Main menu
-    print("version: ", torch.__version__)
     main(init = True)

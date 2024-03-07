@@ -1,3 +1,7 @@
+'''
+This is the central file for running all dataset processing and machine learning routines.
+'''
+#dependencies
 from Programs.Data_Processing.Image_Processor import *
 import Programs.Data_Processing.Dataset_Creator as Creator
 import Programs.Machine_Learning.GCN.Dataset_Obj as Dataset_Obj
@@ -6,16 +10,15 @@ import Programs.Machine_Learning.GCN.GAT as gat
 import Programs.Machine_Learning.GCN.STAGCN as stgcn
 import Programs.Machine_Learning.GCN.Utilities as graph_utils
 
+#imports
 import time
 import random
 import math
 random.seed(42)
-
 import torch
 torch.manual_seed(42)
 torch.cuda.empty_cache()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 def process_images_into_joints(folder):
     '''
     This is a sub function containing the first part of the pre-processing pipeline, namely involving the computationally expensive joint-position extraction
@@ -242,11 +245,26 @@ def load_datasets(types, folder, multi_dim = False, num_people = 3):
     if multi_dim:
         for index, dataset in enumerate(datasets):
             datasets[index] = Creator.convert_person_to_type(dataset, None)
-
     #Return requested datasets
     return datasets
 
 def process_datasets(datasets, leave_one_out = False):
+    '''
+    Translates the loaded in datasets into train, validation and test sets, applying any other bespoke conditions like leave-one-out
+
+    Arguments
+    ---------
+    datasets: List(Datasets)
+        List of datasets
+    leave_one_out: bool (optional, default = True)
+        Indicates whether to split the train and test in a leave-one-out fashion
+
+    Returns
+    -------
+    List(List()), List(List())
+        Returns the train and test split datasets
+
+    '''
     print("Processing data...")
     train_indice_list = []
     test_indice_list = []
@@ -283,6 +301,19 @@ def process_datasets(datasets, leave_one_out = False):
     return multi_input_train_val, multi_input_test
 
 def process_results(train_scores, val_scores, test_scores):
+    '''
+    Calculates and prints various result metrics from the experiment
+
+    Arguments
+    ---------
+    train_scores, val_scores, test_scores: List()
+        Lists of the various accuracy scores
+        
+    Returns
+    -------
+    None
+
+    '''
     print("Final results: ")
     for ind, t in enumerate(test_scores):
         test_scores[ind] = test_scores[ind].cpu()
@@ -295,6 +326,37 @@ def process_results(train_scores, val_scores, test_scores):
     print("mean, std and variance: {:.2f}%, {:.2f}% {:.5f}".format(mean, math.sqrt(var), var))
 
 def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load = None, leave_one_out = False, multi_dim = False, num_people=3):
+    '''
+    Runs the model configuration
+
+    Arguments
+    ---------
+    dataset_types: List(int)
+        list of ints that denote which datasets will be loaded
+    hcf: bool
+        indicates whether to use hcf data
+    batch_size: int
+        batch size
+    epochs: int
+        epochs
+    folder: str
+        name of the root folder for the datasets
+    save: str (optional, default = None)
+        indicates whether to save the model weights
+    load: str (optional, default = None)
+        indicates whether to load model weights 
+    leave_one_out: bool (optional, default = False)
+        indicates whether to use a leave-one-out test configuration
+    multi_dim: bool (optional, default = False)
+        indicates whehter to use 3 or 9-class problem space
+    num_people: int (optional, default = 3)
+        indicates the size of the dataset to load by people
+
+    Returns
+    -------
+    None
+
+    '''
     #Load the full dataset
     datasets = load_datasets(dataset_types, folder, False, num_people)
     print("datasets here: ", datasets)
@@ -338,6 +400,22 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
     process_results(train_scores, val_scores, test_scores)
 
 def convert_directory_to_videos(parent_folder, output, depth = False):
+    '''
+    creates a series of videos from source images
+
+    Arguments
+    ---------
+    parent_folder: str
+        location of root folder for the images
+    output: str
+        output file location
+    depth: bool (optional, default = False)
+        indicates whether to include depth images
+        
+    Returns
+    -------
+    None
+    '''
     image_data = []
     directory = os.fsencode(parent_folder)
     for subdir_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
@@ -348,78 +426,21 @@ def convert_directory_to_videos(parent_folder, output, depth = False):
         print("split: ", split)
         if split[-1] != "":
             print("converting to vid")
-            convert_to_video(subdir.decode('utf-8'), output + split[-1], split[-1], depth=depth)
-
-
-def convert_to_video(image_folder, output, file, depth = False):
-
-    # Get the list of image files in the directory
-    images = [img for img in os.listdir(image_folder) if str(img).split(".")[-1] == "jpg"]
-
-    os.makedirs(output, exist_ok = True)
-    frame = cv2.imread(os.path.join(image_folder, images[0]))
-    height, width, layers = frame.shape
-
-    # Define the output video file name and codec
-    video_name = output + '/' + file + '.mp4'
-    print("video name: ", video_name)
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    video = cv2.VideoWriter(video_name, fourcc, 7, (width, height))
-    d_video = None
-    if depth:
-        d_video_name = output + '/' + file + '_depth.mp4'
-        print("video name: ", d_video_name)
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        d_video = cv2.VideoWriter(d_video_name, fourcc, 7, (width, height))
-
-    for iter,  image in enumerate(images):
-        if iter < len(images) / 2 or depth == False:
-            image_path = os.path.join(image_folder, image)
-            frame = cv2.imread(image_path)
-            video.write(frame)
-        else:
-            #add frames to a depth video to go into the same folder destination
-            image_path = os.path.join(image_folder, image)
-            frame = cv2.imread(image_path)
-            d_video.write(frame)
-
-    cv2.destroyAllWindows()
-    video.release()
-
-    if d_video:
-        d_video.release()
-
-def convert_to_9_class(data, joint_output):
-    data, _ = Utilities.process_data_input(data, None)
-    new_data = []
-    for i, row in enumerate(data):
-        #check row 2, 3 and 4 and place answer in row 2
-        if row[2] == 0 and row[3] == 0 and row[4] == 0:
-            row[2] = 0
-        elif row[2] == 0 and row[3] == 1 and row[4] == 0:
-            row[2] = 1
-        elif row[2] == 0 and row[3] == 0 and row[4] == 1:
-            row[2] = 2
-        
-        elif row[2] == 1 and row[3] == 0 and row[4] == 0:
-            row[2] = 3
-        elif row[2] == 1 and row[3] == 1 and row[4] == 0:
-            row[2] = 4
-        elif row[2] == 1 and row[3] == 0 and row[4] == 1:
-            row[2] = 5
-
-        elif row[2] == 2 and row[3] == 0 and row[4] == 0:
-            row[2] = 6
-        elif row[2] == 2 and row[3] == 1 and row[4] == 0:
-            row[2] = 7
-        elif row[2] == 2 and row[3] == 0 and row[4] == 1:
-            row[2] = 8
-
-        new_data.append(row)
-    
-    Utilities.save_dataset(new_data, joint_output)
+            Utilities.convert_to_video(subdir.decode('utf-8'), output + split[-1], split[-1], depth=depth)
 
 def create_datasets(streams = [1,2,3,4,5,6]):
+    '''
+    creates a series of datasets from individual person datasets
+
+    Arguments
+    ---------
+    streams: List(int)
+        number of streams to stitch together
+        
+    Returns
+    -------
+    None
+    '''
         #Assign person numbers and uniform instance counts:
     folder_names = ['ahmed', 'Amy', 'Anna', 'bob', 'cade', 'emma', 'erin', 
                     'grant', 'pheobe', 'scarlett', 'sean c', 'sean g', 'wanok']
@@ -431,6 +452,24 @@ def create_datasets(streams = [1,2,3,4,5,6]):
         graph_utils.stitch_dataset(folder_names=folder_names, stream=s)
 
 def make_comb(folder, rel_path, vel_path, bone_path):
+    '''
+    creates a series of datasets from individual person datasets
+
+    Arguments
+    ---------
+    folder: str
+        source folder location
+    rel_path: str
+        location of the relative data
+    vel_path: str
+        location of velocity data
+    bone_path: str
+        location of bone angle data
+        
+    Returns
+    -------
+    None
+    '''
     rel, _ = Utilities.process_data_input(rel_path, None)
     vel, _ = Utilities.process_data_input(vel_path, None)
     bone, _ = Utilities.process_data_input(bone_path, None)
@@ -440,76 +479,12 @@ def make_comb(folder, rel_path, vel_path, bone_path):
     
     Creator.combine_datasets(rel, vel, None, None,
                                                 joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data_rel_vel")
-if __name__ == '__main__':
-
-    #make 9d
-    #convert_to_9_class('./code/datasets/joint_data/big/Scale_1_Norm_1_Subtr_1/no_Sub_4_stream/13_people/raw/13_people.csv',
-     #                  "./Code/Datasets/Joint_Data/big/Scale_1_Norm_1_Subtr_1/multi_dim_3_13" )
-    #stop = 5/0
-
-    #Dataset creator
-    process_data("Anna")
-    #create_datasets()
-    folder_names = ['ahmed', 'Amy', 'Anna', 'bob', 'cade', 'emma', 'erin', 
-                    'grant', 'pheobe', 'scarlett', 'sean c', 'sean g', 'wanok']
     
-    #for f in folder_names:
-    #    make_comb(f, './code/datasets/joint_data/' + str(f) + "/rel_data/raw/rel_data.csv",
-    #              './code/datasets/joint_data/' + str(f) + "/vel_data/raw/vel_data.csv",
-    #                './code/datasets/joint_data/' + str(f) + "/bone_data/raw/bone_data.csv"  )
-
-    #graph_utils.stitch_dataset(folder_names, stream = 5)
-    #graph_utils.stitch_dataset(folder_names, stream = 6)
-    #stop = 5/0
-    #Run the model:
-    #Dataset types: Array of types for the datasets you want to pass through at the same time
-    #   1: normal full body 9D dataset
-    #   2: HCF data
-    #   3: 2 region data
-    #   4: 5 region data
-    #Cycles: is the data passed through as single frames or gait cycles
-    #Model type: "ST-AGCN" or "GAT"
-    #hcf: indicates presence of an HCF dataset
-    #multi: indicates if the multi-stream variant of the chosen model should be used (multi variant 
-    # models are compatible with both single and multiple datasets)
-    #Leave_one_out: indicates whether using normally split data or data split by person
-    #Person: full dataset only, denotes which person to extract otherwise 0 or none.
-    #Label: which label to classify by: 2 = gait type, 3 = freeze, 4 = obstacle, 5 = person (not implemented)
-
-    #WHAT AM I DOING:Cust-stgcn, then gaitgraph2 (switch to 3 streams)
-
-    #paper: add new numbers to tables, shorten to 14 pages, done :)
+if __name__ == '__main__':
+    #start and run a model
     start = time.time()
     run_model(dataset_types= [1], hcf=False,
             batch_size = 128, epochs = 80, folder="path",
             save =None, load=None, leave_one_out=False, multi_dim=True, num_people=13)
     end = time.time()
     print("time elapsed: ", end - start)
-
-    #Save all outputs to files for f1 calcs etc
-    
-    #So my best version: bone + vel needs to compete with: (all early-fusion) (w best of scaling, norm and subtraction) (1 day)
-        #2-stream but with st-tagcn (rel + vel)
-        #3-stream but with st-tagcn (rel + vel + bone )
-    
-    #Then my best version of these needs to be tested with (bone + vel, scaling norm and subtr) (1 day)
-        #Resnet
-        #SVM
-        #KNN
-        #st-gcn (just a different model)
-        #st-jagcn (early fusion rel + vel + bone)
-        #2-st-gcn (2 separate streams rel + vel using st-gcn)
-        #Mine
-    
-    #Then my results on best version have to compete with (1 week)
-        #Azure datasets
-            #normal
-            #leave-one-out
-        #Foot platform dataset
-            #normal
-            # leave one out
-    
-    #DONE
-    #Then I need one ablation to make sure it generalizes to different ailments for each person
-        #Results are: 50% on 3 person, 55% on 4 people, 57% on 5 people 61.2% on 13 people (leaving one out) 
-        

@@ -829,3 +829,102 @@ def assign_person_number(data_to_append, data, joint_output, no, start_instance,
     if save:
         save_dataset(data_to_append, joint_output)
     return current_instance, data_to_append 
+
+def convert_to_video(image_folder, output, file, depth = False):
+    '''
+    converts a series of images into a video
+
+    Arguments
+    ---------
+    image_folder: str
+        path to the image folder 
+    output: str
+        output path
+    file: str
+        output path name
+    depth: bool (optional, default = False)
+        indicates whether to include depth frames
+    
+    Returns
+    -------
+    None
+    '''
+    # Get the list of image files in the directory
+    images = [img for img in os.listdir(image_folder) if str(img).split(".")[-1] == "jpg"]
+
+    os.makedirs(output, exist_ok = True)
+    frame = cv2.imread(os.path.join(image_folder, images[0]))
+    height, width, layers = frame.shape
+
+    # Define the output video file name and codec
+    video_name = output + '/' + file + '.mp4'
+    print("video name: ", video_name)
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    video = cv2.VideoWriter(video_name, fourcc, 7, (width, height))
+    d_video = None
+    if depth:
+        d_video_name = output + '/' + file + '_depth.mp4'
+        print("video name: ", d_video_name)
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        d_video = cv2.VideoWriter(d_video_name, fourcc, 7, (width, height))
+
+    for iter,  image in enumerate(images):
+        if iter < len(images) / 2 or depth == False:
+            image_path = os.path.join(image_folder, image)
+            frame = cv2.imread(image_path)
+            video.write(frame)
+        else:
+            #add frames to a depth video to go into the same folder destination
+            image_path = os.path.join(image_folder, image)
+            frame = cv2.imread(image_path)
+            d_video.write(frame)
+
+    cv2.destroyAllWindows()
+    video.release()
+
+    if d_video:
+        d_video.release()
+
+def convert_to_9_class(data, joint_output):
+    '''
+    Converts a dataset from 3-class to 9-class
+
+    Arguments
+    ---------
+    data: str or List(List())
+        list of datasets or the path to their file location
+    joint_output: str
+        output file path
+
+    Returns
+    -------
+    None
+    '''
+    data, _ = process_data_input(data, None)
+    new_data = []
+    for i, row in enumerate(data):
+        #check row 2, 3 and 4 and place answer in row 2
+        if row[2] == 0 and row[3] == 0 and row[4] == 0:
+            row[2] = 0
+        elif row[2] == 0 and row[3] == 1 and row[4] == 0:
+            row[2] = 1
+        elif row[2] == 0 and row[3] == 0 and row[4] == 1:
+            row[2] = 2
+        
+        elif row[2] == 1 and row[3] == 0 and row[4] == 0:
+            row[2] = 3
+        elif row[2] == 1 and row[3] == 1 and row[4] == 0:
+            row[2] = 4
+        elif row[2] == 1 and row[3] == 0 and row[4] == 1:
+            row[2] = 5
+
+        elif row[2] == 2 and row[3] == 0 and row[4] == 0:
+            row[2] = 6
+        elif row[2] == 2 and row[3] == 1 and row[4] == 0:
+            row[2] = 7
+        elif row[2] == 2 and row[3] == 0 and row[4] == 1:
+            row[2] = 8
+
+        new_data.append(row)
+    
+    save_dataset(new_data, joint_output)
