@@ -22,7 +22,7 @@ import Programs.Data_Processing.HCF as HCF
 
 class JointDataset(Dataset):
     def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = joint_connections_m_hip,
-                  cycles = True, meta = 5, person = None, preset_cycle = None, interpolate = True, ensemble = False):
+                  cycles = True, meta = 5, preset_cycle = None, interpolate = True, ensemble = False):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
@@ -36,7 +36,6 @@ class JointDataset(Dataset):
         self.num_nodes_per_graph = 0
         self.meta = meta
         self.cycle_indices = []
-        self.person = person
         self.ensemble = ensemble
         self.preset_cycle = preset_cycle
         self.interpolate = interpolate
@@ -92,16 +91,17 @@ class JointDataset(Dataset):
         return new_cycles
 
     def process(self):
+        '''
+        Overloaded process function, this function processes dataset objects passed as the dataset to be contained into Torch format and saves them
+        as .pt files
+
+        Returns
+        -------
+        None
+        '''
+        #read in the raw data
         self.data = pd.read_csv(self.raw_paths[0], header=None)
         self.data = convert_to_literals(self.data)
-
-        if self.person != None:
-            self.data = self.data[self.data.iloc[:, 5] == self.person]
-
-            instances = []
-            for index, row in self.data.iterrows():
-                if row[0] not in instances:
-                    instances.append(row[0])
 
         #Get the joint adjacency matrix
         coo_matrix = get_COO_matrix(self.joint_connections)
@@ -128,6 +128,7 @@ class JointDataset(Dataset):
             if len(d) > self.max_cycle:
                 self.max_cycle = len(d)
         
+        #Save the data points after converting them to graphs
         self.data = pd.DataFrame(self.data_cycles)
         self.num_cycles = len(self.data_cycles)
         for index, row in enumerate(tqdm(self.data_cycles)):
@@ -153,24 +154,32 @@ class JointDataset(Dataset):
         return self.data.shape[0]
 
     def get(self, idx):
-        #if self.cycles:
-        #    frame_count = 0
-        #    for i, c in enumerate(self.cycle_indices):
-        #        if idx <= frame_count:
-        #            break
-        #        else:
-        #            frame_count += c
-
         if self.test:
             data = torch.load(os.path.join(self.processed_dir, 
                                  f'data_test_{idx}.pt'))
         else:
             data = torch.load(os.path.join(self.processed_dir, 
                                  f'data_{idx}.pt'))    
-
         return data
 
     def modify_COO_matrix(self, gait_cycle_length, connections, current_matrix):
+        '''
+        This continually adds new sub-graphs to the COO matrix to thread together all the frames
+        of a gait cycle into one graph
+
+        Arguments
+        ---------
+        gait_cycle_length: int
+            the length of the current cycle to be added     
+        connections: List(Tuple())
+            The indices of the joint connections
+        current_matrix:
+            The current main graph to add the new subgraph to
+        Returns
+        -------
+        List(List())
+            The updated COO matrix
+        '''
         #Get number of joints per graph:
         #17 connections is mid-hip appended full graph
         current_matrix = copy.deepcopy(current_matrix)
@@ -218,9 +227,27 @@ def convert_to_literals(data, meta = 5):
             else:
                 data.iat[i, col_index] = data.iat[i, col_index]
     return data
-            
+
 #Input here would be each row
-def data_to_graph(row, coo_matrix, meta = 5, ensemble = False):
+def data_to_graph(row, coo_matrix, meta = 5):
+    '''
+    Transforms graph objects into Pytorch objects
+
+    Arguments
+    ---------
+    row: List()
+        the frames added to the graph
+    coo_matrix: List(Tuple())
+        coo_maxtrix of the graph
+    meta: int (optional, default = 5)
+        The amount of metadata to be expected
+
+    Returns
+    -------
+    Pytorch.Data
+        The graph as a Pytorch Data object
+
+    '''
     gait_cycle = []
     y_arr = []
     per_arr = []
@@ -234,7 +261,6 @@ def data_to_graph(row, coo_matrix, meta = 5, ensemble = False):
             gait_cycle = row_as_array
         else:   
             gait_cycle = np.concatenate((gait_cycle, row_as_array), axis=0)
-    #Verify gait cycle is calculated correctly:
     #Pass entire cycle as single graph
     data = Data(x=torch.tensor(list(gait_cycle), dtype=torch.float),
         y=torch.tensor([y], dtype=torch.long),
@@ -242,7 +268,6 @@ def data_to_graph(row, coo_matrix, meta = 5, ensemble = False):
         person = per_arr
         )
     return data
-
 
 class HCFDataset(Dataset):
     def __init__(self, root, filename, test=False, transform=None, pre_transform=None,
@@ -284,6 +309,14 @@ class HCFDataset(Dataset):
         pass
 
     def process(self):
+        '''
+        Overloaded process function, this function processes dataset objects passed as the dataset to be contained into Torch format and saves them
+        as .pt files
+
+        Returns
+        -------
+        None
+        '''
         self.data = pd.read_csv(self.raw_paths[0], header=None)
         self.data = convert_to_literals(self.data)
 
@@ -303,14 +336,6 @@ class HCFDataset(Dataset):
         return self.data.shape[0]
 
     def get(self, idx):
-        if self.cycles:
-            frame_count = 0
-            for i, c in enumerate(self.cycle_indices):
-                if idx <= frame_count:
-                    true_indice = i
-                    break
-                else:
-                    frame_count += c
         if self.test:
             data = torch.load(os.path.join(self.processed_dir, 
                                  f'data_test_{idx}.pt'))
@@ -321,17 +346,28 @@ class HCFDataset(Dataset):
     
 #Input here would be each row
 def data_to_tensor(row):
+    '''
+    Transforms HCF data rows into Pytorch objects
+
+    Arguments
+    ---------
+    row: List()
+        the frames added to the datapoint
+
+    Returns
+    -------
+    Pytorch.Data
+        The data as a Pytorch Data object
+
+    '''
     #The single instance per row case (No gait cycles, row is a single frame)
     if isinstance(row[0], np.ndarray) == False and isinstance(row[0], list) == False:
         refined_row = row.iloc[3:]
         node_f= refined_row
-
         #This is standard Data that has edge shit
         row_as_array = np.array(node_f.values.tolist())
-
         #Turn into one-hot vector
         y = int(row.iloc[2])
-
         data = Data(x=torch.tensor([row_as_array], dtype=torch.float),
                     y=torch.tensor([y], dtype=torch.long))
                 

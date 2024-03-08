@@ -1,42 +1,53 @@
+'''
+This file contains all the utility methods related to GCN and machine learning functions
+'''
+#imports
+import copy
+import time
 import torch
 torch.manual_seed(42)
-from sklearn.metrics import f1_score
 from torch_geometric.loader import DataLoader as GeoLoader
-from torch.utils.data import RandomSampler, SubsetRandomSampler
+from torch.utils.data import RandomSampler
 from sklearn.model_selection import StratifiedKFold
-import copy
+from sklearn.metrics import f1_score, confusion_matrix
+#dependencies
 import Programs.Data_Processing.Utilities as Utilities
 import Programs.Data_Processing.Dataset_Creator as Creator
-from sklearn.metrics import confusion_matrix
-import time
 
-
-def assess_data(dataset):
-    print("Dataset type: ", type(dataset), type(dataset[0]))
-    print('------------')
-    print(f'Number of graphs: {len(dataset)}')
-    print(f'Number of features: {dataset.num_features}')
-    print(f'Number of nodes: {dataset[0].num_nodes}')
-    print(f'Number of classes: {dataset.num_classes}')
-    #Print individual node information
-    data = dataset[0]
-    print(f'x = {data.x.shape}')
-    print(data.x)
-    print(data.y.shape, type(data.y), data.y)
-    print(f'Edges are directed: {data.is_directed()}')
-    print(f'Graph has isolated nodes: {data.has_isolated_nodes()}')
-    print(f'Graph has loops: {data.has_self_loops()}')
-    #Plot graph data using networkX
-    #Render.plot_graph(data)
-
-    # Calculate accuracy
+#utility function to get accuracy from array of predictions
 def accuracy(pred_y, y):
     return (pred_y == y).sum() / len(y)
     
-        
-# define a cross validation function
-def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=None,k_fold=3, batch = 16, inputs_size = 1,
-                 epochs = 100, type = "GAT", make_loaders = False, device = 'cuda'):
+
+def cross_valid(m_model, test_dataset, datasets=None,k_fold=3, batch = 16,
+                 epochs = 100, make_loaders = False, device = 'cuda'):
+    '''
+    creates a series of datasets from individual person datasets
+
+    Arguments
+    ---------
+    m_model: Torch.Model()
+        Machine learning model to be copied at every fold 
+    test_dataset: Torch.Dataset()
+        test set
+    datasets: List(Torch.Model())
+        train and validation datasets
+    k_fold: int (optional, default = 3)
+        number of folds for validation
+    batch: int (optional, default = 3)
+        batch size
+    epochs: int (optional, default = 100)
+        number of epochs per fold
+    make_loaders: bool (optional, default = False)
+        indicates whether to save the dataloaders
+    device: str (optional, default = 'cuda')
+        indicates device, either 'cpu' or 'cuda'
+    
+    Returns
+    -------
+    Torch.Model, List(), List(), List()
+        returns the model and the various scoring metrics
+    '''
     train_score = []
     val_score = []
     test_score = []
@@ -59,21 +70,12 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
     total_preds = []
     total_ys = []
     for fold in range(k_fold):
+        print(f"Fold: {fold} of {k_fold}")
         start = time.time()
-        print("Fold: ", fold)
         train_loaders = []
         val_loaders = []
         test_loaders = []
 
-        #Set up so identical seed is used
-        #G = torch.Generator()
-        #train_sample = RandomSampler(folded_train[0][fold], generator=G,)
-        ##Restrict validation and testing batch sizes to be one batch
-        #val_sample = RandomSampler(folded_val[0][fold], generator=G)
-        #test_sample = RandomSampler(test_dataset[0], generator=G)
-
-        #init = G.get_state()
-        print("whats i go up to here: ", len(datasets))
         for i, dataset in enumerate(datasets):
             G = torch.Generator()
             train_sample = RandomSampler(folded_train[i][fold], generator=G,)
@@ -92,14 +94,10 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
 
             if make_loaders:
                 return train_loaders, val_loaders, test_loaders
-            #Reset the generator so every dataset gets the same sampling 
-            #G.set_state(init)
-       # G.set_state(init)
-
-        model = copy.deepcopy(MY_model)
+        #reset the model, train and save the results to the result lists
+        model = copy.deepcopy(m_model)
         model = model.to(device)
         model, accuracies, vals, tests, all_y, all_pred = train(model, train_loaders, val_loaders, test_loaders, G, epochs, batch, device)
-        #model, accuracies, vals, tests, all_y, all_pred = train_individual(model, train_loaders, val_loaders, test_loaders, G, epochs, batch, device)
         total_ys += all_y
         total_preds += all_pred
         train_score.append(accuracies[-1])
@@ -108,14 +106,38 @@ def cross_valid(MY_model, test_dataset, criterion=None,optimizer=None,datasets=N
         end = time.time()
         print("time elapsed: ",fold,  end - start)
 
-    #print("final confusion: ")
-    #print(confusion_matrix(total_ys, total_preds))
+    print("final confusion: ")
+    print(confusion_matrix(total_ys, total_preds))
     f1 = f1_score(total_ys, total_preds, average='weighted')
     print("f1 score: ", f1)
-    
     return model, train_score, val_score, test_score
 
-def train(model, loader, val_loader, test_loader, generator, epochs, batch_size, device):
+def train(model, loader, val_loader, test_loader, generator, epochs, device):
+    '''
+    creates a series of datasets from individual person datasets
+
+    Arguments
+    ---------
+    model: Torch.Model()
+        Machine learning model
+    loader: Torch.Dataloader()
+        train loader object
+    val_loader: Torch.Dataloader()
+        val loader object
+    test_loader: Torch.Dataloader()
+        test loader object
+    generator: Torch.Generator
+        generator object for consistent seed generation across datasets
+    epochs: int (optional, default = 100)
+        number of epochs per fold
+    device: str (optional, default = 'cuda')
+        indicates device, either 'cpu' or 'cuda'
+    
+    Returns
+    -------
+    Torch.Model, List(), List(), List(), List(), List()
+        returns the model and the various scoring metrics
+    '''
     init = generator.get_state()
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(),
@@ -208,7 +230,30 @@ def train(model, loader, val_loader, test_loader, generator, epochs, batch_size,
     #return model
     return model, train_accs, val_accs, test_accs, all_y, all_pred
 
-def test(model, loaders, generator, validation, train = False, x_b = None, i_b = None, b_b = None, optimizer = None, device = 'cuda'):
+def test(model, loaders, generator, validation, train = False, device = 'cuda'):
+    '''
+    creates a series of datasets from individual person datasets
+
+    Arguments
+    ---------
+    model: Torch.Model()
+        Machine learning model
+    loaders: Torch.Dataloader()
+        test loader object
+    generator: Torch.Generator
+        generator object for consistent seed generation across datasets
+    validation: bool
+        indicates whether this is validation or test
+    train: bool (optional, default = false)
+        indicates whether to adjust gradients or not in model
+    device: str (optional, default = 'cuda')
+        indicates device, either 'cpu' or 'cuda'
+    
+    Returns
+    -------
+    List(), List(), List(), List()
+        returns the model and the various scoring metrics
+    '''
     init = generator.get_state()
     criterion = torch.nn.CrossEntropyLoss()
     model.eval()
@@ -258,64 +303,51 @@ def test(model, loaders, generator, validation, train = False, x_b = None, i_b =
 
     return total_loss, acc, all_pred, all_y
 
-def unfold_3s_dataset(data, joint_output):
-    rel_data = []
-    vel_data = []
-    bones_data = []
 
-    for frame in data:
-        rel_frame = frame[0:6]
-        vel_frame = frame[0:6]
-        bones_frame = frame[0:6]
-        for i, coord in enumerate(frame):
-            if i > 5:
-                rel_frame.append(coord[0:3])
-                vel_frame.append(coord[3:6])
-                bones_frame.append(coord[6:])
-        rel_data.append(rel_frame)
-        vel_data.append(vel_frame)
-        bones_data.append(bones_frame)
+def load_whole_dataset(folder_names, file_name, col_names = Utilities.colnames_midhip):
+    '''
+    Load one or a series of datasets
+
+    Arguments
+    ---------
+    folder_names: str
+        file paths to the folders
+    file_name: str
+        file name in each folder to load
+    col_names: List(Tuple()) (optional, default = colnames_midhip)
+        column names to append
     
-    Utilities.save_dataset(rel_data, joint_output + "_rel")
-    Utilities.save_dataset(vel_data, joint_output + "_vel")
-    Utilities.save_dataset(bones_data, joint_output + "_bone")
-
-def load_whole_dataset(folder_names, file_name, col_names = Utilities.colnames_midhip, override = False):
+    Returns
+    -------
+    List(List())
+        returns the loaded datasets in a list
+    '''
     data = []
     for name in folder_names:
         print("loading: ", "./Code/Datasets/Joint_Data/" + str(name) + '/' + str(file_name) + "/raw/"+ str(file_name) + ".csv")
-        if override == False:
-            abs_joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(name) + str(file_name) + "/raw/"+ str(file_name) + ".csv", None,
+        abs_joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(name) + str(file_name) + "/raw/"+ str(file_name) + ".csv", None,
                                                                     cols=col_names, ignore_depth=False)
-        else:
-            #Override to load raw data which is in a different format
-            abs_joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(name) + str(file_name) + ".csv", None,
-                                                                    cols=Utilities.colnames, ignore_depth=False)
         data.append(abs_joint_data)
     return data
 
-#Make 9 class solution 
-def change_to_ensemble_classes():
-    joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/big/no_subtracted/2_people/raw/2_people.csv",
-                                                            None, cols=Utilities.colnames_nohead, ignore_depth=False)
-    Creator.convert_person_to_type(joint_data, joint_output="./Code/Datasets/Joint_Data/big/2_people_Ensemble")
-
-#Remove one individual and create their own dataset for leave one out testing
-def extract_single_person(data, joint_output, person = [0,1,2]):
-    single_person = []
-    full_dataset = []
-    for i, row in enumerate(data):
-        if row[5] in person:
-            single_person.append(row)
-        else:
-            full_dataset.append(row)
-
-    Utilities.save_dataset(single_person, joint_output + "_single")
-    Utilities.save_dataset(full_dataset, joint_output + "_full")
 
 #Stitch up datasets of individuals to create a full dataset
 def stitch_dataset(folder_names, stream = 1):
-    #1s file
+    '''
+    stitch together multiple single person datasets into one multi-person dataset
+
+    Arguments
+    ---------
+    folder_names: str
+        file paths to the folders
+    stream: int (optional, default = 1)
+        denotes which data file type to stitch together
+    
+    Returns
+    -------
+    List(List())
+        returns the loaded datasets in a list
+    '''
     if stream == 1: # rel
         file_name = '/rel_data'
     elif stream == 2: # bone
@@ -329,36 +361,34 @@ def stitch_dataset(folder_names, stream = 1):
     elif stream == 6: #rel vel bone
         file_name = '/comb_data_rel_vel_bone'
 
-
+    #load in the datasets 
     datasets = load_whole_dataset(folder_names, file_name)
     whole_dataset = datasets[0]
     current_instance = whole_dataset[-1][0]
+    #gradually append the datasets one at a time together, saving at each step for ablation studies
     for i, dataset in enumerate(datasets):
-        save = False
-        if i >= len(datasets) - 1:
-            save = True
         if i > 0:
             current_instance, whole_dataset = Utilities.assign_person_number(whole_dataset, dataset, 
                                                                        "./Code/Datasets/Joint_Data/Big/no_Sub_" + str(stream) + "_stream/" + str(i + 1) + "_people",
                                                                        i, current_instance)
     print("completed.")
 
-#Compress datasets by removing 0s
-def reduce_dataset(data, joint_output):
-    for i, row in enumerate(data):
-        for j, value in enumerate(row):
-            if j > 5:
-                if all(item == 0 for item in value):
-                    data[i][j] = ""
-                    
-    Utilities.save_dataset(data, joint_output)
-
-
 def get_gait_segments(joint_data):
+    '''
+    Splits all data into segments of 7 for approximate gait segments
+
+    Arguments
+    ---------
+    joint_data: List(List())
+    
+    Returns
+    -------
+    List(List())
+        returns the dataset in the form of gait segments
+    '''
     instances = []
     instance = []
     current_instance = joint_data[0][0]
-    
     #First separate the joints into individual instances
     for joints in joint_data:
         #Append joints as normal
@@ -377,17 +407,12 @@ def get_gait_segments(joint_data):
     segments = []
     for instance in instances:
         segment = []
-        num_in_segment = int(len(instance)/division_factor)
-
         for i, frame in enumerate(instance):
             if i % division_factor == 0:
                 if len(segment) >0:
                     segments.append(copy.deepcopy(segment))
                     segment = []
                 segment.append(frame)
-
             else:
                 segment.append(frame)
-    
-    print("segments should be ", len(segments), len(joint_data), division_factor)
     return segments
