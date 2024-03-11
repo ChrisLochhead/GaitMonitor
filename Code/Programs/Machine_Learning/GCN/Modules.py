@@ -120,7 +120,7 @@ class STJA_GCN_Block(torch.nn.Module):
         self.first = first
         if first:
             self.b0 = BatchNorm1d(in_channels).to(device) 
-            self.spatial_conv = GATv2Conv(in_channels, int(dim_h * 2), heads=2).to(device)
+            self.spatial_conv = GATv2Conv(in_channels, int(dim_h), heads=2).to(device)
             self.skip_connection = torch.nn.Conv1d(in_channels, int(dim_h*2), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
         else:
             self.b0 = BatchNorm1d(int(in_channels * 2)).to(device)  

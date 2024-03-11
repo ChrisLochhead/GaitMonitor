@@ -97,7 +97,7 @@ def cross_valid(m_model, test_dataset, datasets=None,k_fold=3, batch = 16,
         #reset the model, train and save the results to the result lists
         model = copy.deepcopy(m_model)
         model = model.to(device)
-        model, accuracies, vals, tests, all_y, all_pred = train(model, train_loaders, val_loaders, test_loaders, G, epochs, batch, device)
+        model, accuracies, vals, tests, all_y, all_pred = train(model, train_loaders, val_loaders, test_loaders, G, epochs, device)
         total_ys += all_y
         total_preds += all_pred
         train_score.append(accuracies[-1])
@@ -199,7 +199,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device):
 
         # Validation
         generator.set_state(init)
-        val_loss, val_acc, _, _ = test(model, val_loader, generator, train = True, validation=True, optimizer = optimizer, device = device)
+        val_loss, val_acc, _, _ = test(model, val_loader, generator, validation=True, device = device)
         val_accs.append(val_acc)
 
         # Print metrics every 10 epochs

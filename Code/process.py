@@ -7,7 +7,7 @@ import Programs.Data_Processing.Dataset_Creator as Creator
 import Programs.Machine_Learning.GCN.Dataset_Obj as Dataset_Obj
 import Programs.Data_Processing.Render as Render
 import Programs.Machine_Learning.GCN.GAT as gat
-import Programs.Machine_Learning.GCN.STAGCN as stgcn
+import Programs.Machine_Learning.GCN.GCN_GraphNetwork as stgcn
 import Programs.Machine_Learning.GCN.Utilities as graph_utils
 
 #imports
@@ -380,11 +380,12 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
     dim_out = 3
     if multi_dim:
         dim_out = 6
+
     print("\nCreating {} datasets: ".format(len(datasets)))
     print("going in: ", datasets[0].num_node_features)
-    model = stgcn.GraphNetwork(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=dim_out, n_inputs=num_datasets,
+    model = stgcn.GCN_GraphNetwork(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=dim_out, n_inputs=num_datasets,
                                 data_dims=data_dims, batch_size=batch_size, hcf=hcf,
-                                max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph, device = device, type=2)
+                                max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph, device = device, type='Gait_Graph2_Block')
     
     if load != None:
         print("loading model")

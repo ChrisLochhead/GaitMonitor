@@ -79,12 +79,14 @@ class GCN_GraphNetwork(torch.nn.Module):
                     for i in range(1, self.size_stgcn):
                         i_stream.append(STJA_GCN_Block(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph, device))
                     self.streams.append(i_stream)
-                elif self.model_type == 'Cust_STGCNBlock':
+                elif self.model_type == 'ST_TAGCN_Block':
                     i_stream.append(ST_TAGCN_Block(self.dim_in[0], self.stgcn_filters[0], 5, self.batch_size, self.cycle_size,
                                                 self.num_nodes_per_graph, device, first=True))
                     for i in range(1, self.size_stgcn):
                         i_stream.append(ST_TAGCN_Block(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph, device))
                     self.streams.append(i_stream)
+                else:
+                    print("Type entry not valid")
         
         #Assign input value for final linear layers after combination
         self.len_steams = len(self.streams)
