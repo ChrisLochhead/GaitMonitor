@@ -14,11 +14,12 @@ import Programs.Machine_Learning.GCN.Utilities as graph_utils
 import time
 import random
 import math
+import pandas as pd
 random.seed(42)
 import torch
 torch.manual_seed(42)
 torch.cuda.empty_cache()
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
 def process_images_into_joints(folder):
     '''
     This is a sub function containing the first part of the pre-processing pipeline, namely involving the computationally expensive joint-position extraction
@@ -80,10 +81,10 @@ def process_joint_normalization(folder, abs_joint_data, image_data, scale_joints
     ''' 
     print("lens: ", len(image_data), len(abs_joint_data))
     if norm_joints:
-        Render.render_joints_series(image_data, abs_joint_data, 10, True)
+        #Render.render_joints_series(image_data, abs_joint_data, 10, True)
         abs_joint_data = Creator.create_normalized_dataset(abs_joint_data, image_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(norm)")
     if scale_joints:
-        abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, None, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
+        abs_joint_data = Creator.create_scaled_dataset(abs_joint_data, image_data, joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(scaled)")
     return abs_joint_data, image_data
 
 def generate_single_stream_dataset(folder, joint_data, prefix = 'rel', subtr = True):
@@ -114,7 +115,7 @@ def generate_single_stream_dataset(folder, joint_data, prefix = 'rel', subtr = T
                                                         base_output="./Code/Datasets/Joint_Data/" + str(folder) + "/" + str(prefix) +"_base")
 
     dum_data = Creator.create_dummy_dataset(joint_data, 
-                                                 output_name="./Code/Datasets/Joint_Data/" + str(folder) + "/" + str(prefix) +"_data")
+                                                 joint_output=         "./Code/Datasets/Joint_Data/" + str(folder) + "/" + str(prefix) +"_data")
     
     return joint_data, dum_data
 
@@ -142,15 +143,15 @@ def process_data(folder = "Chris", run_ims = False, norm_joints = True, scale_jo
     else:
         abs_joint_data, image_data = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)/raw/3_Absolute_Data(trimmed instances).csv",
                                                               "./Code/Datasets/Individuals/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
-    
+
     #Add the mid-hip joint
-    abs_joint_data = Creator.append_midhip(abs_joint_data, image_data, 
-                                                   joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(midhip)")
+    #abs_joint_data = Creator.append_midhip(abs_joint_data, image_data, 
+    #                                               joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(midhip)")
 
     #Save the un-normalized absolute joints for calculating bone angles later
     imperfect_joints = copy.deepcopy(abs_joint_data)
 
-    abs_joint_data, image_data = process_joint_normalization(folder, abs_joint_data, image_data, scale_joints, norm_joints)
+    #abs_joint_data, image_data = process_joint_normalization(folder, abs_joint_data, image_data, scale_joints, norm_joints)
     
     #Create relative, velocity and bone datasets
     print("\nStage 7: Relativizing data")
@@ -162,17 +163,17 @@ def process_data(folder = "Chris", run_ims = False, norm_joints = True, scale_jo
                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/Bones_Data")
     
     #Apply subtraction and dummying
-    relative_joint_data, rel_dum_data = generate_single_stream_dataset(folder, relative_joint_data, prefix='rel', subtr=subtract)
-    velocity_data, vel_dum_data = generate_single_stream_dataset(folder, velocity_data, prefix='vel', subtr=subtract)
-    joint_bones_data, bone_dum_data = generate_single_stream_dataset(folder, joint_bones_data, prefix='bone', subtr=subtract)
+    #relative_joint_data, rel_dum_data = generate_single_stream_dataset(folder, relative_joint_data, prefix='rel', subtr=subtract)
+    #velocity_data, vel_dum_data = generate_single_stream_dataset(folder, velocity_data, prefix='vel', subtr=subtract)
+    #joint_bones_data, bone_dum_data = generate_single_stream_dataset(folder, joint_bones_data, prefix='bone', subtr=subtract)
 
     #Combine datasets
-    Creator.combine_datasets(rel_dum_data, vel_dum_data, None, image_data,
-                                            joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data_rel_vel")
-    Creator.combine_datasets(rel_dum_data, vel_dum_data, bone_dum_data, image_data,
-                                            joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data_rel_vel_bone")
-    Creator.combine_datasets(vel_dum_data, bone_dum_data, None, image_data,
-                                             joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data_bone_vel")
+    #Creator.combine_datasets(rel_dum_data, vel_dum_data, None, image_data,
+    #                                        joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data_rel_vel")
+    #Creator.combine_datasets(rel_dum_data, vel_dum_data, bone_dum_data, image_data,
+    #                                        joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data_rel_vel_bone")
+    #Creator.combine_datasets(vel_dum_data, bone_dum_data, None, image_data,
+    #                                         joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data_bone_vel")
 
 
 def load_datasets(types, folder, multi_dim = False, num_people = 3):
@@ -202,15 +203,9 @@ def load_datasets(types, folder, multi_dim = False, num_people = 3):
         print("loading dataset {} of {}. ".format(i + 1, len(types)), t)
         #Type 1: Normal, full dataset
         if t == 1:  
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/Relative_Data', 
-                                        'Relative_Data.csv',             
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/2_people', 
+                                        '2_people.csv',             
                                             joint_connections=Render.joint_connections_n_head))   
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/Velocity_Data', 
-            #                                        'Velocity_Data.csv',             
-            #                                         joint_connections=Render.joint_connections_n_head))      
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/Bones_Data', 
-            #                                        'Bones_Data.csv',             
-            #                                         joint_connections=Render.joint_connections_n_head))   
             #2s ST-GCN
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "no_sub_1_stream" + f'/{num_people}_people', 
             #                            f'{num_people}_people.csv',             
@@ -385,7 +380,7 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
     print("going in: ", datasets[0].num_node_features)
     model = stgcn.GCN_GraphNetwork(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=dim_out, n_inputs=num_datasets,
                                 data_dims=data_dims, batch_size=batch_size, hcf=hcf,
-                                max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph, device = device, type='Gait_Graph2_Block')
+                                max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph, device = device, type='VAE')
     
     if load != None:
         print("loading model")
@@ -446,7 +441,7 @@ def create_datasets(streams = [1,2,3,4,5,6]):
     folder_names = ['ahmed', 'Amy', 'Anna', 'bob', 'cade', 'emma', 'erin', 
                     'grant', 'pheobe', 'scarlett', 'sean c', 'sean g', 'wanok']
     for p in folder_names:
-        #Current run: 0, 0, 0
+        #Current run: 1, 0, 1
         process_data(p, run_ims=False, norm_joints=True, scale_joints=True, subtract=True)
     
     for s in streams:
@@ -481,11 +476,48 @@ def make_comb(folder, rel_path, vel_path, bone_path):
     Creator.combine_datasets(rel, vel, None, None,
                                                 joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data_rel_vel")
     
+
+#TEMP FUNCTIONS HERE
+########################################################################################################################################################################################### 
+def remove_z(joint_source, joint_output):
+    joints, _ = Utilities.process_data_input(joint_source, None)
+
+    for i, row in enumerate(joints):
+        for j, coord in enumerate(row):
+            if j > 5:
+                joints[i][j][2] = 0
+    
+    Utilities.save_dataset(joints, joint_output)
+    #81 vs 
+
+def replace_nans(joint_source, joint_output):
+    data, _ = Utilities.process_data_input(joint_source, None)
+    Utilities.save_dataset(data, joint_output)
+
+###########################################################################################################################################################################################
 if __name__ == '__main__':
-    #start and run a model
+    #create_datasets()
+    #process_data('Path')
+
+    #T_GCN, VELOCITY AND POSITION: 
     start = time.time()
     run_model(dataset_types= [1], hcf=False,
-            batch_size = 128, epochs = 80, folder="path",
-            save =None, load=None, leave_one_out=False, multi_dim=True, num_people=13)
+            batch_size = 128, epochs = 80, folder="big/Scale_1_Norm_1_Subtr_1/no_sub_4_stream",
+            save =None, load=None, leave_one_out=False, multi_dim=False, num_people=13)
     end = time.time()
     print("time elapsed: ", end - start)
+
+#TODO Plan
+'''
+Disjointed-ST-GCN
+- transform GCN class into same shape as ST-GCN just without the spatio-temporal
+- make one TGCN and one SGCN
+- pass velocities to TGCN and positions to SGCN
+- do classification on both and see if there's an improvement
+- construct a weighted ensemble method either by voting and then potentially a combination?
+
+VAE-ST-GCN
+- make an autoencoder
+- make it work for ST-GCN
+- generate data and see how it works vs traditional noise-based data
+'''

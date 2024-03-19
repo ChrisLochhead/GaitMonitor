@@ -92,6 +92,7 @@ def normalize_joint_scales(joint_data, image_data = None, meta = 5, width = 424,
     norm_joints = []
     for i, instance in enumerate(tqdm(joint_data)):
         #Add metadata
+        render_joints(image_data[i], joint_data[i], True)
         norm_joint_row = instance[0:meta + 1]
         for j, joint in enumerate(instance):
             #Ignore metadata
@@ -112,9 +113,9 @@ def normalize_joint_scales(joint_data, image_data = None, meta = 5, width = 424,
                           round(joint[2], 2)]
             norm_joint_row.append(norm_joint)
         norm_joints.append(norm_joint_row)
+        render_joints(image_data[i], norm_joints[i], True)
     return norm_joints
-        
-  
+    
 def trim_frames(joint_data, image_data = None, trim = 5):
     '''
     A simple utility function to trim any excess frames to avoid the noise caused by individuals walking onto/out of the FOV of the camera.
@@ -293,3 +294,6 @@ def normalize_outlier_depths(joints_data, image_data = None, meta = 5):
                         joints_data[i][indice][2] = quartiles[2]
                         continue   
     return joints_data
+
+
+    

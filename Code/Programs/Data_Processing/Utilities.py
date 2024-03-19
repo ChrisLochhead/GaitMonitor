@@ -467,7 +467,9 @@ def convert_to_literals(data, metadata = True, m = 5):
     for i,  (index, row) in enumerate(data.iterrows()):
         for col_index, col in enumerate(row):
             if col_index > m and metadata == True or metadata == False:
-                tmp = ast.literal_eval(row[col_index])
+                if 'nan' in row[col_index].lower():
+                    data.iat[i, col_index] = data.iat[i, col_index].replace('nan', '0.0')
+                tmp = ast.literal_eval(data.iat[i, col_index])
                 data.iat[i, col_index] = copy.deepcopy(tmp)
             else:
                 data.iat[i, col_index] = float(data.iat[i, col_index])

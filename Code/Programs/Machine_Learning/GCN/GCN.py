@@ -44,3 +44,107 @@ class GCN(torch.nn.Module):
         h = self.lin2(h)
 
         return h, F.log_softmax(h, dim=1)
+
+from torch_geometric.nn import global_add_pool,  GATv2Conv, ChebConv
+from torch.nn import Linear, BatchNorm1d, ReLU
+
+class S_GCN(torch.nn.Module):
+    def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, spatial_size, device, first = False):
+        super(S_GCN, self).__init__()
+        #Layers
+        self.first = first
+        if first:
+            self.b0 = BatchNorm1d(in_channels).to(device) 
+            self.spatial_conv = ChebConv(in_channels, int(dim_h*2), 1).to(device)
+            self.skip_connection = torch.nn.Conv1d(in_channels, int(dim_h*2), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
+        else:
+            self.b0 = BatchNorm1d(int(in_channels * 2)).to(device)  
+            self.spatial_conv = ChebConv(int(in_channels * 2 ), int(dim_h * 2), 1).to(device) 
+            self.skip_connection = torch.nn.Conv1d(int(in_channels*2), int(dim_h*2), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)           
+            
+
+        double_dim = int(dim_h * 2)
+        self.b1 = BatchNorm1d(double_dim).to(device)
+        self.b2 = BatchNorm1d(cycle_size).to(device)
+        self.b3 = BatchNorm1d(int(dim_h)).to(device)
+        self.relu = ReLU()
+        self.dropout = torch.nn.Dropout(0.1)
+        self.in_channels = in_channels
+        #Shape Info
+        self.batch_size = batch_size
+        self.cycle_size = cycle_size
+
+    def forward(self, x, edge_index, train):
+        #print("initial x: ", x.shape, self.in_channels)
+        if self.batch_size > 1:
+            x = self.b0(x)
+
+        residual = x
+        residual = self.relu(self.skip_connection(residual))
+        #Convert to 2D representation for GAT layer (Batch * Cycle, Channel)
+        x = x.view(x.shape[2] * x.shape[0], x.shape[1])
+        x = self.relu(self.b1(self.spatial_conv(x, edge_index)))
+        x = x.view(self.batch_size, x.shape[1], self.cycle_size)
+        x = x.view(self.batch_size, self.cycle_size, -1)
+        x = x.view(x.shape[1] * x.shape[0], x.shape[2])
+        x = x.view(self.batch_size, x.shape[1], self.cycle_size)
+        #Apply dropout and residual
+        x = residual + x
+        x = self.dropout(x)
+        return x
+    
+
+class T_GCN(torch.nn.Module):
+    def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, spatial_size, device, first = False):
+        super(T_GCN, self).__init__()
+        #Layers
+        self.first = first
+        if first:
+            self.b0 = BatchNorm1d(in_channels).to(device) 
+            self.spatial_conv = ChebConv(in_channels, int(dim_h*2), 1).to(device)
+            self.temporal_conv = ChebConv(in_channels, int(dim_h*2), 1).to(device)
+            self.skip_connection = torch.nn.Conv1d(in_channels, int(dim_h*2), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)
+        else:
+            self.b0 = BatchNorm1d(int(in_channels * 2)).to(device)  
+            self.spatial_conv = ChebConv(int(in_channels * 2 ), int(dim_h * 2), 1).to(device) 
+            self.skip_connection = torch.nn.Conv1d(int(in_channels*2), int(dim_h*2), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)           
+            
+            self.temporal_conv = ChebConv(int(dim_h*2), int(dim_h*2), 1).to(device)
+
+        double_dim = int(dim_h * 2)
+        self.b1 = BatchNorm1d(double_dim).to(device)
+        self.b2 = BatchNorm1d(cycle_size).to(device)
+        self.b3 = BatchNorm1d(int(dim_h)).to(device)
+        self.relu = ReLU()
+        self.dropout = torch.nn.Dropout(0.1)
+        self.in_channels = in_channels
+        #Shape Info
+        self.batch_size = batch_size
+        self.cycle_size = cycle_size
+
+    def forward(self, x, edge_index, train):
+        #print("initial x: ", x.shape, self.in_channels)
+        if self.batch_size > 1:
+            x = self.b0(x)
+
+        residual = x
+        residual = self.relu(self.skip_connection(residual))
+        #print("after residual process", x.shape)
+        #Convert to 2D representation for GAT layer (Batch * Cycle, Channel)
+        x = x.view(x.shape[2] * x.shape[0], x.shape[1])
+        #Apply standard spatial convolution
+        #x = self.relu(self.b1(self.spatial_conv(x, edge_index)))
+        #Switch to temporal format (keep channels for the residual) maybe not needed
+        x = x.view(self.batch_size, x.shape[1], self.cycle_size)
+        x = x.view(self.batch_size, self.cycle_size, -1)
+        #Put it back into 2 dims
+        x = x.view(x.shape[1] * x.shape[0], x.shape[2])
+        #Convolve w/attention in the temporal direction
+        x = self.relu(self.b1(self.temporal_conv(x, edge_index)))
+        #Restore to temporal shape
+        x = x.view(self.batch_size, x.shape[1], self.cycle_size)
+        #Apply dropout and residual
+        x = residual + x
+        x = self.dropout(x)
+        #print("layer done \n\n")
+        return x

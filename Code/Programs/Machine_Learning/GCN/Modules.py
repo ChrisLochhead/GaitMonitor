@@ -349,10 +349,7 @@ class ST_TAGCN_Block(torch.nn.Module):
             self.spatial_conv = ChebConv(int(in_channels * 2 ), int(dim_h * 2), 1).to(device) 
             self.skip_connection = torch.nn.Conv1d(int(in_channels*2), int(dim_h*2), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)           
             
-
-
         self.temporal_conv = AGNNConv(int(dim_h*2), int(dim_h*2)).to(device)
-
         double_dim = int(dim_h * 2)
         self.b1 = BatchNorm1d(double_dim).to(device)
         self.b2 = BatchNorm1d(cycle_size).to(device)
@@ -365,31 +362,125 @@ class ST_TAGCN_Block(torch.nn.Module):
         self.cycle_size = cycle_size
 
     def forward(self, x, edge_index, train):
-        #print("initial x: ", x.shape, self.in_channels)
         if self.batch_size > 1:
             x = self.b0(x)
         residual = x
-        #print("skip connection and residual", self.skip_connection, residual.shape, self.cycle_size, self.batch_size)
         residual = self.relu(self.skip_connection(residual))
-        #print("after residual process", x.shape)
-        #Convert to 2D representation for GAT layer (Batch * Cycle, Channel)
         x = x.view(x.shape[2] * x.shape[0], x.shape[1])
-        #Apply standard spatial convolution
-        #print("spatial conv: ", self.spatial_conv)
         x = self.relu(self.b1(self.spatial_conv(x, edge_index)))
-        #print("after spatial 1: ", x.shape)
-        #Switch to temporal format (keep channels for the residual) maybe not needed
         x = x.view(self.batch_size, x.shape[1], self.cycle_size)
         x = x.view(self.batch_size, self.cycle_size, -1)
-        #ST-AAGCN W temp only
-        #Put it back into 2 dims
         x = x.view(x.shape[1] * x.shape[0], x.shape[2])
-        #Convolve w/attention in the temporal direction
         x = self.relu(self.b1(self.temporal_conv(x, edge_index)))
-        #Restore to temporal shape
         x = x.view(self.batch_size, x.shape[1], self.cycle_size)
-        #Apply dropout and residual
         x = residual + x
         x = self.dropout(x)
-        #print("layer done \n\n")
+        return x
+    
+
+class VAE_ST_TAGCN_Block(torch.nn.Module):
+    def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, device, first=False, latent_dim = 20):
+        super(VAE_ST_TAGCN_Block, self).__init__()
+        
+        # Encoder layers
+        self.encoder = Encoder(in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, latent_dim, device, first)
+        
+        # Decoder layers
+        self.decoder = Decoder(int(cycle_size/4), dim_h, temporal_kernel_size, batch_size, cycle_size, device)
+        
+    def forward(self, x, edge_index, train=True):
+        # Encode input data to latent space
+        mu, log_var = self.encoder(x, edge_index)
+        
+        # Reparameterization trick
+        std = torch.exp(0.5 * log_var)
+        eps = torch.randn_like(std)
+        z = mu + eps * std
+        
+        # Decode latent space representation
+        reconstructed_x = self.decoder(z, edge_index)
+        
+        return reconstructed_x, mu, log_var
+    
+
+class Encoder(torch.nn.Module):
+    def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, latent_dim, device, first=False):
+        super(Encoder, self).__init__()
+        # Layers
+        self.first = first
+        self.b0 = BatchNorm1d(in_channels).to(device) 
+        self.start_shape = int(in_channels * cycle_size)
+        #in_channels = self.start_shape
+
+        #elf.spatial_conv = ChebConv(in_channels, int(dim_h*2), 1).to(device)
+        #self.temporal_conv = ChebConv(int(dim_h*2), int(dim_h/4), 1).to(device)
+
+        self.spatial_conv = torch.nn.Conv1d(cycle_size, int(cycle_size/2), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)           
+        self.temporal_conv = torch.nn.Conv1d(in_channels, 1, kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)      
+
+        self.b1 = BatchNorm1d(int(cycle_size/ 2)).to(device)
+        self.b2 = BatchNorm1d(1).to(device)
+
+        self.relu = ReLU()
+        self.dropout = torch.nn.Dropout(0.1)
+        self.cycle_size = cycle_size
+        self.in_channels =self.start_shape# in_channels
+        self.batch_size = batch_size
+        # Shape Info
+        self.latent_dim = int(self.cycle_size/4)
+
+    def forward(self, x, edge_index, train=True):
+        if self.batch_size > 1:
+            x = self.b0(x)
+        #residual = x
+        ##residual = self.relu(self.skip_connection(residual))
+        print("starting shape: ", x.shape, self.cycle_size, self.batch_size, self.in_channels)
+        x = x.view(x.shape[0], x.shape[2], -1)
+        print("before spatial: ", x.shape, self.spatial_conv, self.b1)
+        x = self.relu(self.b1(self.spatial_conv(x)))
+        print("aFTER spatial: ", x.shape)
+        x = x.view(x.shape[0], x.shape[2], x.shape[1])
+        print("aFTER reshape: ", x.shape, self.temporal_conv, self.b2)
+        x = self.relu(self.b2(self.temporal_conv(x)))
+        print("aFTER temporal: ", x.shape)
+        x = x.view(x.shape[0], x.shape[2], x.shape[1])
+        #x = residual + x
+        x = self.dropout(x)
+        
+        # Latent space representation
+        print("aFTER dropout: ", x.shape)
+
+        mu = x[:, :self.latent_dim]
+        log_var = x[:, self.latent_dim:]
+        print("final shapes: ", x.shape, mu.shape, log_var.shape)
+        return mu, log_var
+    
+
+class Decoder(torch.nn.Module):
+    def __init__(self, latent_dim, dim_h, temporal_kernel_size, batch_size, cycle_size, device):
+        super(Decoder, self).__init__()
+        
+        self.spatial_conv = torch.nn.Conv1d(int(cycle_size/4), cycle_size, kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)           
+        self.temporal_conv = torch.nn.Conv1d(1, 3, kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)      
+
+        self.b1 = BatchNorm1d(3).to(device)
+        self.b2 = BatchNorm1d(cycle_size).to(device)
+
+        self.relu = ReLU()
+        self.dropout = torch.nn.Dropout(0.1)
+        # Shape Info
+        self.batch_size = batch_size
+        self.cycle_size = cycle_size
+
+    def forward(self, x, edge_index, train=True):
+        print("input sizes: ", x.shape)
+        x = x.view(x.shape[0], x.shape[2], x.shape[1])
+        print("before temp:", x.shape)
+        x = self.relu(self.b1(self.temporal_conv(x)))
+        print("after temp:", x.shape)
+        x = x.view(x.shape[0], x.shape[2], x.shape[1])
+        print("after reshape:", x.shape, self.spatial_conv)
+        x = self.relu(self.b2(self.spatial_conv(x)))
+        print("after spatial:", x.shape)
+        x = self.dropout(x)
         return x

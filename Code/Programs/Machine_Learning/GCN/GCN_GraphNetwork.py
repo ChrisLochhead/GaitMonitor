@@ -8,16 +8,18 @@ from torch.nn import Linear
 import torch.nn.functional as F
 from torch_geometric.nn import global_add_pool,  GATv2Conv, ChebConv
 from torch.nn import Linear, BatchNorm1d, ReLU
-from Programs.Machine_Learning.GCN.Dataset_Obj import *
 import torch.nn as nn
 from torch_geometric.nn.conv import GraphConv, AGNNConv
 from torchvision.models import resnet18
 
 #dependencies
-from Programs.Machine_Learning.GCN.Modules import ST_GCN_Block, STJA_GCN_Block, Cust_STGCN_Block, Gait_Graph2_Block, ST_TAGCN_Block
+from Programs.Machine_Learning.GCN.Dataset_Obj import *
+from Programs.Machine_Learning.GCN.Modules import ST_GCN_Block, STJA_GCN_Block, Cust_STGCN_Block, Gait_Graph2_Block, ST_TAGCN_Block, VAE_ST_TAGCN_Block
+from Programs.Machine_Learning.GCN.GCN import S_GCN, T_GCN
+
 
 class GCN_GraphNetwork(torch.nn.Module):
-    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 3, stgcn_filters = [128, 128, 128, 128], 
+    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 1, stgcn_filters = [128], 
                  max_cycle = 49, num_nodes_per_graph = 18, device = 'cuda', type = 'ST_TAGCN_Block'):
         super(GCN_GraphNetwork, self).__init__()
 
@@ -85,8 +87,26 @@ class GCN_GraphNetwork(torch.nn.Module):
                     for i in range(1, self.size_stgcn):
                         i_stream.append(ST_TAGCN_Block(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph, device))
                     self.streams.append(i_stream)
+                elif self.model_type == 'S_GCN':
+                    i_stream.append(S_GCN(self.dim_in[0], self.stgcn_filters[0], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph,
+                                                device, first=True))
+                    for i in range(1, self.size_stgcn):
+                        i_stream.append(S_GCN(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph, device, first=False))
+                    self.streams.append(i_stream)
+                elif self.model_type == 'T_GCN':
+                    i_stream.append(T_GCN(self.dim_in[0], self.stgcn_filters[0], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph,
+                                                device, first=True))
+                    for i in range(1, self.size_stgcn):
+                        i_stream.append(T_GCN(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size, self.num_nodes_per_graph, device, first=False))
+                    self.streams.append(i_stream)
+                elif self.model_type == 'VAE':
+                    i_stream.append(VAE_ST_TAGCN_Block(self.dim_in[0], self.stgcn_filters[0], 5, self.batch_size, self.cycle_size,
+                                                device = device, first=True))
+                    for i in range(1, self.size_stgcn):
+                        i_stream.append(VAE_ST_TAGCN_Block(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size, device=device, first=False))
+                    self.streams.append(i_stream)
                 else:
-                    print("Type entry not valid")
+                    print("entered type not valid")
         
         #Assign input value for final linear layers after combination
         self.len_steams = len(self.streams)

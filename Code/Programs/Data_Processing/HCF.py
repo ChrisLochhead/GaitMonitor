@@ -369,7 +369,7 @@ def sample_gait_cycles(data_cycles):
         Decimated gait cycles
     '''
     # Find the length of the biggest sublist
-    cycles = [[] for i in range(6)]
+    cycles = [[] for i in range(3)]
     print("len gait cycles: ", len(data_cycles))
     for cycle in data_cycles:
         cycles[cycle[0][2]].append(cycle)

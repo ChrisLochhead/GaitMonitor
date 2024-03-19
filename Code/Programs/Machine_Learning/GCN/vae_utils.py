@@ -114,6 +114,12 @@ def cross_valid(m_model, test_dataset, datasets=None,k_fold=3, batch = 16,
     print("f1 score: ", f1)
     return model, train_score, val_score, test_score
 
+
+def vae_loss(recon_x, x, mu, log_var):
+    BCE = F.binary_cross_entropy(recon_x, x.view(-1, 784), reduction='sum')
+    KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+    return BCE + KLD
+
 def train(model, loader, val_loader, test_loader, generator, epochs, device):
     '''
     creates a series of datasets from individual person datasets
@@ -141,16 +147,11 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device):
         returns the model and the various scoring metrics
     '''
     init = generator.get_state()
-    criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(),
                                 lr=0.1,
                                 weight_decay=0.001)
     model.train()
-    train_accs = []
-    val_accs = []
-    test_accs = []
-    all_pred = []
-    all_y = []
+
     #First pass, append all the data together into arrays
     xs_batch = [[] for l in range(len(loader))]
     indice_batch = [[] for l in range(len(loader))]
@@ -186,22 +187,17 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device):
             data_x = [xs_batch[i][index] for i in range(len(loader))]
             data_i = [indice_batch[i][index] for i in range(len(loader))]
             data_b = [batch_batch[i][index] for i in range(len(loader))]
-            data_y =  [ys_batch[i][index] for i in range(len(loader))]
-            out = model(data_x, data_i, data_b, train=True)
 
-            #print("data ys all the same: ", len(data_y), len(out))
-            loss = criterion(out, data_y[0]) / len(loader[0])
+            recon_batch, mu, log_var = model(data_x, data_i, data_b, train)
+            loss = vae_loss(recon_batch, data_x, mu, log_var)
+
             total_loss = total_loss + loss
-            acc =  acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loader[0])
-            train_accs.append(acc)
             loss.backward()
             optimizer.step()
-            del data, data_x, data_i, data_b, data_y, out
 
         # Validation
         generator.set_state(init)
-        val_loss, val_acc, _, _ = test(model, val_loader, generator, validation=True, device = device)
-        val_accs.append(val_acc)
+        val_loss = test(model, val_loader, generator, validation=True, device = device)
 
         # Print metrics every 10 epochs
         if (epoch % 5 == 0):
@@ -212,24 +208,16 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device):
 
             if test_loader != None:
                 generator.set_state(init)
-                test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False, device = device)
-                all_pred += pred_y
-                all_y += lab_y
-                print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
-                test_accs.append(test_acc)
-        #Tidy up to save memory
-        del total_loss, acc, val_loss, val_acc 
+                test_loss = test(model, test_loader, generator, validation=False, device = device)
+                print(f'Test Loss: {test_loss:.2f}')
 
     if test_loader != None:
         generator.set_state(init)
-        test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False, device = device)
-        all_pred += pred_y
-        all_y += lab_y
-        print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
-        test_accs.append(test_acc)
+        test_loss = test(model, test_loader, generator, validation=False, device = device)
+        print(f'Test Loss: {test_loss:.2f}')
 
     #return model
-    return model, train_accs, val_accs, test_accs, all_y, all_pred
+    return model
 
     
 def test(model, loaders, generator, validation, train = False, device = 'cuda'):
@@ -257,19 +245,14 @@ def test(model, loaders, generator, validation, train = False, device = 'cuda'):
         returns the model and the various scoring metrics
     '''
     init = generator.get_state()
-    criterion = torch.nn.CrossEntropyLoss()
     model.eval()
     loss = 0
-    acc = 0
-    all_y = []
-    all_pred = []
     with torch.no_grad():
         #First pass, append all the data together into arrays
         xs_batch = [[] for l in range(len(loaders))]
         indice_batch = [[] for l in range(len(loaders))]
         batch_batch = [[] for l in range(len(loaders))]
         ys_batch = [[] for l in range(len(loaders))]
-
         for i, load in enumerate(loaders): 
             generator.set_state(init)
             for j, data in enumerate(load):
@@ -281,140 +264,14 @@ def test(model, loaders, generator, validation, train = False, device = 'cuda'):
 
         #Second pass: process the data 
         generator.set_state(init)
-
         total_loss = 0
         for index, data in enumerate(loaders[0]):
             data_x = [xs_batch[i][index] for i in range(len(loaders))]
             data_i = [indice_batch[i][index] for i in range(len(loaders))]
             data_b = [batch_batch[i][index] for i in range(len(loaders))]
-            data_y = [ys_batch[i][index] for i in range(len(loaders))]
 
-            y_classes = [0,0,0,0,0,0,0,0,0]
-            for d in data_y[0]:
-                y_classes[d.item()] += 1
-
-            out = model(data_x, data_i, data_b, train)
-            loss = criterion(out, data_y[0]) / len(loaders[0]) 
+            recon_batch, mu, log_var = model(data_x, data_i, data_b, train)
+            loss = vae_loss(recon_batch, data_x, mu, log_var)
             total_loss = total_loss + loss
 
-            acc = acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loaders[0])
-            #Record all the predictions and labels for each fold of each test
-            if validation == False:
-                all_pred += out.argmax(dim=1).cpu()
-                all_y += data_y[0].cpu()
-
-    return total_loss, acc, all_pred, all_y
-
-
-def load_whole_dataset(folder_names, file_name, col_names = Utilities.colnames_midhip):
-    '''
-    Load one or a series of datasets
-
-    Arguments
-    ---------
-    folder_names: str
-        file paths to the folders
-    file_name: str
-        file name in each folder to load
-    col_names: List(Tuple()) (optional, default = colnames_midhip)
-        column names to append
-    
-    Returns
-    -------
-    List(List())
-        returns the loaded datasets in a list
-    '''
-    data = []
-    for name in folder_names:
-        print("loading: ", "./Code/Datasets/Joint_Data/" + str(name) + '/' + str(file_name) + "/raw/"+ str(file_name) + ".csv")
-        abs_joint_data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/" + str(name) + str(file_name) + "/raw/"+ str(file_name) + ".csv", None,
-                                                                    cols=col_names, ignore_depth=False)
-        data.append(abs_joint_data)
-    return data
-
-
-#Stitch up datasets of individuals to create a full dataset
-def stitch_dataset(folder_names, stream = 1):
-    '''
-    stitch together multiple single person datasets into one multi-person dataset
-
-    Arguments
-    ---------
-    folder_names: str
-        file paths to the folders
-    stream: int (optional, default = 1)
-        denotes which data file type to stitch together
-    
-    Returns
-    -------
-    List(List())
-        returns the loaded datasets in a list
-    '''
-    if stream == 1: # rel
-        file_name = '/rel_data'
-    elif stream == 2: # bone
-        file_name = '/bone_data'
-    elif stream == 3: # vel bone
-        file_name = '/comb_data'
-    elif stream == 4: # vel
-        file_name = '/vel_data'
-    elif stream == 5: #rel vel 
-        file_name = '/comb_data_rel_vel'
-    elif stream == 6: #rel vel bone
-        file_name = '/comb_data_rel_vel_bone'
-
-    #load in the datasets 
-    datasets = load_whole_dataset(folder_names, file_name)
-    whole_dataset = datasets[0]
-    current_instance = whole_dataset[-1][0]
-    #gradually append the datasets one at a time together, saving at each step for ablation studies
-    for i, dataset in enumerate(datasets):
-        if i > 0:
-            current_instance, whole_dataset = Utilities.assign_person_number(whole_dataset, dataset, 
-                                                                       "./Code/Datasets/Joint_Data/Big/no_Sub_" + str(stream) + "_stream/" + str(i + 1) + "_people",
-                                                                       i, current_instance)
-    print("completed.")
-
-def get_gait_segments(joint_data):
-    '''
-    Splits all data into segments of 7 for approximate gait segments
-
-    Arguments
-    ---------
-    joint_data: List(List())
-    
-    Returns
-    -------
-    List(List())
-        returns the dataset in the form of gait segments
-    '''
-    instances = []
-    instance = []
-    current_instance = joint_data[0][0]
-    #First separate the joints into individual instances
-    for joints in joint_data:
-        #Append joints as normal
-        if joints[0] == current_instance:
-            instance.append(joints)
-        else:
-            #Only add certain persons examples
-            instances.append(copy.deepcopy(instance))
-            instance = []
-            instance.append(joints)
-            current_instance = joints[0]
-    #Add the last instance hanging off missed by the loop
-    instances.append(copy.deepcopy(instance))
-
-    division_factor = 6
-    segments = []
-    for instance in instances:
-        segment = []
-        for i, frame in enumerate(instance):
-            if i % division_factor == 0:
-                if len(segment) >0:
-                    segments.append(copy.deepcopy(segment))
-                    segment = []
-                segment.append(frame)
-            else:
-                segment.append(frame)
-    return segments
+    return total_loss
