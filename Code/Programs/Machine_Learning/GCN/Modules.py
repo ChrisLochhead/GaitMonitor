@@ -399,6 +399,7 @@ class VAE_ST_TAGCN_Block(torch.nn.Module):
         
         # Decode latent space representation
         reconstructed_x = self.decoder(z, edge_index)
+        print("out here: ", reconstructed_x.shape)
         
         return reconstructed_x, mu, log_var
     
@@ -443,16 +444,18 @@ class Encoder(torch.nn.Module):
         print("aFTER reshape: ", x.shape, self.temporal_conv, self.b2)
         x = self.relu(self.b2(self.temporal_conv(x)))
         print("aFTER temporal: ", x.shape)
-        x = x.view(x.shape[0], x.shape[2], x.shape[1])
+        #x = x.view(x.shape[0], x.shape[2], x.shape[1])
+        #x = x.view(x.shape[0] * x.shape[1], x.shape[2])
         #x = residual + x
         x = self.dropout(x)
         
         # Latent space representation
         print("aFTER dropout: ", x.shape)
 
-        mu = x[:, :self.latent_dim]
-        log_var = x[:, self.latent_dim:]
+        mu = x[:, :, :self.latent_dim]
+        log_var = x[:, :, self.latent_dim:]
         print("final shapes: ", x.shape, mu.shape, log_var.shape)
+        print("\n")
         return mu, log_var
     
 
@@ -474,7 +477,7 @@ class Decoder(torch.nn.Module):
 
     def forward(self, x, edge_index, train=True):
         print("input sizes: ", x.shape)
-        x = x.view(x.shape[0], x.shape[2], x.shape[1])
+        #x = x.view(x.shape[0], x.shape[2], x.shape[1])
         print("before temp:", x.shape)
         x = self.relu(self.b1(self.temporal_conv(x)))
         print("after temp:", x.shape)
@@ -482,5 +485,6 @@ class Decoder(torch.nn.Module):
         print("after reshape:", x.shape, self.spatial_conv)
         x = self.relu(self.b2(self.spatial_conv(x)))
         print("after spatial:", x.shape)
+        x = x.view(x.shape[0], x.shape[2], x.shape[1])
         x = self.dropout(x)
         return x

@@ -229,9 +229,9 @@ def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, d
             smoothed_direction = direction_after + direction_before
             
         #Remove noise:
-        for j in range(0, 3):
-            if smoothed_direction[j] < 0.01 and smoothed_direction[j] > -0.01:
-                smoothed_direction[j] = np.float64(0.0)
+        #for j in range(0, 3):
+        #    if smoothed_direction[j] < 0.01 and smoothed_direction[j] > -0.01:
+        #        smoothed_direction[j] = np.float64(0.0)
 
         if debug and image != None:
             x = int((smoothed_direction[1] * 40) + joints_current[i][1])

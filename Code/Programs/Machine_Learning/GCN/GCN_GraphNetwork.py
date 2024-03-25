@@ -19,8 +19,8 @@ from Programs.Machine_Learning.GCN.GCN import S_GCN, T_GCN
 
 
 class GCN_GraphNetwork(torch.nn.Module):
-    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 1, stgcn_filters = [128], 
-                 max_cycle = 49, num_nodes_per_graph = 18, device = 'cuda', type = 'ST_TAGCN_Block'):
+    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 1, stgcn_filters = [128, 128, 128], 
+                 max_cycle = 7, num_nodes_per_graph = 18, device = 'cuda', type = 'ST_TAGCN_Block'):
         super(GCN_GraphNetwork, self).__init__()
 
         dim_half = int(dim_h/2)
@@ -164,16 +164,24 @@ class GCN_GraphNetwork(torch.nn.Module):
                 h = h.view(self.batch_size, self.dim_in[i], self.cycle_size)
                 #In the case of ST-GCN this is a list object
                 for j, layer in enumerate(stream):
-                    h = layer(h, edge_indices[i], train)
+                    if self.model_type == 'VAE':
+                        h, var, mu = layer(h, edge_indices[i], train)
+                    else:
+                        h = layer(h, edge_indices[i], train)
                     #Add the last layer of each stream to a list. reshaping it to 2D first
                     #so it's compatible with HCF layers
+                    print("what's h: ", h.shape, type(h))
                     if j == len(stream) - 1:
-                        h = h.view(h.shape[0], h.shape[1] * h.shape[2])
+                        #h = h.view(h.shape[0], h.shape[1] * h.shape[2])
                         hidden_layers.append(h)
 
         # Concatenate graph embeddings
         #print("self.block", self.block2, type(self.block2))
         h = torch.cat(([l for l in hidden_layers]), dim=1)
+        if self.model_type == 'VAE':
+            print("what am i returning at the end of graph network forward", h.shape, var.shape, mu.shape)
+            return h, var, mu
+
         #h = h.view(h.shape[0], 14, -1)
         #print("size before: ", h.size())
         #h = self.avg_pool(h)

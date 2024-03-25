@@ -9,6 +9,7 @@ import Programs.Data_Processing.Render as Render
 import Programs.Machine_Learning.GCN.GAT as gat
 import Programs.Machine_Learning.GCN.GCN_GraphNetwork as stgcn
 import Programs.Machine_Learning.GCN.Utilities as graph_utils
+import Programs.Machine_Learning.GCN.vae_utils as vae_utils
 
 #imports
 import time
@@ -19,7 +20,7 @@ random.seed(42)
 import torch
 torch.manual_seed(42)
 torch.cuda.empty_cache()
-device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 def process_images_into_joints(folder):
     '''
     This is a sub function containing the first part of the pre-processing pipeline, namely involving the computationally expensive joint-position extraction
@@ -163,9 +164,9 @@ def process_data(folder = "Chris", run_ims = False, norm_joints = True, scale_jo
                                                    joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/Bones_Data")
     
     #Apply subtraction and dummying
-    #relative_joint_data, rel_dum_data = generate_single_stream_dataset(folder, relative_joint_data, prefix='rel', subtr=subtract)
-    #velocity_data, vel_dum_data = generate_single_stream_dataset(folder, velocity_data, prefix='vel', subtr=subtract)
-    #joint_bones_data, bone_dum_data = generate_single_stream_dataset(folder, joint_bones_data, prefix='bone', subtr=subtract)
+    relative_joint_data, rel_dum_data = generate_single_stream_dataset(folder, relative_joint_data, prefix='rel', subtr=subtract)
+    velocity_data, vel_dum_data = generate_single_stream_dataset(folder, velocity_data, prefix='vel', subtr=subtract)
+    joint_bones_data, bone_dum_data = generate_single_stream_dataset(folder, joint_bones_data, prefix='bone', subtr=subtract)
 
     #Combine datasets
     #Creator.combine_datasets(rel_dum_data, vel_dum_data, None, image_data,
@@ -176,7 +177,7 @@ def process_data(folder = "Chris", run_ims = False, norm_joints = True, scale_jo
     #                                         joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data_bone_vel")
 
 
-def load_datasets(types, folder, multi_dim = False, num_people = 3):
+def load_datasets(types, folder, multi_dim = False, class_loc = 2, num_classes = 9):
     '''
     This loads in datasets selected datasets for training.
 
@@ -203,9 +204,12 @@ def load_datasets(types, folder, multi_dim = False, num_people = 3):
         print("loading dataset {} of {}. ".format(i + 1, len(types)), t)
         #Type 1: Normal, full dataset
         if t == 1:  
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/rel_data', 
+            #                            'rel_data.csv',             
+            #                                joint_connections=Render.joint_connections_n_head))   
             datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/2_people', 
-                                        '2_people.csv',             
-                                            joint_connections=Render.joint_connections_n_head))   
+                            '2_people.csv',             
+                                joint_connections=Render.bottom_joint_connection, class_loc=class_loc, num_classes=num_classes))   
             #2s ST-GCN
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "no_sub_1_stream" + f'/{num_people}_people', 
             #                            f'{num_people}_people.csv',             
@@ -320,7 +324,7 @@ def process_results(train_scores, val_scores, test_scores):
     mean, var = Utilities.mean_var(test_scores)
     print("mean, std and variance: {:.2f}%, {:.2f}% {:.5f}".format(mean, math.sqrt(var), var))
 
-def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load = None, leave_one_out = False, multi_dim = False, num_people=3):
+def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load = None, leave_one_out = False, dim_out = 3, class_loc = 2, model_type = 'VAE', vae=False):
     '''
     Runs the model configuration
 
@@ -353,7 +357,7 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
 
     '''
     #Load the full dataset
-    datasets = load_datasets(dataset_types, folder, False, num_people)
+    datasets = load_datasets(dataset_types, folder, False, class_loc, dim_out)
     print("datasets here: ", datasets)
     #Concatenate data dimensions for ST-GCN
     data_dims = []
@@ -372,23 +376,24 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
     datasets = [datasets[0]]
     num_datasets = len(datasets)
 
-    dim_out = 3
-    if multi_dim:
-        dim_out = 6
-
     print("\nCreating {} datasets: ".format(len(datasets)))
+    print("dataset info:", datasets[0].max_cycle, datasets[0].num_nodes_per_graph)
     print("going in: ", datasets[0].num_node_features)
     model = stgcn.GCN_GraphNetwork(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=dim_out, n_inputs=num_datasets,
                                 data_dims=data_dims, batch_size=batch_size, hcf=hcf,
-                                max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph, device = device, type='VAE')
+                                max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph, device = device, type=model_type)
     
     if load != None:
         print("loading model")
         model.load_state_dict(torch.load('./Code/Datasets/Weights/' + str(load) + '.pth'))
 
     model = model.to(device)
-    model, train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
+    if vae == False:
+        model, train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
                                                                      k_fold=3, batch=batch_size, epochs=epochs, device = device)
+    else:
+        model, train_scores, val_scores, test_scores = vae_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
+                                                                k_fold=3, batch=batch_size, epochs=epochs, device = device)
     if save != None:
         print("saving model")
         torch.save(model.state_dict(), './Code/Datasets/Weights/' + str(save) + '.pth')
@@ -494,28 +499,111 @@ def replace_nans(joint_source, joint_output):
     data, _ = Utilities.process_data_input(joint_source, None)
     Utilities.save_dataset(data, joint_output)
 
+def convert_shoe_to_format():
+    '''Example of Python code reading the skeletons'''
+    loaded = np.load('./code/datasets/shoedata/DIRO_skeletons.npz')
+
+    #get skeleton data of size (n_subject, n_gait, n_frame, 25*3)
+    data = loaded['data']
+
+    #get joint coordinates of a specific skeleton
+    skel = data[0,0,0,:]
+    x = [skel[i] for i in range(0, len(skel), 3)]
+    y = [skel[i] for i in range(1, len(skel), 3)]
+    z = [skel[i] for i in range(2, len(skel), 3)]
+
+    #get default separation
+    separation = loaded['split']
+
+    #print information
+    print(data.shape)
+    print(separation)
+    #iterate through subjects
+    instance = 0
+    frames = []
+    for i, subject in enumerate(data):
+        print(f"subject {i} of {len(data)}")
+        for j, abnormality in enumerate(subject):
+            print(f"abnormality {j} of {len(subject)}")
+            for k, frame in enumerate(abnormality):
+                print(f"frame {k} of {len(abnormality)}")
+                meta_data = [instance, k, j, 0, 0, i]
+                sublists = [frame[i:i+3] for i in range(0, len(frame), 3)]
+                for l, coords in enumerate(sublists):
+                    #print(f"value {l} of {len(frame)}")
+                    if l < 21 and l != 1 and l != 15 and l != 19:
+                        meta_data.append([coords[0], coords[1], coords[2]])
+                #iterate instance after every series of frames
+                frames.append(meta_data)
+            instance += 1
+
+    Utilities.save_dataset(frames, './code/datasets/joint_data/shoedata/3_Absolute_Data(trimmed instances)', colnames=Utilities.colnames_midhip)
+    #try making dataframe
+
+    #expected results:
+    #(9, 9, 1200, 75)
+    #['train' 'test' 'train' 'test' 'train' 'train' 'test' 'test' 'train']
+
+def scale_values_in_data(data):
+    for i, row in enumerate(data):
+        print(f"row {i} of {len(data)}")
+        for j, coord in enumerate(row):
+            #print("in here: ", j, coord)
+            if j > 5:
+                #print("before: ", data[i][j])
+                data[i][j][0] *= 100
+                data[i][j][1] *= 100
+                data[i][j][2] *= 100
+                #print("after: ", data[i][j])
+        #stop = 5/0
+    return data
+
+from sklearn.preprocessing import StandardScaler
+def apply_standard_scaler(data):
+    coordinates = [coord for sublist in data for coord in sublist[6:]]
+    # Initialize StandardScaler
+    scaler = StandardScaler()
+
+    # Fit the scaler to the flattened coordinates
+    scaler.fit(coordinates)
+
+    # Transform and replace the original coordinates with scaled ones
+    for a, row in enumerate(data):
+        for i in range(3, len(row)):
+            # Scale only if it's a list (3D coordinates)
+            if isinstance(row[i], list):
+                data[a][i] = scaler.transform([row[i]])[0].tolist()
+    Utilities.save_dataset(data, './code/datasets/joint_data/test')
+    return data
 ###########################################################################################################################################################################################
 if __name__ == '__main__':
     #create_datasets()
-    #process_data('Path')
+    print("starting")
+    #process_data("shoedata")
+    #T_GCN, Position, shoedata 78%
+    #S_gcn, Position, shoedata 78.9
+    #ST-GCN Position, shoedata, 86.65%, 87.41% (relativized), converges faster
+    #ST-TAGCN position, shoedata path datas 63% legs 85%
 
-    #T_GCN, VELOCITY AND POSITION: 
+    #Weightgait position 87.93% w just legs 
+
+    #if a trend is identified, try again for weightgait and pathological datasets
+
+    #if not, do the following
+    #1s, 1s, 1s 2s, 3s, on all 3 and see if 1s is consistently better on ST-TAGCN
     start = time.time()
     run_model(dataset_types= [1], hcf=False,
-            batch_size = 128, epochs = 80, folder="big/Scale_1_Norm_1_Subtr_1/no_sub_4_stream",
-            save =None, load=None, leave_one_out=False, multi_dim=False, num_people=13)
+            batch_size = 128, epochs = 80, folder="big/Scale_1_Norm_1_Subtr_1/no_sub_2_stream/",
+            save =True, load=None, leave_one_out=False, dim_out=3, class_loc=2, model_type='VAE', vae=True)
     end = time.time()
     print("time elapsed: ", end - start)
 
+
+
+#notes
+    
 #TODO Plan
 '''
-Disjointed-ST-GCN
-- transform GCN class into same shape as ST-GCN just without the spatio-temporal
-- make one TGCN and one SGCN
-- pass velocities to TGCN and positions to SGCN
-- do classification on both and see if there's an improvement
-- construct a weighted ensemble method either by voting and then potentially a combination?
-
 VAE-ST-GCN
 - make an autoencoder
 - make it work for ST-GCN

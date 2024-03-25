@@ -439,7 +439,7 @@ def create_dummy_dataset(joint_file, joint_output):
     '''
     data, _ = Utilities.process_data_input(joint_file, None)
     mean = 0 
-    std_dev = 0.1
+    std_dev = 0.001
     sequences = []
     sequence = []
 
@@ -536,7 +536,7 @@ def subtract_skeleton(joint_file, joint_output, base_output):
     #Extract an overlay sequence for each individual
     overlay_sequences = [s for i, s in enumerate(rel_sequences) if i % 60 == 0]
     for i, sequence in enumerate(rel_sequences):
-        if i % 60 == 0:
+        if i % 9 == 0: #CHANGE BACK
             overlay_sequences.append(Utilities.get_average_sequence(rel_sequences[i:i+10]))
     #Subtract the data by the mask
     overlay_iter = 0
@@ -547,7 +547,7 @@ def subtract_skeleton(joint_file, joint_output, base_output):
                 if k> 5:
                     #Check if coord and overlay[j][k] are within a radius of eachother, ignoring the first 10
                     try:
-                        if Utilities.check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 10):
+                        if Utilities.check_within_radius(coord, overlay_sequences[overlay_iter][j][k], 0.01):
                             #print("detected within raidus: ", coord, overlay_sequence[j][k])
                             rel_sequences[i][j][k] = [0.0, 0.0, 0.0]
                             #nothing = 0

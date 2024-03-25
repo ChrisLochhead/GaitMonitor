@@ -116,7 +116,12 @@ def cross_valid(m_model, test_dataset, datasets=None,k_fold=3, batch = 16,
 
 
 def vae_loss(recon_x, x, mu, log_var):
-    BCE = F.binary_cross_entropy(recon_x, x.view(-1, 784), reduction='sum')
+    print("types: ", type(recon_x), type(x))
+    x = torch.tensor(x)
+    x = x.view(recon_x.shape[0], recon_x.shape[1], recon_x.shape[2])
+    print("what am i comparing: ", recon_x.shape, x.shape)
+
+    BCE = F.binary_cross_entropy(recon_x, x, reduction='sum')
     KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
     return BCE + KLD
 
@@ -189,7 +194,8 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device):
             data_b = [batch_batch[i][index] for i in range(len(loader))]
 
             recon_batch, mu, log_var = model(data_x, data_i, data_b, train)
-            loss = vae_loss(recon_batch, data_x, mu, log_var)
+            print("out of the model: ", recon_batch.shape, mu.shape, log_var.shape)
+            loss = vae_loss(recon_batch, data_x[0], mu, log_var)
 
             total_loss = total_loss + loss
             loss.backward()

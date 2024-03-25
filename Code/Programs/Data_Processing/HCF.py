@@ -354,7 +354,7 @@ def get_gait_cycles(joint_data, images):
     return gait_cycles
 
 
-def sample_gait_cycles(data_cycles):
+def sample_gait_cycles(data_cycles, num_classes = 9, class_loc = 2):
     '''
     Decimates the gait cycles so they are all of equal length
 
@@ -369,10 +369,10 @@ def sample_gait_cycles(data_cycles):
         Decimated gait cycles
     '''
     # Find the length of the biggest sublist
-    cycles = [[] for i in range(3)]
+    cycles = [[] for i in range(num_classes)]
     print("len gait cycles: ", len(data_cycles))
     for cycle in data_cycles:
-        cycles[cycle[0][2]].append(cycle)
+        cycles[cycle[0][class_loc]].append(cycle)
     for c in cycles:
         print("cycle len: ", len(c))
     #done = 5/0

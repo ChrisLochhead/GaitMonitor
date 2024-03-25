@@ -22,7 +22,7 @@ import Programs.Data_Processing.HCF as HCF
 
 class JointDataset(Dataset):
     def __init__(self, root, filename, test=False, transform=None, pre_transform=None, joint_connections = joint_connections_m_hip,
-                  cycles = True, meta = 5, preset_cycle = None, interpolate = True, ensemble = False):
+                  cycles = True, meta = 5, preset_cycle = None, interpolate = True, ensemble = False, class_loc = 2, num_classes = 9):
         """
         root = Where the dataset should be stored. This folder is split
         into raw_dir (downloaded dataset) and processed_dir (processed data). 
@@ -39,6 +39,8 @@ class JointDataset(Dataset):
         self.ensemble = ensemble
         self.preset_cycle = preset_cycle
         self.interpolate = interpolate
+        self.class_loc = class_loc
+        self.n_c = num_classes
         super(JointDataset, self).__init__(root, transform, pre_transform)
         
     @property
@@ -117,7 +119,7 @@ class JointDataset(Dataset):
         #Alternatively, use a preset if provided
             self.base_cycles = self.set_gait_cycles(self.data.to_numpy())
 
-        self.data_cycles = HCF.sample_gait_cycles(copy.deepcopy(self.base_cycles))
+        self.data_cycles = HCF.sample_gait_cycles(copy.deepcopy(self.base_cycles), self.n_c, self.class_loc)
         self.num_nodes_per_graph = len(self.data.columns) - self.meta - 1
 
         #Find the largest cycle
@@ -253,14 +255,19 @@ def data_to_graph(row, coo_matrix, meta = 5):
     per_arr = []
     for cycle_part in row:
         refined_row = cycle_part[meta + 1 :]   
+        #refined_row = refined_row[-7:]
         row_as_array = np.array(refined_row)  
         y = int(cycle_part[2])  
         per_arr = int(cycle_part[5])
+        #Remove certain parts of the body, just leave the legs 
+
         y_arr.append(y)
         if len(gait_cycle) <= 0:
             gait_cycle = row_as_array
         else:   
             gait_cycle = np.concatenate((gait_cycle, row_as_array), axis=0)
+    #print("gait cycle shape: ", len(gait_cycle), len(gait_cycle[0]))
+    #done = 5/0
     #Pass entire cycle as single graph
     data = Data(x=torch.tensor(list(gait_cycle), dtype=torch.float),
         y=torch.tensor([y], dtype=torch.long),
