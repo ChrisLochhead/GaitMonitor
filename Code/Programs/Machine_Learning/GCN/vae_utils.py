@@ -15,7 +15,8 @@ from sklearn.metrics import f1_score, confusion_matrix
 #dependencies
 import Programs.Data_Processing.Utilities as Utilities
 import Programs.Data_Processing.Dataset_Creator as Creator
-
+import torch.nn as nn
+import math
 #utility function to get accuracy from array of predictions
 def accuracy(pred_y, y):
     return (pred_y == y).sum() / len(y)
@@ -99,12 +100,10 @@ def cross_valid(m_model, test_dataset, datasets=None,k_fold=3, batch = 16,
         #reset the model, train and save the results to the result lists
         model = copy.deepcopy(m_model)
         model = model.to(device)
-        model, accuracies, vals, tests, all_y, all_pred = train(model, train_loaders, val_loaders, test_loaders, G, epochs, device)
-        total_ys += all_y
-        total_preds += all_pred
-        train_score.append(accuracies[-1])
-        val_score.append(vals[-1])
-        test_score.append(tests[-1])
+        model, vae_data, ys = train(model, train_loaders, val_loaders, test_loaders, G, epochs, device, generate_data=True)
+
+        #print("what does vae data look like here: ", len(vae_data), vae_data[0].shape, len(vae_data), len(ys[0]), type(ys[0]), ys[0][0], len(ys), batch, model.cycle_size)
+        vae_data = convert_vae_to_reg_data(vae_data, ys[0][0], batch)
         end = time.time()
         print("time elapsed: ",fold,  end - start)
 
@@ -112,20 +111,47 @@ def cross_valid(m_model, test_dataset, datasets=None,k_fold=3, batch = 16,
     print(confusion_matrix(total_ys, total_preds))
     f1 = f1_score(total_ys, total_preds, average='weighted')
     print("f1 score: ", f1)
-    return model, train_score, val_score, test_score
+    return model, train_score, val_score, test_score, vae_data
+
+def convert_vae_to_reg_data(data, ys, batch_size):
+    #going to need to bullshit the metadata
+    output_data = []
+    instance_count = 0
+    for i, batch in enumerate(data):
+        #print(f'batch {batch} of {len(data)}')
+        #Split tensor into 32 sections of size [108, 3]
+        data_cycles = torch.chunk(batch, batch_size, dim=0)
+        y_cycle = torch.chunk(ys, batch_size, dim=0)
+        # Split each of the 32 sections into 6 sections of size [18, 3]
+        frames = [torch.chunk(section, 6, dim=0) for section in data_cycles]
+        curr_y = 0
+        for j, frame_batch in enumerate(frames):
+            #print("frame batch: ", len(frame_batch))
+            curr_y += 1
+            for k, frame in enumerate(frame_batch):
+                list_frame = frame.tolist()
+                #print("frame now: ", list_frame)
+                #print("issue: ", y_cycle[j])
+                #print("full: ", y_cycle)
+                meta_data = [instance_count,k,y_cycle[j].item(), 0,0,0]
+                for val in list_frame:
+                    meta_data.append(val)
+                #print("final metadata: ", meta_data, len(meta_data))
+                output_data.append(meta_data)
+            instance_count += 1
+    return output_data
 
 
-def vae_loss(recon_x, x, mu, log_var):
-    print("types: ", type(recon_x), type(x))
-    x = torch.tensor(x)
-    x = x.view(recon_x.shape[0], recon_x.shape[1], recon_x.shape[2])
-    print("what am i comparing: ", recon_x.shape, x.shape)
+def vae_loss(recon_x, x, mu, log_var, beta, z):
+    batch_size = 128# x.size()[0] # change to 128 if problem
+    BCE = nn.BCELoss()(recon_x, x)
+    KLD_element = mu.pow(2).add_(log_var.exp()).mul_(-1).add_(1).add_(log_var)
+    KLD = torch.sum(KLD_element).mul_(-0.5)
 
-    BCE = F.binary_cross_entropy(recon_x, x, reduction='sum')
-    KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
-    return BCE + KLD
+    return (BCE + KLD) / batch_size
 
-def train(model, loader, val_loader, test_loader, generator, epochs, device):
+
+def train(model, loader, val_loader, test_loader, generator, epochs, device, generate_data = False):
     '''
     creates a series of datasets from individual person datasets
 
@@ -152,9 +178,8 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device):
         returns the model and the various scoring metrics
     '''
     init = generator.get_state()
-    optimizer = torch.optim.SGD(model.parameters(),
-                                lr=0.1,
-                                weight_decay=0.001)
+    optimizer = torch.optim.Adam(model.parameters(),
+                                lr=1.0)
     model.train()
 
     #First pass, append all the data together into arrays
@@ -162,7 +187,8 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device):
     indice_batch = [[] for l in range(len(loader))]
     batch_batch = [[] for l in range(len(loader))]
     ys_batch = [[] for l in range(len(loader))]
-
+    vae_data = []
+    ys = []
     for ind, load in enumerate(loader): 
         generator.set_state(init)
         for j, data in enumerate(load):
@@ -174,12 +200,12 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device):
 
     for epoch in range(epochs + 1):
         #Reduce by 0.1 times at 10th and 60th epoch
-        if epoch == 20:
-            #print("reducing learing rate")
-            optimizer.param_groups[0]['lr'] = 0.01
-        elif epoch == 60:
-            #print("reducing learning rate again")
-            optimizer.param_groups[0]['lr'] = 0.001
+        #if epoch == 20:
+        #    #print("reducing learing rate")
+        #    optimizer.param_groups[0]['lr'] = 0.01
+        #elif epoch == 60:
+        #    #print("reducing learning rate again")
+        #    optimizer.param_groups[0]['lr'] = 0.001
 
         total_loss = 0
         acc = 0
@@ -188,22 +214,33 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device):
         #Second pass: process the data 
         generator.set_state(init)
         for index, data in enumerate(loader[0]):
-            optimizer.zero_grad()
+            #optimizer.zero_grad()
             data_x = [xs_batch[i][index] for i in range(len(loader))]
             data_i = [indice_batch[i][index] for i in range(len(loader))]
             data_b = [batch_batch[i][index] for i in range(len(loader))]
-
-            recon_batch, mu, log_var = model(data_x, data_i, data_b, train)
-            print("out of the model: ", recon_batch.shape, mu.shape, log_var.shape)
-            loss = vae_loss(recon_batch, data_x[0], mu, log_var)
-
+            data_y = [ys_batch[i][index] for i in range(len(loader))]
+            #print("what's coming in: ", len(data_x), data_x[0].shape)
+            recon_batch, mu, log_var, z = model(data_x, data_i, data_b, train)
+            if generate_data and epoch >= epochs:
+                #print("in here now: ", epochs, epoch)
+                #print("adding to vae 1: ", len(recon_batch))
+                vae_data.append(recon_batch)
+                ys.append(data_y)
+                
+            #print("out of the model: ", recon_batch.shape, mu.shape, log_var.shape, data_x[0].shape)
+            loss = vae_loss(recon_batch, data_x[0], mu, log_var, (epoch / epochs) * 0.01, z)
+            #print("between: ", recon_batch)
+            #print("and: ", data_x[0])
+            #done = 5/0
             total_loss = total_loss + loss
-            loss.backward()
-            optimizer.step()
+            optimizer.zero_grad()
+            #loss.backward()
+            #optimizer.step()
+
 
         # Validation
         generator.set_state(init)
-        val_loss = test(model, val_loader, generator, validation=True, device = device)
+        val_loss = test(model, val_loader, generator, validation=True, device = device, generate_data=generate_data, vae_data = vae_data, ys=ys)
 
         # Print metrics every 10 epochs
         if (epoch % 5 == 0):
@@ -214,19 +251,21 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device):
 
             if test_loader != None:
                 generator.set_state(init)
-                test_loss = test(model, test_loader, generator, validation=False, device = device)
+                test_loss = test(model, test_loader, generator, validation=False, device = device, beta = epoch / epochs, generate_data=generate_data, vae_data = vae_data, ys=ys)
                 print(f'Test Loss: {test_loss:.2f}')
 
     if test_loader != None:
         generator.set_state(init)
-        test_loss = test(model, test_loader, generator, validation=False, device = device)
+        test_loss = test(model, test_loader, generator, validation=False, device = device, beta = epoch/epochs, generate_data=generate_data, vae_data = vae_data, ys=ys)
         print(f'Test Loss: {test_loss:.2f}')
 
     #return model
-    return model
+    print("len leaving: ", len(ys), ys[0])
+    print("len vae: ", len(vae_data), vae_data[0])
+    return model, vae_data, ys
 
     
-def test(model, loaders, generator, validation, train = False, device = 'cuda'):
+def test(model, loaders, generator, validation, train = False, device = 'cuda', beta = 0, generate_data = False, vae_data = None, ys = None):
     '''
     creates a series of datasets from individual person datasets
 
@@ -275,9 +314,13 @@ def test(model, loaders, generator, validation, train = False, device = 'cuda'):
             data_x = [xs_batch[i][index] for i in range(len(loaders))]
             data_i = [indice_batch[i][index] for i in range(len(loaders))]
             data_b = [batch_batch[i][index] for i in range(len(loaders))]
+            data_y = [ys_batch[i][index] for i in range(len(loaders))]
 
-            recon_batch, mu, log_var = model(data_x, data_i, data_b, train)
-            loss = vae_loss(recon_batch, data_x, mu, log_var)
+            recon_batch, mu, log_var, z = model(data_x, data_i, data_b, train)
+            if generate_data:
+                vae_data.append(recon_batch)
+                ys.append(data_y)
+            loss = vae_loss(recon_batch, data_x[0], mu, log_var, beta, z)
             total_loss = total_loss + loss
 
     return total_loss

@@ -366,17 +366,22 @@ class ST_TAGCN_Block(torch.nn.Module):
             x = self.b0(x)
         residual = x
         residual = self.relu(self.skip_connection(residual))
+        #print("x coming in: ", x.shape)
         x = x.view(x.shape[2] * x.shape[0], x.shape[1])
+        #print("x 1: ", x.shape)
         x = self.relu(self.b1(self.spatial_conv(x, edge_index)))
+        #print("x 2: ", x.shape)
         x = x.view(self.batch_size, x.shape[1], self.cycle_size)
         x = x.view(self.batch_size, self.cycle_size, -1)
         x = x.view(x.shape[1] * x.shape[0], x.shape[2])
+        #print("x 3: ", x.shape)
         x = self.relu(self.b1(self.temporal_conv(x, edge_index)))
+        #print("x 4: ", x.shape)
         x = x.view(self.batch_size, x.shape[1], self.cycle_size)
+        #print("x out: ", x.shape)
         x = residual + x
         x = self.dropout(x)
         return x
-    
 
 class VAE_ST_TAGCN_Block(torch.nn.Module):
     def __init__(self, in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, device, first=False, latent_dim = 20):
@@ -386,22 +391,24 @@ class VAE_ST_TAGCN_Block(torch.nn.Module):
         self.encoder = Encoder(in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, latent_dim, device, first)
         
         # Decoder layers
-        self.decoder = Decoder(int(cycle_size/4), dim_h, temporal_kernel_size, batch_size, cycle_size, device)
+        self.decoder = Decoder(in_channels, dim_h, temporal_kernel_size, batch_size, cycle_size, device)
         
     def forward(self, x, edge_index, train=True):
         # Encode input data to latent space
-        mu, log_var = self.encoder(x, edge_index)
-        
+
+        x, mu, log_var = self.encoder(x, edge_index)
+    
         # Reparameterization trick
-        std = torch.exp(0.5 * log_var)
-        eps = torch.randn_like(std)
-        z = mu + eps * std
+        std = log_var.mul(0.5).exp_()
+        eps = torch.randn_like(log_var)
+        z = eps.mul(std).add_(mu)
         
         # Decode latent space representation
         reconstructed_x = self.decoder(z, edge_index)
-        print("out here: ", reconstructed_x.shape)
-        
-        return reconstructed_x, mu, log_var
+        #print("out here: ", reconstructed_x.shape, first.shape, x.shape)
+        #stop = 5/0
+        #return x, mu, log_var
+        return reconstructed_x, mu, log_var, z #reconstructed_x
     
 
 class Encoder(torch.nn.Module):
@@ -412,15 +419,16 @@ class Encoder(torch.nn.Module):
         self.b0 = BatchNorm1d(in_channels).to(device) 
         self.start_shape = int(in_channels * cycle_size)
         #in_channels = self.start_shape
+        print("shape going in: ", cycle_size, in_channels, batch_size)
+        cycle_size  = cycle_size * in_channels #* batch_size
+        print("cycle size: ", cycle_size)
+        self.c1 = nn.Linear(cycle_size, int(cycle_size * 0.99)).to(device)
+        self.c2 = nn.Linear(int(cycle_size * 0.99), int(cycle_size * 0.98)).to(device)
+        self.c3 = nn.Linear(int(cycle_size), int(cycle_size * 0.8)).to(device)
 
-        #elf.spatial_conv = ChebConv(in_channels, int(dim_h*2), 1).to(device)
-        #self.temporal_conv = ChebConv(int(dim_h*2), int(dim_h/4), 1).to(device)
-
-        self.spatial_conv = torch.nn.Conv1d(cycle_size, int(cycle_size/2), kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)           
-        self.temporal_conv = torch.nn.Conv1d(in_channels, 1, kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)      
-
-        self.b1 = BatchNorm1d(int(cycle_size/ 2)).to(device)
-        self.b2 = BatchNorm1d(1).to(device)
+        self.b1 = BatchNorm1d(int(cycle_size * 0.90)).to(device)
+        self.b2 = BatchNorm1d(int(cycle_size * 0.85)).to(device)
+        self.b3 = BatchNorm1d(int(cycle_size * 0.80)).to(device)
 
         self.relu = ReLU()
         self.dropout = torch.nn.Dropout(0.1)
@@ -429,62 +437,84 @@ class Encoder(torch.nn.Module):
         self.batch_size = batch_size
         # Shape Info
         self.latent_dim = int(self.cycle_size/4)
+        self.mean = nn.Linear(int(cycle_size * 0.8), int(cycle_size * 0.8)).to(device)        
+        self.var = nn.Linear(int(cycle_size * 0.8), int(cycle_size * 0.8)).to(device) 
 
     def forward(self, x, edge_index, train=True):
-        if self.batch_size > 1:
-            x = self.b0(x)
+        #if self.batch_size > 1:
+        ##    x = self.b0(x)
+        x = x.view(self.batch_size, -1)
+        #x = torch.flatten(x)
+        #print("entering encoder: ", x.shape)
+        #print("what does it look like going in: ", x)
         #residual = x
         ##residual = self.relu(self.skip_connection(residual))
-        print("starting shape: ", x.shape, self.cycle_size, self.batch_size, self.in_channels)
-        x = x.view(x.shape[0], x.shape[2], -1)
-        print("before spatial: ", x.shape, self.spatial_conv, self.b1)
-        x = self.relu(self.b1(self.spatial_conv(x)))
-        print("aFTER spatial: ", x.shape)
-        x = x.view(x.shape[0], x.shape[2], x.shape[1])
-        print("aFTER reshape: ", x.shape, self.temporal_conv, self.b2)
-        x = self.relu(self.b2(self.temporal_conv(x)))
-        print("aFTER temporal: ", x.shape)
+        #print("starting shape: ", x.shape, self.cycle_size, self.batch_size, self.in_channels)
+        #x = x.view(x.shape[0], x.shape[2], -1)
+        #print("before spatial: ", x.shape, self.c3)
+        ##x = self.relu(self.c1(x))
+        #x = self.relu(self.c2(x))
+        x = self.c3(x)
+        #print("aFTER spatial: ", x.shape)
+        #stop = 5/0
+        #x = x.view(x.shape[0], x.shape[2], x.shape[1])
+        #print("aFTER reshape: ", x.shape, self.temporal_conv, self.b2)
+        #x = self.relu(self.b2(self.temporal_conv(x)))
+        #print("aFTER temporal: ", x.shape)
         #x = x.view(x.shape[0], x.shape[2], x.shape[1])
         #x = x.view(x.shape[0] * x.shape[1], x.shape[2])
         #x = residual + x
-        x = self.dropout(x)
+        #x = self.dropout(x)
         
         # Latent space representation
-        print("aFTER dropout: ", x.shape)
+        #print("aFTER dropout: ", x.shape, self.latent_dim)
+        mu = self.mean(x)
+        log_var = self.var(x)
 
-        mu = x[:, :, :self.latent_dim]
-        log_var = x[:, :, self.latent_dim:]
-        print("final shapes: ", x.shape, mu.shape, log_var.shape)
-        print("\n")
-        return mu, log_var
+        #print("final out of encoder: ", x, x.shape)
+        #print("\n")
+        return x, mu, log_var
     
 
 class Decoder(torch.nn.Module):
     def __init__(self, latent_dim, dim_h, temporal_kernel_size, batch_size, cycle_size, device):
         super(Decoder, self).__init__()
-        
-        self.spatial_conv = torch.nn.Conv1d(int(cycle_size/4), cycle_size, kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)           
-        self.temporal_conv = torch.nn.Conv1d(1, 3, kernel_size=temporal_kernel_size, stride=1, padding='same').to(device)      
-
-        self.b1 = BatchNorm1d(3).to(device)
-        self.b2 = BatchNorm1d(cycle_size).to(device)
+        self.cycle_size = cycle_size
+        cycle_size  = 3 * cycle_size
+        self.c1 = nn.Linear(int(cycle_size * 0.97), int(cycle_size * 0.98)).to(device)
+        self.c2 = nn.Linear(int(cycle_size * 0.98), int(cycle_size * 0.99)).to(device)
+        self.c3 = nn.Linear(int(cycle_size * 0.8), int(cycle_size)).to(device)
+        self.c4 = nn.Linear(int(cycle_size * 0.95), cycle_size).to(device)
+        self.b1 = BatchNorm1d(106).to(device)
+        self.b2 = BatchNorm1d(int(cycle_size * 0.66)).to(device)
+        self.b3 = BatchNorm1d(int(cycle_size)).to(device)
 
         self.relu = ReLU()
         self.dropout = torch.nn.Dropout(0.1)
         # Shape Info
         self.batch_size = batch_size
-        self.cycle_size = cycle_size
 
     def forward(self, x, edge_index, train=True):
-        print("input sizes: ", x.shape)
+        #print("input sizes: ", x.shape)
         #x = x.view(x.shape[0], x.shape[2], x.shape[1])
-        print("before temp:", x.shape)
-        x = self.relu(self.b1(self.temporal_conv(x)))
-        print("after temp:", x.shape)
-        x = x.view(x.shape[0], x.shape[2], x.shape[1])
-        print("after reshape:", x.shape, self.spatial_conv)
-        x = self.relu(self.b2(self.spatial_conv(x)))
-        print("after spatial:", x.shape)
-        x = x.view(x.shape[0], x.shape[2], x.shape[1])
-        x = self.dropout(x)
+        #print("before temp:", x.shape)
+        #x = self.relu(self.b1(self.temporal_conv(x)))
+        #x = x.view(x.shape[0], x.shape[2], x.shape[1])
+       # x = self.relu(self.c1(x))
+        #print("after c1:", x.shape, self.c1)
+        #x = self.relu(self.c2(x))
+        #print("after c2:", x.shape, self.c2)
+        x = self.c3(x)
+        #print("after c3:", x.shape, self.c3)
+        #x = self.c4(x)
+        #print("after spatial:", x.shape)
+        #x = x.view(x.shape[0], x.shape[2], x.shape[1])
+        #x = self.dropout(x)
+        #x = x.view(x.shape[1], x.shape[0])
+        x = x.view(self.batch_size, -1)
+        x = torch.sigmoid(x)
+        x = x.view(self.batch_size * self.cycle_size, -1)
+        #print("leaving decoder: ", x.shape)
+        #print("what it looks like: ", x)
+        #stop = 5/0
         return x

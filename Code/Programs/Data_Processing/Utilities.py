@@ -9,6 +9,7 @@ import os
 import copy
 import ast
 import re
+import numbers
 import math
 import pandas as pd
 import numpy as np
@@ -307,7 +308,7 @@ def save_dataset(data, name, colnames = colnames):
     elif len(data[0]) == 23:
         colnames = colnames_default
 
-    new_dataframe = pd.DataFrame(data, columns = colnames)
+    new_dataframe = pd.DataFrame(data)#, columns = colnames)
     file_name = name.split("/")
     file_name = file_name[-1]
     os.makedirs(name + "/raw/" ,exist_ok=True)
@@ -466,9 +467,11 @@ def convert_to_literals(data, metadata = True, m = 5):
     '''
     for i,  (index, row) in enumerate(data.iterrows()):
         for col_index, col in enumerate(row):
-            if col_index > m and metadata == True or metadata == False:
-                if 'nan' in row[col_index].lower():
-                    data.iat[i, col_index] = data.iat[i, col_index].replace('nan', '0.0')
+            if col_index > m and metadata == True and isinstance(data.iat[i, col_index], numbers.Number) == False or metadata == False and isinstance(data.iat[i, col_index], numbers.Number) == False:
+                if isinstance(row[col_index], str):
+                    if 'nan' in row[col_index].lower():
+                        data.iat[i, col_index] = data.iat[i, col_index].replace('nan', '0.0')
+                #print("check: ", type(data.iat[i, col_index]), data.iat[i, col_index], isinstance(data.iat[i, col_index], numbers.Number))
                 tmp = ast.literal_eval(data.iat[i, col_index])
                 data.iat[i, col_index] = copy.deepcopy(tmp)
             else:

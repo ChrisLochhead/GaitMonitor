@@ -19,7 +19,7 @@ from Programs.Machine_Learning.GCN.GCN import S_GCN, T_GCN
 
 
 class GCN_GraphNetwork(torch.nn.Module):
-    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 1, stgcn_filters = [128, 128, 128], 
+    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 2, stgcn_filters = [128,128], 
                  max_cycle = 7, num_nodes_per_graph = 18, device = 'cuda', type = 'ST_TAGCN_Block'):
         super(GCN_GraphNetwork, self).__init__()
 
@@ -103,7 +103,7 @@ class GCN_GraphNetwork(torch.nn.Module):
                     i_stream.append(VAE_ST_TAGCN_Block(self.dim_in[0], self.stgcn_filters[0], 5, self.batch_size, self.cycle_size,
                                                 device = device, first=True))
                     for i in range(1, self.size_stgcn):
-                        i_stream.append(VAE_ST_TAGCN_Block(self.stgcn_filters[i-1], self.stgcn_filters[i], 5, self.batch_size, self.cycle_size, device=device, first=False))
+                        i_stream.append(VAE_ST_TAGCN_Block(self.dim_in[0], self.stgcn_filters[0], 5, self.batch_size, self.cycle_size, device=device, first=False))
                     self.streams.append(i_stream)
                 else:
                     print("entered type not valid")
@@ -161,27 +161,31 @@ class GCN_GraphNetwork(torch.nn.Module):
                 #Reshape for temporal convolutions
                 #batch, channel, num nodes per cycle, num features
                 #print("h shape: ", h.shape, self.batch_size, self.cycle_size, self.dim_in, i)
-                h = h.view(self.batch_size, self.dim_in[i], self.cycle_size)
+                if self.model_type != 'VAE':
+                    h = h.view(self.batch_size, self.dim_in[i], self.cycle_size)
                 #In the case of ST-GCN this is a list object
                 for j, layer in enumerate(stream):
                     if self.model_type == 'VAE':
-                        h, var, mu = layer(h, edge_indices[i], train)
+                        h, var, mu, z = layer(h, edge_indices[i], train)
                     else:
                         h = layer(h, edge_indices[i], train)
                     #Add the last layer of each stream to a list. reshaping it to 2D first
                     #so it's compatible with HCF layers
-                    print("what's h: ", h.shape, type(h))
+                    #print("what's h: ", h.shape, type(h))
                     if j == len(stream) - 1:
-                        #h = h.view(h.shape[0], h.shape[1] * h.shape[2])
+                        if self.model_type != 'VAE':
+                            h = h.view(h.shape[0], h.shape[1] * h.shape[2])
                         hidden_layers.append(h)
 
         # Concatenate graph embeddings
         #print("self.block", self.block2, type(self.block2))
-        h = torch.cat(([l for l in hidden_layers]), dim=1)
-        if self.model_type == 'VAE':
-            print("what am i returning at the end of graph network forward", h.shape, var.shape, mu.shape)
-            return h, var, mu
 
+        if self.model_type == 'VAE':
+            h = torch.cat(([l for l in hidden_layers]), dim=0)
+            #print("what am i returning at the end of graph network forward", h.shape, var.shape, mu.shape)
+            return h, var, mu, z
+        
+        h = torch.cat(([l for l in hidden_layers]), dim=1)
         #h = h.view(h.shape[0], 14, -1)
         #print("size before: ", h.size())
         #h = self.avg_pool(h)
@@ -189,6 +193,7 @@ class GCN_GraphNetwork(torch.nn.Module):
         #h = h.view(h.shape[0], -1)
         # Combine the results and pass them through the combination layer
         #To compress them into classification
+        #print("h in : ", h.size())
         h = self.combination_layer(h)
         #print("h out: ", h.size())
         return h

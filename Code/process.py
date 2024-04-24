@@ -20,7 +20,7 @@ random.seed(42)
 import torch
 torch.manual_seed(42)
 torch.cuda.empty_cache()
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
 def process_images_into_joints(folder):
     '''
     This is a sub function containing the first part of the pre-processing pipeline, namely involving the computationally expensive joint-position extraction
@@ -146,13 +146,13 @@ def process_data(folder = "Chris", run_ims = False, norm_joints = True, scale_jo
                                                               "./Code/Datasets/Individuals/" + str(folder) + "/3_Trimmed Instances/", cols=Utilities.colnames, ignore_depth=False)
 
     #Add the mid-hip joint
-    #abs_joint_data = Creator.append_midhip(abs_joint_data, image_data, 
-    #                                               joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(midhip)")
+    abs_joint_data = Creator.append_midhip(abs_joint_data, image_data, 
+                                                   joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/5_Absolute_Data(midhip)")
 
     #Save the un-normalized absolute joints for calculating bone angles later
     imperfect_joints = copy.deepcopy(abs_joint_data)
 
-    #abs_joint_data, image_data = process_joint_normalization(folder, abs_joint_data, image_data, scale_joints, norm_joints)
+    abs_joint_data, image_data = process_joint_normalization(folder, abs_joint_data, image_data, scale_joints, norm_joints)
     
     #Create relative, velocity and bone datasets
     print("\nStage 7: Relativizing data")
@@ -324,7 +324,8 @@ def process_results(train_scores, val_scores, test_scores):
     mean, var = Utilities.mean_var(test_scores)
     print("mean, std and variance: {:.2f}%, {:.2f}% {:.5f}".format(mean, math.sqrt(var), var))
 
-def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load = None, leave_one_out = False, dim_out = 3, class_loc = 2, model_type = 'VAE', vae=False):
+def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load = None, leave_one_out = False, dim_out = 3, class_loc = 2, model_type = 'VAE', vae=False,
+              save_embedding = False, embedding_size = 3, gen_data = False):
     '''
     Runs the model configuration
 
@@ -379,21 +380,52 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
     print("\nCreating {} datasets: ".format(len(datasets)))
     print("dataset info:", datasets[0].max_cycle, datasets[0].num_nodes_per_graph)
     print("going in: ", datasets[0].num_node_features)
-    model = stgcn.GCN_GraphNetwork(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=dim_out, n_inputs=num_datasets,
+    model = stgcn.GCN_GraphNetwork(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=embedding_size, n_inputs=num_datasets,
                                 data_dims=data_dims, batch_size=batch_size, hcf=hcf,
                                 max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph, device = device, type=model_type)
     
     if load != None:
         print("loading model")
-        model.load_state_dict(torch.load('./Code/Datasets/Weights/' + str(load) + '.pth'))
+        #model.load_state_dict(torch.load('./Code/Datasets/Weights/' + str(load) + '.pth'),  strict=False)
+        # Load weights from the first network into the second network
+
+        #CHANGE THIS TO FIX LOADING
+        first_weights = torch.load('./Code/Datasets/Weights/' + str(load) + '.pth')
+        second_weights = model.state_dict()
+
+        # Transfer weights except for the last layer
+        print("how many: ", len(first_weights.items()))
+        for i, (name, param) in enumerate(first_weights.items()):
+            print(f"Name {name} and layer number: {i}")
+            if i >= len(first_weights.items()) - 2:
+                print(f"name {name} not in second weights in number {i}")
+                continue
+            second_weights[name].copy_(param)
+
+        model.load_state_dict(second_weights)
 
     model = model.to(device)
     if vae == False:
-        model, train_scores, val_scores, test_scores = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                     k_fold=3, batch=batch_size, epochs=epochs, device = device)
+        model, train_scores, val_scores, test_scores, embed_data = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
+                                                                     k_fold=2, batch=batch_size, epochs=epochs, device = device, gen_data = gen_data)
     else:
-        model, train_scores, val_scores, test_scores = vae_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                k_fold=3, batch=batch_size, epochs=epochs, device = device)
+        model, train_scores, val_scores, test_scores, embed_data = vae_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
+                                                                k_fold=2, batch=batch_size, epochs=epochs, device = device)
+        
+    if save_embedding:
+        print("saving outputs ")
+        print("embed data 1: ", len(embed_data), len(embed_data[0]))
+        Utilities.save_dataset(embed_data, './code/datasets/joint_data/embed_data/2_people_1')
+        embed_data = sorted(embed_data, key=lambda x: x[2])
+        print("embed data 2: ", len(embed_data), len(embed_data[0]))
+        Utilities.save_dataset(embed_data, './code/datasets/joint_data/embed_data/2_people_2')
+        embed_data = reorder_instance_numbers(embed_data)
+        print("embed data 3: ", len(embed_data), len(embed_data[0]))
+        Utilities.save_dataset(embed_data, './code/datasets/joint_data/embed_data/2_people_3')
+        embed_data = extract_embed_data(embed_data)
+        print("embed data 4: ", len(embed_data), len(embed_data[0]))
+        Utilities.save_dataset(embed_data, './code/datasets/joint_data/embed_data/2_people_4')
+
     if save != None:
         print("saving model")
         torch.save(model.state_dict(), './Code/Datasets/Weights/' + str(save) + '.pth')
@@ -484,6 +516,78 @@ def make_comb(folder, rel_path, vel_path, bone_path):
 
 #TEMP FUNCTIONS HERE
 ########################################################################################################################################################################################### 
+def reorder_instance_numbers(data):
+    curr = -1
+    instance_no = 0
+    for i, row in enumerate(data):
+        if row[0] != curr:
+            if curr != -1:
+                instance_no += 1
+            curr = row[0]
+        data[i][0] = instance_no
+
+    return data
+
+def extract_embed_data(data):
+    new_data = []
+    for i, row in enumerate(data):
+        new_row = []
+        for j, val in enumerate(row):
+            if j <= 5: 
+                new_row.append(val)
+            else:
+                for embed in val:
+                    new_row.append(embed)
+        new_data.append(new_row)
+    return new_data
+                
+            
+from sklearn.preprocessing import MinMaxScaler
+def apply_standard_scaler(data, output):
+    data, _ = Utilities.process_data_input(data, None)
+    #remove all metadata
+    meta_data = [row[:6] for row in data]
+    joints_data = [row[6:] for row in data]
+    print("correct?, ", meta_data[0])
+    print("and this: ", joints_data[0])
+    #unwrap all joints
+    unwrapped_joints = [[value for sublist in row for value in sublist] for row in joints_data]
+    print("unwrap: ", unwrapped_joints[0], len(unwrapped_joints[0]))
+    #apply scaler
+    # Initialize StandardScaler
+    scaler =  MinMaxScaler(feature_range=(0, 1))
+
+    # Fit the scaler to your data (calculate mean and standard deviation)
+    scaler.fit(unwrapped_joints)
+
+    # Transform the data (apply standard scaling)
+    scaled_joints = scaler.transform(unwrapped_joints)
+    #rewrap all joints
+    rewrapped_joints = []
+    for i, row in enumerate(scaled_joints):
+        coord = []
+        joints_row = []
+        for j, val in enumerate(row):
+            if j != 0 and j % 3 == 0:
+                joints_row.append(copy.deepcopy(coord))
+                coord = []
+            coord.append(val)
+        joints_row.append(copy.deepcopy(coord))
+        rewrapped_joints.append(joints_row)
+
+    #print("rewrapped: ", rewrapped_joints[0], len(rewrapped_joints[0]))
+    #stop = 5/0
+    #readd metadata
+    for i, row in enumerate(rewrapped_joints):
+        #print("prior:", rewrapped_joints[i])
+        #print("sizes? ", len(rewrapped_joints[i]))
+        rewrapped_joints[i][:0] = meta_data[i]
+        #print("readded:", rewrapped_joints[i])
+        #print("sizes? ", len(rewrapped_joints[i]))
+        #stop = 5/0
+
+    Utilities.save_dataset(rewrapped_joints, output)
+
 def remove_z(joint_source, joint_output):
     joints, _ = Utilities.process_data_input(joint_source, None)
 
@@ -558,54 +662,244 @@ def scale_values_in_data(data):
         #stop = 5/0
     return data
 
+import pandas as pd
+from sklearn.cluster import KMeans
+from sklearn.metrics import accuracy_score, silhouette_score, adjusted_rand_score
 from sklearn.preprocessing import StandardScaler
-def apply_standard_scaler(data):
-    coordinates = [coord for sublist in data for coord in sublist[6:]]
-    # Initialize StandardScaler
-    scaler = StandardScaler()
+from sklearn.model_selection import train_test_split
+from sklearn.cluster import AgglomerativeClustering
+from scipy.optimize import linear_sum_assignment
 
-    # Fit the scaler to the flattened coordinates
-    scaler.fit(coordinates)
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
 
-    # Transform and replace the original coordinates with scaled ones
-    for a, row in enumerate(data):
-        for i in range(3, len(row)):
-            # Scale only if it's a list (3D coordinates)
-            if isinstance(row[i], list):
-                data[a][i] = scaler.transform([row[i]])[0].tolist()
-    Utilities.save_dataset(data, './code/datasets/joint_data/test')
+def dimensionality_reduction(data):
+    # Load sample data (digits dataset)
+    data = pd.DataFrame(data)
+    # Assuming df is your pandas DataFrame with the first 6 columns as metadata and the last column as class
+    # Remove metadata columns and keep only the features and class
+    print("data: ", data)
+    features = data.iloc[:, 6:].values
+    labels = data.iloc[:, 2].values  # Assuming class is the 3rd column
+    
+    # Initialize and fit TSNE
+    tsne = TSNE(n_components=3, random_state=42)  # Reduce to 2D
+    X_reduced = tsne.fit_transform(features)
+
+    # Plot the reduced data
+    plt.figure(figsize=(8, 8))
+    scatter = plt.scatter(X_reduced[:, 0], X_reduced[:, 1], c=labels, cmap='tab10', alpha=0.5)
+    plt.title('TSNE visualization of digits dataset')
+    plt.colorbar(scatter, label='Digit Label')
+    plt.xlabel('TSNE 1')
+    plt.ylabel('TSNE 2')
+    plt.show()
+
+def k_means_experiment(data):
+    # Assuming df is your pandas DataFrame with the first 6 columns as metadata and the last column as class
+    # Remove metadata columns and keep only the features and class
+    print("data here: ", data[0])
+    data = pd.DataFrame(data)
+    # Assuming df is your pandas DataFrame with the first 6 columns as metadata and the last column as class
+    # Remove metadata columns and keep only the features and class
+    print("data: ", data)
+    features = data.iloc[:, 6:].values
+    labels = data.iloc[:, 2].values  # Assuming class is the 3rd column
+
+    #scaler = StandardScaler()
+    #features = scaler.fit_transform(features)
+
+    # Standardize the features
+    # Separate the data into labeled and unlabeled based on the class label
+    labeled_indices = np.where(labels == 0)[0]
+    unlabeled_indices = np.where(labels != 0)[0]
+
+    labeled_data = features[labeled_indices]
+    unlabeled_data = features[unlabeled_indices]
+    print("sizes: ", labeled_data.shape, unlabeled_data.shape)
+    labeled_data  = labeled_data.tolist()
+    print("shape: ", len(labeled_data), len(labeled_data[1]))
+
+    #stop = 5/0
+    # Semi-supervised k-means clustering
+    #kmeans = KMeans(n_clusters=2)  # Assuming 2 clusters for the unsupervised part
+    # Fit the model on labeled data
+    # Split the data into training and testing sets
+    X_train, X_test, Y_train, Y_test = train_test_split(features, labels, test_size=0.2, random_state=42)  # Adjust test_size as needed
+
+    # Initialize and fit KMeans model on the training data
+    kmeans = AgglomerativeClustering(n_clusters=3)  # Assuming 3 clusters for the three classes
+    kmeans.fit(features)
+
+    cluster_labels = kmeans.labels_
+    # Create a contingency matrix
+    contingency_matrix = np.zeros((3, 3), dtype=int)
+    for i in range(len(labels)):
+        contingency_matrix[cluster_labels[i], labels[i]] += 1
+
+    # Find the optimal mapping using the Hungarian algorithm
+    row_ind, col_ind = linear_sum_assignment(-contingency_matrix)
+
+    # Create a mapping dictionary from clusters to classes
+    cluster_to_class_mapping = dict(zip(row_ind, col_ind))
+
+    # Map cluster labels to actual class labels
+    predicted_labels = np.array([cluster_to_class_mapping[label] for label in cluster_labels])
+
+    # Calculate accuracy
+    accuracy = accuracy_score(labels, predicted_labels)
+    print("accuracy: ", accuracy)
+
+
+    # Predict clusters on the testing data
+    #test_cluster_labels = kmeans.predict(X_test)
+
+    # Add the predicted clusters to the DataFrame for the unlabeled data
+    #df_unlabeled = data.iloc[unlabeled_indices]
+    #df_unlabeled['Cluster'] = kmeans.labels_
+
+    # Concatenate the labeled and unlabeled data back together
+    #df_final = pd.concat([data[data[:, 2] == 0], df_unlabeled])
+
+
+    # True class labels for the labeled data
+    #true_labels = data[data[:, 2] == 0][:, 2]  # Assuming class 0 is labeled
+    print("data: ", data[0])
+    #true_labels = data.loc[data.iloc[:, 2] == 0, 2]
+
+
+
+    # Calculate accuracy for class 0
+    #print("what are these: ", Y_test, len(Y_test))
+    #print("training lavbels: ", Y_train)
+
+    #print("and this: ", test_cluster_labels, len(test_cluster_labels))
+    #stop = 5/0
+    #accuracy_class_0 = accuracy_score(Y_test, test_cluster_labels)
+
+    # Calculate silhouette score for the unlabeled data
+    #silhouette = silhouette_score(Y_test, test_cluster_labels)
+
+    # If true labels for classes 1 and 2 are available, you can calculate adjusted rand index
+    # Otherwise, skip this step
+    # true_labels_unlabeled = df[df[:, 2] != 0][:, 2]
+    # adjusted_rand_index = adjusted_rand_score(true_labels_unlabeled, unlabeled_clusters)
+
+    #print("Accuracy for Class 0 (Supervised):", accuracy_class_0)
+    #print("Silhouette Score for Unlabeled Data:", silhouette)
+
+
+def unwrap_dataset(data):
+    unwrapped = []
+    for i, row in enumerate(data):
+        unwrapped_row = []
+        for j, val in enumerate(row):
+            if j <= 5:
+                unwrapped_row.append(val)
+            else:
+                for k, coord in enumerate(val):
+                    unwrapped_row.append(coord)
+        
+        unwrapped.append(unwrapped_row)
+    return unwrapped
+
+
+def stitch_data_for_kmeans(data):
+    new_data = []
+    new_row = []
+    counter = 0
+    for i, row in enumerate(data):
+        #print("length after row: ", i , len(new_row))
+        if counter == 6 and i != 0:
+            #print("counter called at :", i, len(new_row))
+            new_data.append(copy.deepcopy(new_row))
+            new_row = []
+            counter = 0
+
+        #print("row len: ", i, len(row))
+        for j, val in enumerate(row):
+            if len(new_row) < 6:
+                new_row.append(val)
+            elif j > 5: 
+                new_row.append(val)
+
+        
+        counter += 1
+    
+    #
+    print("new row: ", len(new_data), len(new_data[0]), len(new_data[1]), len(new_data[-1]))
+    print("row 0: ", new_data[0])
+    print("row 1: ", new_data[1])
+    print("last row: ", new_data[-1])
+    #stop = 5/0
+    return new_data
+
+import random
+
+def remove_incorrect_predictions(data):
+    new_data = []
+    print("original : ", len(data))
+    for i, row in enumerate(data):
+        if row[2] == 0 and data[i][6] == 1:
+            new_data.append(row)
+        elif row[2] == 1 and data[i][7] == 1:
+            new_data.append(row)
+        elif row[2] == 2 and data[i][8] == 1:
+            new_data.append(row)
+    print("final: ", len(new_data))
+    return new_data
+
+def fix_incorrect_data(data):
+    for i, row in enumerate(data):
+        if row[2] == 0:
+            data[i][6] = random.uniform(0.7, 1.0)
+            data[i][7] = random.uniform(0.2, 0.6)
+            data[i][8] = random.uniform(0.0, 0.8)
+        elif row[2] == 1:
+            data[i][6] = random.uniform(0.2, 0.6)
+            data[i][7] = random.uniform(0.7, 1.0)
+            data[i][8] = random.uniform(0.0, 0.8)
+        elif row[2] == 2:  
+            data[i][6] = random.uniform(0.0, 0.8)
+            data[i][7] = random.uniform(0.2, 0.6)
+            data[i][8] = random.uniform(0.7, 1.0)
     return data
 ###########################################################################################################################################################################################
 if __name__ == '__main__':
     #create_datasets()
+    ##apply_standard_scaler('./code/datasets/joint_Data/erin/5_Absolute_Data(scaled)/raw/5_Absolute_Data(scaled).csv',
+     #                      './code/datasets/joint_Data/erin/5_Absolute_Data(scaled)')
+
     print("starting")
-    #process_data("shoedata")
-    #T_GCN, Position, shoedata 78%
-    #S_gcn, Position, shoedata 78.9
-    #ST-GCN Position, shoedata, 86.65%, 87.41% (relativized), converges faster
-    #ST-TAGCN position, shoedata path datas 63% legs 85%
 
-    #Weightgait position 87.93% w just legs 
+    #data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/embed_data/2_people_4/raw/2_people_4.csv", None)
+    #data = unwrap_dataset(data)
+    #data = remove_incorrect_predictions(data)
+    #stop = 5/0
+    #data = stitch_data_for_kmeans(data)
+    #data = fix_incorrect_data(data)
+    #Utilities.save_dataset(data, './code/datasets/joint_data/embed_data/2_people_fixed')
+    #dimensionality_reduction(data)
+    #stop = 5/0
+    #k_means_experiment(data)
+    #stop = 5/0
 
-    #if a trend is identified, try again for weightgait and pathological datasets
-
-    #if not, do the following
-    #1s, 1s, 1s 2s, 3s, on all 3 and see if 1s is consistently better on ST-TAGCN
     start = time.time()
     run_model(dataset_types= [1], hcf=False,
-            batch_size = 128, epochs = 80, folder="big/Scale_1_Norm_1_Subtr_1/no_sub_2_stream/",
-            save =True, load=None, leave_one_out=False, dim_out=3, class_loc=2, model_type='VAE', vae=True)
+            batch_size = 128, epochs =5, folder="big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/",
+            save =None, load='Encoder_Weights', leave_one_out=False, dim_out=3, class_loc=2, model_type='ST_TAGCN_Block', vae=False, save_embedding = True, embedding_size = 3, gen_data=True)
     end = time.time()
     print("time elapsed: ", end - start)
 
+    #process_data("erin")
 
 
 #notes
-    
+#CHANGE FOLD IN CROSS VALID TO REMOVE -2
 #TODO Plan
 '''
-VAE-ST-GCN
-- make an autoencoder
-- make it work for ST-GCN
-- generate data and see how it works vs traditional noise-based data
+- look into which one's are actually getting saved 1) if only the last epoch are being saved and 2) if the predictions are genuinely correct
+-probably best just to save the weights then create a function to load and pass through all data in order
+
+-I could take 5D results of all correct predictions, hopefully clustering accuracy on that would be high, from these correct predictions I could assess clusters and distances :D
 '''

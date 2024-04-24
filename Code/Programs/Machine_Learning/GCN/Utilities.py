@@ -22,7 +22,7 @@ def accuracy(pred_y, y):
     
 
 def cross_valid(m_model, test_dataset, datasets=None,k_fold=3, batch = 16,
-                 epochs = 100, make_loaders = False, device = 'cuda'):
+                 epochs = 100, make_loaders = False, device = 'cuda', gen_data = False):
     '''
     creates a series of datasets from individual person datasets
 
@@ -71,7 +71,13 @@ def cross_valid(m_model, test_dataset, datasets=None,k_fold=3, batch = 16,
 
     total_preds = []
     total_ys = []
+    model = copy.deepcopy(m_model)
+    model = model.to(device)
     for fold in range(k_fold):
+        if fold >= k_fold - 1:
+            gen_data = True
+        else:
+            gen_data = False
         print(f"Fold: {fold} of {k_fold}")
         start = time.time()
         train_loaders = []
@@ -95,11 +101,12 @@ def cross_valid(m_model, test_dataset, datasets=None,k_fold=3, batch = 16,
             test_loaders.append(GeoLoader(test_set, batch_size=batch, sampler = test_sample, drop_last = True))
 
             if make_loaders:
-                return train_loaders, val_loaders, test_loaders
+                return train_loaders, val_loaders, test_loaders, None
         #reset the model, train and save the results to the result lists
-        model = copy.deepcopy(m_model)
-        model = model.to(device)
-        model, accuracies, vals, tests, all_y, all_pred = train(model, train_loaders, val_loaders, test_loaders, G, epochs, device)
+        print("RESET MODEL")
+        #model = copy.deepcopy(m_model)
+        #model = model.to(device)
+        model, accuracies, vals, tests, all_y, all_pred, embed_data, ys = train(model, train_loaders, val_loaders, test_loaders, G, epochs, device, gen_data)
         total_ys += all_y
         total_preds += all_pred
         train_score.append(accuracies[-1])
@@ -112,9 +119,11 @@ def cross_valid(m_model, test_dataset, datasets=None,k_fold=3, batch = 16,
     print(confusion_matrix(total_ys, total_preds))
     f1 = f1_score(total_ys, total_preds, average='weighted')
     print("f1 score: ", f1)
-    return model, train_score, val_score, test_score
+    print("ys coming out: ",  len(embed_data), len(ys), len(ys[0]), len(ys[0][0]))
+    embed_data = convert_embed_to_reg_data(embed_data, ys, batch)
+    return model, train_score, val_score, test_score, embed_data
 
-def train(model, loader, val_loader, test_loader, generator, epochs, device):
+def train(model, loader, val_loader, test_loader, generator, epochs, device, gen_data):
     '''
     creates a series of datasets from individual person datasets
 
@@ -143,7 +152,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device):
     init = generator.get_state()
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(),
-                                lr=0.1,
+                                lr=0.01,
                                 weight_decay=0.001)
     model.train()
     train_accs = []
@@ -151,6 +160,9 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device):
     test_accs = []
     all_pred = []
     all_y = []
+    embed_data = []
+    ys = []
+    gen_test = False
     #First pass, append all the data together into arrays
     xs_batch = [[] for l in range(len(loader))]
     indice_batch = [[] for l in range(len(loader))]
@@ -189,6 +201,12 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device):
             data_y =  [ys_batch[i][index] for i in range(len(loader))]
             out = model(data_x, data_i, data_b, train=True)
 
+            if gen_data and epoch >= epochs:
+                print("IN HERE: ", epoch)
+                gen_test = True
+                #embed_data.append(torch.sigmoid(out))
+                #ys.append(data_y)
+            #stop = 5/0
             #print("data ys all the same: ", len(data_y), len(out))
             loss = criterion(out, data_y[0]) / len(loader[0])
             total_loss = total_loss + loss
@@ -200,7 +218,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device):
 
         # Validation
         generator.set_state(init)
-        val_loss, val_acc, _, _ = test(model, val_loader, generator, validation=True, device = device)
+        val_loss, val_acc, _, _ = test(model, val_loader, generator, validation=True, device = device, gen_test = gen_test, embed_data=embed_data, ys=ys)
         val_accs.append(val_acc)
 
         # Print metrics every 10 epochs
@@ -212,27 +230,29 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device):
 
             if test_loader != None:
                 generator.set_state(init)
-                test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False, device = device)
+                test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False, device = device, gen_test = gen_test, embed_data=embed_data, ys=ys)
                 all_pred += pred_y
                 all_y += lab_y
                 print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
                 test_accs.append(test_acc)
         #Tidy up to save memory
-        del total_loss, acc, val_loss, val_acc 
+        del total_loss, acc, val_loss, val_acc
+        #print("REMOVE BREAK FOR EPOCHS IN FUTURE")
+        #break
 
     if test_loader != None:
         generator.set_state(init)
-        test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False, device = device)
+        test_loss, test_acc, pred_y, lab_y = test(model, test_loader, generator, validation=False, device = device, gen_test=gen_test, embed_data=embed_data, ys=ys)
         all_pred += pred_y
         all_y += lab_y
         print(f'Test Loss: {test_loss:.2f} | Test Acc: {test_acc * 100:.2f}%')
         test_accs.append(test_acc)
 
     #return model
-    return model, train_accs, val_accs, test_accs, all_y, all_pred
+    return model, train_accs, val_accs, test_accs, all_y, all_pred, embed_data, ys
 
     
-def test(model, loaders, generator, validation, train = False, device = 'cuda'):
+def test(model, loaders, generator, validation, train = False, device = 'cuda', gen_test = False, embed_data = None, ys = None):
     '''
     creates a series of datasets from individual person datasets
 
@@ -294,6 +314,13 @@ def test(model, loaders, generator, validation, train = False, device = 'cuda'):
                 y_classes[d.item()] += 1
 
             out = model(data_x, data_i, data_b, train)
+            if gen_test:
+                gen_test = True
+                embed_data.append(out)
+                print("whats out", out, out.shape)
+                print("whats y: ", data_y, data_y[0])
+                ys.append(data_y)
+
             loss = criterion(out, data_y[0]) / len(loaders[0]) 
             total_loss = total_loss + loss
 
@@ -417,4 +444,53 @@ def get_gait_segments(joint_data):
                 segment.append(frame)
             else:
                 segment.append(frame)
+        if len(segment) == division_factor:
+            segments.append(copy.deepcopy(segment))
+            segment = []
+            segment.append(frame)
     return segments
+
+
+def convert_embed_to_reg_data(data, ys, batch_size):
+    output_data = []
+    instance_count = 0
+    for i, batch in enumerate(data):
+        #print(f'batch {i} of {len(data)}')
+        #Split tensor into 32 sections of size [108, 3]
+        data_cycles = torch.chunk(batch, batch_size, dim=0)
+        #print("data cycles: ", len(data_cycles), type(data_cycles))
+        print("full ", len(data_cycles), len(ys[i][0]), len(batch))
+        y_cycle = torch.chunk(ys[i][0], batch_size, dim=0)
+        print("ys: ", len(y_cycle))
+        #print("y: ", ys)
+        # Split each of the 32 sections into 6 sections of size [18, 3]
+
+        #INVESTIGATE THIS TO SEE IF THIS IS WHERE THE PROBLEM OCCURS 
+        frames = [torch.chunk(section, 6, dim=0) for section in data_cycles]
+        #print("frames: ", len(frames), frames[0])
+        curr_y = 0
+        for j, frame_batch in enumerate(frames):
+            #print("frame batch: ", len(frame_batch))
+            curr_y += 1
+            for k, frame in enumerate(frame_batch):
+                list_frame = frame.tolist()
+                #print("frame now: ", list_frame, list_frame[0])
+                m_val = max(list_frame[0])
+                #for l, t in enumerate(list_frame[0]):
+                    #print("t: ", t)
+                #    if list_frame[0][l] != m_val:
+                #        list_frame[0][l] = 0
+                #    else:
+                #        list_frame[0][l] = 1
+                #print("after transformation: ", list_frame)
+                #print("issue: ", y_cycle[j])
+                #print("full: ", y_cycle)
+                meta_data = [instance_count,k,y_cycle[j].item(), 0,0,0]
+                for val in list_frame:
+                    meta_data.append(val)
+                #print("final metadata: ", meta_data, len(meta_data))
+                #stop = 5/0
+
+                output_data.append(meta_data)
+            instance_count += 1
+    return output_data
