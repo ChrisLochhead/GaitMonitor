@@ -295,7 +295,7 @@ def save_dataset(data, name, colnames = colnames):
     None
 
     '''
-    print("Saving joints")
+    print("Saving joints"), len(data[0])
     #Check for dataset type
     if len(data[0]) == 24:
         colnames = colnames_midhip

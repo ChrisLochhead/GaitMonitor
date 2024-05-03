@@ -133,9 +133,12 @@ class GCN_GraphNetwork(torch.nn.Module):
         Linear(linear_input, 2048), ReLU(), BatchNorm1d(2048), torch.nn.Dropout(0.15),
         Linear(2048, 1024), ReLU(), BatchNorm1d(1024), torch.nn.Dropout(0.15),
         Linear(1024, 512), ReLU(), BatchNorm1d(512), torch.nn.Dropout(0.15),
-        Linear(512, 128), ReLU(), BatchNorm1d(128), torch.nn.Dropout(0.15),
-        Linear(128, num_classes)
-        )
+        Linear(512, 128), ReLU(), BatchNorm1d(128), torch.nn.Dropout(0.15))
+        #Linear(512, 18), ReLU(), BatchNorm1d(18), torch.nn.Dropout(0.15),
+        #Linear(18, num_classes)
+        #)
+        self.second_last = torch.nn.Sequential(Linear(128, 18), ReLU(), BatchNorm1d(18), torch.nn.Dropout(0.15))
+        self.last = torch.nn.Sequential(Linear(18, num_classes))
 
    
     def forward(self, data, edge_indices, batches, train):
@@ -174,6 +177,8 @@ class GCN_GraphNetwork(torch.nn.Module):
                     #print("what's h: ", h.shape, type(h))
                     if j == len(stream) - 1:
                         if self.model_type != 'VAE':
+                            #print("REMOVE THIS IN FUTURE")
+                            h = h.view(h.shape[0], h.shape[2], h.shape[1])
                             h = h.view(h.shape[0], h.shape[1] * h.shape[2])
                         hidden_layers.append(h)
 
@@ -195,5 +200,7 @@ class GCN_GraphNetwork(torch.nn.Module):
         #To compress them into classification
         #print("h in : ", h.size())
         h = self.combination_layer(h)
+        embedding = self.second_last(h)
+        h = self.last(embedding)
         #print("h out: ", h.size())
-        return h
+        return h, embedding

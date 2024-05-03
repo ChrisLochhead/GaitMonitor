@@ -199,7 +199,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device, gen
             data_i = [indice_batch[i][index] for i in range(len(loader))]
             data_b = [batch_batch[i][index] for i in range(len(loader))]
             data_y =  [ys_batch[i][index] for i in range(len(loader))]
-            out = model(data_x, data_i, data_b, train=True)
+            out, embedding = model(data_x, data_i, data_b, train=True)
 
             if gen_data and epoch >= epochs:
                 print("IN HERE: ", epoch)
@@ -212,8 +212,8 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device, gen
             total_loss = total_loss + loss
             acc =  acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loader[0])
             train_accs.append(acc)
-            loss.backward()
-            optimizer.step()
+            #loss.backward()
+            #optimizer.step()
             del data, data_x, data_i, data_b, data_y, out
 
         # Validation
@@ -313,10 +313,10 @@ def test(model, loaders, generator, validation, train = False, device = 'cuda', 
             for d in data_y[0]:
                 y_classes[d.item()] += 1
 
-            out = model(data_x, data_i, data_b, train)
+            out, embedding = model(data_x, data_i, data_b, train)
             if gen_test:
                 gen_test = True
-                embed_data.append(out)
+                embed_data.append(embedding)
                 print("whats out", out, out.shape)
                 print("whats y: ", data_y, data_y[0])
                 ys.append(data_y)

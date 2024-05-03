@@ -10,6 +10,7 @@ import Programs.Machine_Learning.GCN.GAT as gat
 import Programs.Machine_Learning.GCN.GCN_GraphNetwork as stgcn
 import Programs.Machine_Learning.GCN.Utilities as graph_utils
 import Programs.Machine_Learning.GCN.vae_utils as vae_utils
+from Programs.Data_Processing.kmeans_interp.kmeans_feature_imp import KMeansInterp
 
 #imports
 import time
@@ -20,7 +21,7 @@ random.seed(42)
 import torch
 torch.manual_seed(42)
 torch.cuda.empty_cache()
-device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 def process_images_into_joints(folder):
     '''
     This is a sub function containing the first part of the pre-processing pipeline, namely involving the computationally expensive joint-position extraction
@@ -380,7 +381,7 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
     print("\nCreating {} datasets: ".format(len(datasets)))
     print("dataset info:", datasets[0].max_cycle, datasets[0].num_nodes_per_graph)
     print("going in: ", datasets[0].num_node_features)
-    model = stgcn.GCN_GraphNetwork(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=embedding_size, n_inputs=num_datasets,
+    model = stgcn.GCN_GraphNetwork(dim_in=[d.num_node_features for d in datasets], dim_h=32, num_classes=dim_out, n_inputs=num_datasets,
                                 data_dims=data_dims, batch_size=batch_size, hcf=hcf,
                                 max_cycle=datasets[0].max_cycle, num_nodes_per_graph=datasets[0].num_nodes_per_graph, device = device, type=model_type)
     
@@ -669,9 +670,10 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.cluster import AgglomerativeClustering
 from scipy.optimize import linear_sum_assignment
-
+from scipy.stats import mode
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 
 def dimensionality_reduction(data):
     # Load sample data (digits dataset)
@@ -695,98 +697,162 @@ def dimensionality_reduction(data):
     plt.ylabel('TSNE 2')
     plt.show()
 
-def k_means_experiment(data):
-    # Assuming df is your pandas DataFrame with the first 6 columns as metadata and the last column as class
-    # Remove metadata columns and keep only the features and class
-    print("data here: ", data[0])
-    data = pd.DataFrame(data)
-    # Assuming df is your pandas DataFrame with the first 6 columns as metadata and the last column as class
-    # Remove metadata columns and keep only the features and class
-    print("data: ", data)
-    features = data.iloc[:, 6:].values
-    labels = data.iloc[:, 2].values  # Assuming class is the 3rd column
 
-    #scaler = StandardScaler()
-    #features = scaler.fit_transform(features)
+def apply_grouped_pca(data):
+   # Initialize a list to store the PCA features for each group
+    pca_features = []
+
+    # Number of groups
+    num_groups = 18
+
+    # Apply PCA to each group of 6 features
+    for group_num in range(num_groups):
+        # Calculate the indices for the current group
+        feature_indices = [group_num + i * num_groups for i in range(6)]
+        
+        # Select the group of 6 features
+        feature_group = data.iloc[:, feature_indices]
+        
+        # Initialize PCA
+        pca = PCA(n_components=1)  # Assuming you want to keep 1 principal component per group
+        
+        # Fit PCA to the feature group and transform it
+        pca_result = pca.fit_transform(feature_group)
+        
+        # Append the PCA feature to the list
+        pca_features.append(pca_result.flatten())
+
+    # Concatenate the PCA features into a DataFrame
+    pca_df = pd.DataFrame(pca_features).T
+
+    # Rename the columns to represent the PCA features
+    pca_df.columns = [f'PCA_Feature_{group_num + 1}' for group_num in range(num_groups)]
+
+    # Display the resulting DataFrame
+    return pca_df
+
+def k_means_experiment(data):
+    data = pd.DataFrame(data)
+    # Remove metadata columns and keep only the features and class
+    features = data.iloc[:, 6:].values
+    labels = data.iloc[:, 2].values 
+
+    scaler = StandardScaler()
+    features = scaler.fit_transform(features)
 
     # Standardize the features
     # Separate the data into labeled and unlabeled based on the class label
+    '''
     labeled_indices = np.where(labels == 0)[0]
     unlabeled_indices = np.where(labels != 0)[0]
 
     labeled_data = features[labeled_indices]
     unlabeled_data = features[unlabeled_indices]
-    print("sizes: ", labeled_data.shape, unlabeled_data.shape)
     labeled_data  = labeled_data.tolist()
-    print("shape: ", len(labeled_data), len(labeled_data[1]))
-
-    #stop = 5/0
-    # Semi-supervised k-means clustering
-    #kmeans = KMeans(n_clusters=2)  # Assuming 2 clusters for the unsupervised part
-    # Fit the model on labeled data
-    # Split the data into training and testing sets
-    X_train, X_test, Y_train, Y_test = train_test_split(features, labels, test_size=0.2, random_state=42)  # Adjust test_size as needed
+    '''
+    features = apply_grouped_pca(pd.DataFrame(features))
 
     # Initialize and fit KMeans model on the training data
-    kmeans = AgglomerativeClustering(n_clusters=3)  # Assuming 3 clusters for the three classes
+    kmeans = KMeans(n_clusters=3)  # Assuming 3 clusters for the three classes
     kmeans.fit(features)
-
     cluster_labels = kmeans.labels_
-    # Create a contingency matrix
-    contingency_matrix = np.zeros((3, 3), dtype=int)
-    for i in range(len(labels)):
-        contingency_matrix[cluster_labels[i], labels[i]] += 1
+    # Map clusters to the true class labels
+    # For each cluster, find the most common true label
+    cluster_to_class = {}
+    for i in range(3):
+        mask = cluster_labels == i
+        cluster_to_class[i] = mode(labels[mask]).mode[0]
 
-    # Find the optimal mapping using the Hungarian algorithm
-    row_ind, col_ind = linear_sum_assignment(-contingency_matrix)
-
-    # Create a mapping dictionary from clusters to classes
-    cluster_to_class_mapping = dict(zip(row_ind, col_ind))
-
-    # Map cluster labels to actual class labels
-    predicted_labels = np.array([cluster_to_class_mapping[label] for label in cluster_labels])
-
-    # Calculate accuracy
+    # Map the cluster labels to the true class labels
+    predicted_labels = np.array([cluster_to_class[cluster] for cluster in cluster_labels])
     accuracy = accuracy_score(labels, predicted_labels)
-    print("accuracy: ", accuracy)
 
+    centroids = kmeans.cluster_centers_
+    distance_01 = np.linalg.norm(centroids[0] - centroids[1])  # Distance between cluster 0 and 1
+    distance_02 = np.linalg.norm(centroids[0] - centroids[2])  # Distance between cluster 0 and 2
+    distance_12 = np.linalg.norm(centroids[1] - centroids[2])  # Distance between cluster 1 and 2
 
-    # Predict clusters on the testing data
-    #test_cluster_labels = kmeans.predict(X_test)
+    # Step 2: Calculate differences between centroids for each feature
+    centroid_differences = np.max(centroids, axis=0) - np.min(centroids, axis=0)
 
-    # Add the predicted clusters to the DataFrame for the unlabeled data
-    #df_unlabeled = data.iloc[unlabeled_indices]
-    #df_unlabeled['Cluster'] = kmeans.labels_
+    # Step 3: Calculate feature variability within each cluster
+    cluster_variances = []
+    for cluster in range(3):
+        cluster_data = data[kmeans.labels_ == cluster]
+        cluster_variance = cluster_data.var()
+        cluster_variances.append(cluster_variance)
 
-    # Concatenate the labeled and unlabeled data back together
-    #df_final = pd.concat([data[data[:, 2] == 0], df_unlabeled])
+    print("cluster variances: ", type(cluster_variances), len(cluster_variances), len(cluster_variances[0]), len(cluster_variances[1]), len(cluster_variances[2]))
+    # Combine the feature differences and variabilities to rank features for each cluster
+    # Create a dictionary to store the importance scores
+    feature_importance = {}
+    for feature_index in range(18):
+        #print("how big is this: ", data.shape[1])
+        #feature_name = features.columns[feature_index]
+        importance_scores = []
+        for cluster in range(3):
+            # Calculate importance as the inverse of variance within the cluster
+            # times the difference between centroids
+            importance = 1 / ((cluster_variances[cluster][feature_index] * centroid_differences[feature_index]) + 0.0001)
 
+            importance_scores.append((cluster, importance))
 
-    # True class labels for the labeled data
-    #true_labels = data[data[:, 2] == 0][:, 2]  # Assuming class 0 is labeled
-    print("data: ", data[0])
-    #true_labels = data.loc[data.iloc[:, 2] == 0, 2]
+        # Sort the importance scores for each feature
+        importance_scores.sort(key=lambda x: x[1], reverse=True)
+        feature_importance[feature_index] = importance_scores
 
+    # Number of features in each group
+    group_size = 6
+    group_index = 0
+    current_group_importance = {}
+    cluster_importances = [[],[],[]]
+    # Iterate through each feature and its importance scores in different clusters
+    for idx, (feature_name, importance_scores) in enumerate(feature_importance.items()):
+        # Determine the current group by dividing the index by the group size
+        current_group_index = idx // group_size
+        
+        # If we move to a new group, reset the cumulative importance dictionary and print the previous group's results
+        if current_group_index > group_index:
+            # Print the cumulative importance of the previous group
+            #print(f'Group {group_index + 1}:')
+            for cluster, importance in current_group_importance.items():
+                #print(f'Cluster {cluster}: Cumulative Importance = {importance:.4f}')
+                cluster_importances[cluster].append(importance)
+            # Reset the cumulative importance for the new group
+            current_group_importance = {}
+            group_index = current_group_index
+        
+        # Iterate through the importance scores for each cluster
+        for cluster, importance in importance_scores:
+            # Add the importance to the cumulative sum for the current group
+            if cluster not in current_group_importance:
+                current_group_importance[cluster] = 0
+            current_group_importance[cluster] += importance
 
+    #Need to do PCA on original features 
+    features.columns = ['Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
+    'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', 'M_hip']
 
-    # Calculate accuracy for class 0
-    #print("what are these: ", Y_test, len(Y_test))
-    #print("training lavbels: ", Y_train)
+    # Combine Joints into joint-groups
+    features['head'] = features[['Nose', 'L_eye', 'R_eye', 'L_ear', 'R_ear']].sum(axis=1)
+    features['left_arm'] = features[['L_shoulder', 'L_elbow', 'L_hand']].sum(axis=1)
+    features['right_arm'] = features[['R_shoulder', 'R_elbow', 'R_hand']].sum(axis=1)
+    features['left_leg'] = features[['L_hip', 'L_knee', 'L_foot', 'M_hip']].sum(axis=1)
+    features['right_leg'] = features[['R_hip', 'R_knee', 'R_foot']].sum(axis=1)
+    # Create a new DataFrame with the combined columns
+    X = features[['head', 'left_arm', 'right_arm', 'left_leg', 'right_leg']]
+    kms = KMeansInterp(
+        n_clusters=3,
+        ordered_feature_names=X.columns.tolist(), 
+        feature_importance_method='wcss_min', # or 'unsup2sup'
+    ).fit(X.values)
 
-    #print("and this: ", test_cluster_labels, len(test_cluster_labels))
-    #stop = 5/0
-    #accuracy_class_0 = accuracy_score(Y_test, test_cluster_labels)
-
-    # Calculate silhouette score for the unlabeled data
-    #silhouette = silhouette_score(Y_test, test_cluster_labels)
-
-    # If true labels for classes 1 and 2 are available, you can calculate adjusted rand index
-    # Otherwise, skip this step
-    # true_labels_unlabeled = df[df[:, 2] != 0][:, 2]
-    # adjusted_rand_index = adjusted_rand_score(true_labels_unlabeled, unlabeled_clusters)
-
-    #print("Accuracy for Class 0 (Supervised):", accuracy_class_0)
-    #print("Silhouette Score for Unlabeled Data:", silhouette)
+    # A dictionary where the key [0] is the cluster label, and [:10] will refer to the first 10 most important features
+    print("cluster 0", kms.feature_importances_[0][:10])# Features here are words
+    print("cluster 1", kms.feature_importances_[1][:10])# Features here are words
+    print("cluster 2", kms.feature_importances_[2][:10])# Features here are words
+    print("Accuracy", accuracy)
+    return [kms.feature_importances_[0][0], kms.feature_importances_[0][1], kms.feature_importances_[0][2]], [distance_01, distance_02, distance_12], kmeans, cluster_to_class
 
 
 def unwrap_dataset(data):
@@ -864,6 +930,133 @@ def fix_incorrect_data(data):
             data[i][7] = random.uniform(0.2, 0.6)
             data[i][8] = random.uniform(0.7, 1.0)
     return data
+
+def calculate_column_averages(data):
+    # Initialize sums for each column
+    col_sums = [0, 0, 0]
+
+    # Iterate through each sublist (row)
+    for row in data:
+        # Accumulate the sum for each column
+        col_sums[0] += row[0]
+        col_sums[1] += row[1]
+        col_sums[2] += row[2]
+
+    # Calculate the average for each column
+    num_rows = len(data)
+    col_averages = [col_sums[i] / num_rows for i in range(3)]
+
+    return col_averages
+
+def map_predictions(predictions, cluster_map):
+    """
+    Map the cluster predictions according to the provided cluster mapping.
+
+    Parameters:
+        predictions (list or numpy array): Original cluster predictions from k-means.
+        cluster_map (dict): Dictionary mapping original clusters to new clusters.
+        
+    Returns:
+        list or numpy array: Mapped cluster predictions.
+    """
+    # Apply the cluster mapping to each prediction
+    mapped_predictions = [cluster_map[pred] for pred in predictions]
+    
+    return mapped_predictions
+
+def predict_and_calculate_proximity(kmeans_model, data_df, metadata, cluster_map):
+    """
+    Predicts the cluster each data instance belongs to and calculates the proximity (distance)
+    to each of the k-means model's centroids.
+    
+    Parameters:
+    kmeans_model (KMeans): The trained KMeans model.
+    data_df (DataFrame): The DataFrame containing data instances.
+
+    Returns:
+    DataFrame: A DataFrame with the predictions and proximity values.
+    """
+    # Convert the DataFrame to a NumPy array for efficient calculation
+    data_array = data_df.to_numpy()
+    
+    # Predict the clusters for each instance using the KMeans model
+    cluster_predictions = kmeans_model.predict(data_array)
+
+    cluster_predictions = map_predictions(cluster_predictions, cluster_map)
+    #cluster_accuracy = accuracy_score(labels, cluster_predictions)
+    ##print("accuracy in here: ", cluster_accuracy)
+    
+    # Get the centroids from the KMeans model
+    centroids = kmeans_model.cluster_centers_
+    
+    # List to store the proximity values for each instance
+    proximities = []
+
+    # Calculate proximity to each centroid for each data instance
+    for instance in data_array:
+        # Calculate distances to each centroid
+        distances = [np.linalg.norm(instance - centroid) for centroid in centroids]
+        
+        # Append the list of distances to the proximities list
+        proximities.append(distances)
+    
+    # Create a new DataFrame with predictions and proximities
+    result_df = metadata
+    print("result_df: ", result_df.head(10), result_df.shape, len(cluster_predictions), len(proximities))
+    for i, v in enumerate(proximities):
+        proximities[i] = gait_coefficient(v[0], v[1], v[2])
+    result_df['Cluster'] = cluster_predictions
+    result_df['Severity coefficient'] = proximities
+    calculate_mean_variance(result_df['Cluster'], result_df['Severity coefficient'], cluster_map)
+    return result_df.values.tolist()
+
+def gait_coefficient(d0, d1, d2, w1 = 0.5, w2 = 1.5):
+    """
+    Calculate the coefficient representing how far an individual's gait pattern is from regular gait.
+
+    Parameters:
+        d0 (float): Distance from the individual's gait pattern to the centroid of cluster 0 (regular gait).
+        d1 (float): Distance from the individual's gait pattern to the centroid of cluster 1 (first type of pathology).
+        d2 (float): Distance from the individual's gait pattern to the centroid of cluster 2 (more severe type of pathology).
+        w1 (float): Weight for the distance to cluster 1 (default is 0.5).
+        w2 (float): Weight for the distance to cluster 2 (default is 1.0).
+
+    Returns:
+        float: Coefficient representing how far the individual's gait pattern is from regular gait.
+    """
+    # Calculate the weighted distances to clusters 1 and 2 relative to the distance to cluster 0
+    weighted_d1 = w1 * (d1 / d0)
+    weighted_d2 = w2 * (d2 / d0)
+    
+    # Calculate the total coefficient as the sum of weighted distances
+    coefficient = weighted_d1 + weighted_d2
+    
+    return coefficient
+
+def calculate_mean_variance(labels, coefficients, cluster_map):
+    """
+    Calculate and print the mean and variance of coefficients for each unique label.
+
+    Parameters:
+        labels (pandas Series): Series containing label values.
+        coefficients (pandas Series): Series containing coefficient values.
+    """
+    # Combine the labels and coefficients into a DataFrame
+    data = pd.DataFrame({'label': labels, 'coefficient': coefficients})
+
+    # Group by labels
+    grouped_data = data.groupby('label')
+
+    # Calculate mean and variance for each group
+    mean_vars = [0 for i in grouped_data]
+    for label, group in grouped_data:
+        mean = group['coefficient'].mean()
+        variance = group['coefficient'].var()
+        mean_vars[int(cluster_map[label])] = [mean, variance]
+        print("applying: ", mean, " to : ", cluster_map, cluster_map[label], label)
+    for i, (mean, var) in enumerate(mean_vars):
+        print(f"Label {i}: Mean = {mean:.4f}, Variance = {var:.4f}")
+
 ###########################################################################################################################################################################################
 if __name__ == '__main__':
     #create_datasets()
@@ -872,22 +1065,45 @@ if __name__ == '__main__':
 
     print("starting")
 
-    #data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/embed_data/2_people_4/raw/2_people_4.csv", None)
-    #data = unwrap_dataset(data)
-    #data = remove_incorrect_predictions(data)
-    #stop = 5/0
-    #data = stitch_data_for_kmeans(data)
-    #data = fix_incorrect_data(data)
-    #Utilities.save_dataset(data, './code/datasets/joint_data/embed_data/2_people_fixed')
-    #dimensionality_reduction(data)
-    #stop = 5/0
-    #k_means_experiment(data)
-    #stop = 5/0
+    data, _ = Utilities.process_data_input("./Code/Datasets/Joint_Data/embed_data/2_people_4/raw/2_people_4.csv", None)
+    data = stitch_data_for_kmeans(data)
+    Utilities.save_dataset(data, './code/datasets/joint_data/embed_data/2_people_fixed')
+
+    feature_counts ={0: {'head': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0},
+                     1: {'head': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0},
+                     2: {'head': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0}
+                     }
+    
+    centroid_distances = []
+    for i in range(50):
+        [clust_1, clust_2, clust_3], [dist_01, dist_02, dist_12], k_model, cluster_map = k_means_experiment(data)
+        feature_counts[0][clust_1[0]] += 1
+        feature_counts[1][clust_2[0]] += 1
+        feature_counts[2][clust_3[0]] += 1
+        centroid_distances.append([dist_01, dist_02, dist_12])
+
+
+    averages = calculate_column_averages(centroid_distances)
+    print("feature counts: ", feature_counts)
+    print("centroid distances: ", averages)
+
+    #process data for k-means experiments
+    data  = pd.DataFrame(data)
+    features = data.iloc[:, 6:].values
+    scaler = StandardScaler()
+    features = scaler.fit_transform(features)
+    features = apply_grouped_pca(pd.DataFrame(features))
+    result_df = predict_and_calculate_proximity(k_model, features, data.iloc[:, :6], cluster_map)
+    print("cluster map", cluster_map)
+    #Add column names
+    Utilities.save_dataset(result_df, './code/datasets/joint_data/embed_data/proximities')
+    stop = 5/0
 
     start = time.time()
+    #New_Embedding_Weights
     run_model(dataset_types= [1], hcf=False,
-            batch_size = 128, epochs =5, folder="big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/",
-            save =None, load='Encoder_Weights', leave_one_out=False, dim_out=3, class_loc=2, model_type='ST_TAGCN_Block', vae=False, save_embedding = True, embedding_size = 3, gen_data=True)
+            batch_size = 128, epochs =80, folder="big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/",
+            save =None, load=None, leave_one_out=False, dim_out=3, class_loc=2, model_type='ST_TAGCN_Block', vae=False, save_embedding = True, embedding_size = 3, gen_data=True)
     end = time.time()
     print("time elapsed: ", end - start)
 
@@ -896,10 +1112,17 @@ if __name__ == '__main__':
 
 #notes
 #CHANGE FOLD IN CROSS VALID TO REMOVE -2
+#if cluster centre distances are below a threshold, there's no discernable difference between the two states, meaning no degradation has occurred or recovery, threshold is accuracy, % chance
+#that their is a difference 
+
+#measure how much data this is based on, threshold for impact
+#
 #TODO Plan
 '''
-- look into which one's are actually getting saved 1) if only the last epoch are being saved and 2) if the predictions are genuinely correct
--probably best just to save the weights then create a function to load and pass through all data in order
+-0s and 1s are flipped for classes for some reason
+-investigate any potential bugs and decimate code, refactor
+-test if it works on more than 2 person dataset
+-test effectiveness on other datasets
+-done
 
--I could take 5D results of all correct predictions, hopefully clustering accuracy on that would be high, from these correct predictions I could assess clusters and distances :D
 '''
