@@ -19,7 +19,7 @@ from Programs.Machine_Learning.GCN.GCN import S_GCN, T_GCN
 
 
 class GCN_GraphNetwork(torch.nn.Module):
-    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 2, stgcn_filters = [128,128], 
+    def __init__(self, dim_in, dim_h, num_classes, n_inputs, data_dims, batch_size, hcf = False, stgcn_size = 3, stgcn_filters = [64, 128, 256], 
                  max_cycle = 7, num_nodes_per_graph = 18, device = 'cuda', type = 'ST_TAGCN_Block'):
         super(GCN_GraphNetwork, self).__init__()
 

@@ -6,6 +6,7 @@ import copy
 import time
 import torch
 torch.manual_seed(42)
+from torch.profiler import profile, record_function
 import numpy as np
 from torch_geometric.loader import DataLoader as GeoLoader
 from torch.utils.data import RandomSampler
@@ -199,8 +200,19 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device, gen
             data_i = [indice_batch[i][index] for i in range(len(loader))]
             data_b = [batch_batch[i][index] for i in range(len(loader))]
             data_y =  [ys_batch[i][index] for i in range(len(loader))]
-            out, embedding = model(data_x, data_i, data_b, train=True)
+            with profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+                        schedule=torch.profiler.schedule(wait=1, warmup=1, active=3),
+                        on_trace_ready=torch.profiler.tensorboard_trace_handler('./logs')) as prof:
+                for i in range(10):
+                    with record_function("model_inference"):
+                        out, embedding = model(data_x, data_i, data_b, train=True)
+                    prof.step()
 
+            # Access the profiler results
+            print(prof.key_averages().table(sort_by="self_cpu_time_total"))
+            #out, embedding = model(data_x, data_i, data_b, train=True)
+
+            stop = 5/0
             if gen_data and epoch >= epochs:
                 print("IN HERE: ", epoch)
                 gen_test = True
@@ -212,8 +224,8 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device, gen
             total_loss = total_loss + loss
             acc =  acc + accuracy(out.argmax(dim=1), data_y[0]) / len(loader[0])
             train_accs.append(acc)
-            #loss.backward()
-            #optimizer.step()
+            loss.backward()
+            optimizer.step()
             del data, data_x, data_i, data_b, data_y, out
 
         # Validation
