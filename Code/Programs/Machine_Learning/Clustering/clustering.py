@@ -18,36 +18,40 @@ import Programs.Data_Processing.Utilities as Utilities
 from scipy.spatial.distance import cdist
 from scipy.spatial.distance import euclidean
 
-def calculate_centroid_distance(cluster_centers, cluster_a, cluster_b, dimension_x):
+def calculate_centroid_distance(cluster_a_centroid, cluster_b_centroid, dimension_x):
     # Extract the centroids of cluster_a and cluster_b
-    centroid_a = cluster_centers[cluster_a, dimension_x]
-    centroid_b = cluster_centers[cluster_b, dimension_x]
-
+    centroid_a = cluster_a_centroid[dimension_x]
+    centroid_b = cluster_b_centroid[dimension_x]
+    print("centroid distances: ", centroid_a, centroid_b)
     # Calculate the absolute distance between the centroids along dimension_x
     distance = np.abs(centroid_a - centroid_b)
 
     return distance
 
-def calculate_distance_ranges(cluster_centers, cluster_labels, cluster_a, cluster_b, dimension_x):
+def calculate_distance_ranges(cluster_data, first_cluster_data, dimension_x):
     # Select data points belonging to cluster_a and cluster_b
-    cluster_a_points = cluster_centers[cluster_labels == cluster_a]
-
+    cluster_a_points = cluster_data.values.tolist()# cluster_data[cluster_labels == cluster_a]
+    first_cluster_points = first_cluster_data.values.tolist()
     # Compute distances from cluster_a to cluster_b and vice versa along dimension_x
-    distances_from_a_to_b = [euclidean(point[dimension_x], cluster_centers[cluster_b, dimension_x]) for point in cluster_a_points]
+    print("CLUSTER DATA RANGE: ", cluster_data.shape)
+    cluster_a_points = cluster_data.iloc[:, dimension_x].values  # Assuming x is the index, use .values to get the numpy array
+    first_cluster_points = first_cluster_data.iloc[:, dimension_x].values  # Assuming x is the index, use .values to get the numpy array
 
-    # Find the minimum distances
-    min_dist = np.min(distances_from_a_to_b)
-    max_dist = np.max(distances_from_a_to_b)
+    # Compute pairwise distances
+    distances = np.abs(cluster_a_points[:, np.newaxis] - first_cluster_points)
 
-    return min_dist, max_dist
+ 
+    return distances.min(), distances.max()
 
-def calculate_overlap_percentage(cluster_centers, cluster_labels, cluster_a, cluster_b, dimension_x):
+def calculate_overlap_percentage(cluster_data, first_cluster_data, dimension_x):
     # Calculate the closest distances from cluster_a to cluster_b and vice versa
-    min_distance, max_distance = calculate_distance_ranges(cluster_centers, cluster_labels, cluster_a, cluster_b, dimension_x)
+    min_distance, max_distance = calculate_distance_ranges(cluster_data, first_cluster_data, dimension_x)
 
     # Find the total range of dimension_x across both clusters
-    all_points_a = cluster_centers[cluster_labels == cluster_a][:, dimension_x]
-    all_points_b = cluster_centers[cluster_labels == cluster_b][:, dimension_x]
+    all_points_a = cluster_data.iloc[:, dimension_x]
+    all_points_b = first_cluster_data.iloc[:, dimension_x]
+
+
     min_value = min(np.min(all_points_a), np.min(all_points_b))
     max_value = max(np.max(all_points_a), np.max(all_points_b))
     total_range = max_value - min_value
@@ -58,6 +62,7 @@ def calculate_overlap_percentage(cluster_centers, cluster_labels, cluster_a, clu
     return overlap_percentage_from_a_to_b, max_distance
 
 def k_means_experiment(data):
+    print("In here??")
     data = pd.DataFrame(data)
     # Remove metadata columns and keep only the features and class
     features = data.iloc[:, 6:].values
@@ -77,42 +82,62 @@ def k_means_experiment(data):
     labeled_data  = labeled_data.tolist()
     '''
     features = apply_grouped_pca(pd.DataFrame(features))
+    pca_data_table = features.copy()
+    pca_data_table['labels'] = labels
+
+    print("feature shape: ", features.shape)
 
     # Initialize and fit KMeans model on the training data
     kmeans = KMeans(n_clusters=3)  # Assuming 3 clusters for the three classes
     kmeans.fit(features)
     cluster_labels = kmeans.labels_
+
     # Map clusters to the true class labels
     # For each cluster, find the most common true label
     cluster_to_class = {}
     for i in range(3):
         mask = cluster_labels == i
-        cluster_to_class[i] = mode(labels[mask]).mode[0]
+        cluster_to_class[i] = int(mode(labels[mask]).mode[0])
+        
 
     # Map the cluster labels to the true class labels
     predicted_labels = np.array([cluster_to_class[cluster] for cluster in cluster_labels])
     accuracy = accuracy_score(labels, predicted_labels)
 
+    #Re-arrange the cluster centroids to correspond to the classes 
     centroids = kmeans.cluster_centers_
+    arranged_centroids = [None] * len(centroids)
+    # Rearrange the sublists according to the dictionary
+    for original_index, new_index in cluster_to_class.items():
+        arranged_centroids[new_index] = centroids[original_index]
+
     distance_01 = np.linalg.norm(centroids[0] - centroids[1])  # Distance between cluster 0 and 1
     distance_02 = np.linalg.norm(centroids[0] - centroids[2])  # Distance between cluster 0 and 2
     distance_12 = np.linalg.norm(centroids[1] - centroids[2])  # Distance between cluster 1 and 2
 
-    # Step 2: Calculate differences between centroids for each feature
-    centroid_differences = np.max(centroids, axis=0) - np.min(centroids, axis=0)
-
     # Step 3: Calculate feature variability within each cluster
     cluster_variances = []
+    cluster_datasets = []
     for cluster in range(3):
-        cluster_data = data[kmeans.labels_ == cluster]
+        #TODO: replace data labels in data with their predictions
+        cluster_data = pca_data_table[pca_data_table.iloc[:, -1] == cluster]
+        print("what's this: ", type(cluster_data), cluster_data.shape)
+        cluster_datasets.append(cluster_data.iloc[:, :-1])
         cluster_variance = cluster_data.var()
+        #remove noise
+        #if cluster_variance > 1000:
+        #    cluster_variance = 0.0
         cluster_variances.append(cluster_variance)
+        
 
-    print("cluster variances: ", type(cluster_variances), len(cluster_variances), len(cluster_variances[0]), len(cluster_variances[1]), len(cluster_variances[2]))
+    print("cluster variances: ", cluster_variances)
+
     # Combine the feature differences and variabilities to rank features for each cluster
     # Create a dictionary to store the importance scores
-    feature_importance = {}
+    #feature_importance = {}
+    all_importances  = []
     for feature_index in range(18):
+        print("FEATURE INDEX: ", feature_index)
         importance_scores = []
         for cluster in range(1,3):
             # calculate each abnormal cluster with initial cluster
@@ -122,51 +147,82 @@ def k_means_experiment(data):
             Feature importance f = 1/cluster_variance_f  * (1 + cluster_overlap for feature f between cluster a and b)
               + (abs(centroid_a - centroid_b) / the maximum feature value across clusters a and b - the minimum feature value across clusters a and b)
             '''
-            cluster_variance_inv = 1/cluster_variances[cluster][feature_index]
-            cluster_overlap_f, max_distance = calculate_overlap_percentage(centroids, cluster_labels, 0, cluster, dimension_x=feature_index)
+            print("variance: ", cluster, feature_index, cluster_variances[cluster][feature_index])
+            cluster_variance_inv = cluster_variances[cluster][feature_index]
+            cluster_overlap_f, max_distance = calculate_overlap_percentage(cluster_datasets[cluster], cluster_datasets[0], dimension_x=feature_index)
             cluster_overlap_f += 1
-            centroid_dist_f = calculate_centroid_distance(centroids, 0, cluster, feature_index) 
+            centroid_dist_f = calculate_centroid_distance(centroids[cluster], centroids[0], feature_index) 
             norm_centroid_dist_f = centroid_dist_f / max_distance
             feature_importance_f = (cluster_variance_inv * cluster_overlap_f) + norm_centroid_dist_f
             # Example usage:
 
             print("Overlap percentages along dimension x for each cluster:", cluster_variance_inv, cluster_overlap_f, centroid_dist_f, max_distance)
+            print("final feature importance: ", feature_importance_f)
+            if pd.isna(feature_importance_f):
+                feature_importance_f = 0.0
             #importance = 1 / ((cluster_variances[cluster][feature_index] * centroid_differences[feature_index]) + 0.0001)
 
-            importance_scores.append((cluster, feature_importance_f))
+            importance_scores.append([cluster, feature_importance_f])
+        all_importances.append(importance_scores)
+    for imp in all_importances:
+        print("final importance scores: ", imp)
 
-        # Sort the importance scores for each feature
-        importance_scores.sort(key=lambda x: x[1], reverse=True)
-        feature_importance[feature_index] = importance_scores
+    limp_importance = [row[0] for row in all_importances]
+    shuffle_importance = [row[1] for row in all_importances]
 
-    # Number of features in each group
-    group_size = 6
-    group_index = 0
-    current_group_importance = {}
-    cluster_importances = [[],[],[]]
-    # Iterate through each feature and its importance scores in different clusters
-    for idx, (feature_name, importance_scores) in enumerate(feature_importance.items()):
-        # Determine the current group by dividing the index by the group size
-        current_group_index = idx // group_size
-        
-        # If we move to a new group, reset the cumulative importance dictionary and print the previous group's results
-        if current_group_index > group_index:
-            # Print the cumulative importance of the previous group
-            #print(f'Group {group_index + 1}:')
-            for cluster, importance in current_group_importance.items():
-                #print(f'Cluster {cluster}: Cumulative Importance = {importance:.4f}')
-                cluster_importances[cluster].append(importance)
-            # Reset the cumulative importance for the new group
-            current_group_importance = {}
-            group_index = current_group_index
-        
-        # Iterate through the importance scores for each cluster
-        for cluster, importance in importance_scores:
-            # Add the importance to the cumulative sum for the current group
-            if cluster not in current_group_importance:
-                current_group_importance[cluster] = 0
-            current_group_importance[cluster] += importance
+    #features.columns = ['Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
+    #'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', 'M_hip']
+    limp_body_importance = {'head':0, 'torso': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0}
+    for ind, importance in enumerate(limp_importance):
+        print("ind and importance: ", ind, importance)
+        if ind in [1,2,3,4]:
+            limp_body_importance['head'] += importance[1]
+        elif ind in [0, 17]:
+            limp_body_importance['torso'] += importance[1]
+        elif ind in [5,7,9]:
+            limp_body_importance['left_arm'] += importance[1]
+        elif ind in [6,8,10]:
+            limp_body_importance['right_arm'] += importance[1]
+        elif ind in [11,13,15]:
+            limp_body_importance['left_leg'] += importance[1]
+        elif ind in [12,14,16]:
+            limp_body_importance['right_leg'] += importance[1]
+        else:
+            print("something gone wrong")
 
+
+    shuffle_body_importance = {'head':0, 'torso': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0}
+    for ind, importance in enumerate(shuffle_importance):
+        print("ind and importance: ", ind, importance)
+        if ind in [1,2,3,4]:
+            shuffle_body_importance['head'] += importance[1]
+        elif ind in [0, 17]:
+            shuffle_body_importance['torso'] += importance[1]
+        elif ind in [5,7,9]:
+            shuffle_body_importance['left_arm'] += importance[1]
+        elif ind in [6,8,10]:
+            shuffle_body_importance['right_arm'] += importance[1]
+        elif ind in [11,13,15]:
+            shuffle_body_importance['left_leg'] += importance[1]
+        elif ind in [12,14,16]:
+            shuffle_body_importance['right_leg'] += importance[1]
+        else:
+            print("something gone wrong")
+
+    total_sum = sum(limp_body_importance.values())
+    # Replace each value with its percentage of the total sum
+    percentage_limp = {k: (v / total_sum) * 100 for k, v in limp_body_importance.items()}
+    total_sum = sum(limp_body_importance.values())
+    # Replace each value with its percentage of the total sum
+    percentage_shuffle = {k: (v / total_sum) * 100 for k, v in shuffle_body_importance.items()}
+
+    percentage_limp = sorted(percentage_limp.items(), key=lambda item: item[1])
+    percentage_shuffle = sorted(percentage_shuffle.items(), key=lambda item: item[1])
+    print(percentage_limp)
+    print(percentage_shuffle)
+    (l_lk, l_lv) = percentage_limp[-1]
+    (l_sk, l_sv) = percentage_shuffle[-1]
+    print("what are these: ", (l_lk, l_lv) , "separeate", (l_sk, l_sv) )
     #Need to do PCA on original features 
     features.columns = ['Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
     'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', 'M_hip']
@@ -191,7 +247,7 @@ def k_means_experiment(data):
     print("cluster 1", kms.feature_importances_[1][:10])# Features here are words
     print("cluster 2", kms.feature_importances_[2][:10])# Features here are words
     print("Accuracy", accuracy)
-    return [kms.feature_importances_[0][0], kms.feature_importances_[0][1], kms.feature_importances_[0][2]], [distance_01, distance_02, distance_12], kmeans, cluster_to_class
+    return [kms.feature_importances_[0][0], (l_lk, l_lv), (l_sk, l_sv)], [distance_01, distance_02, distance_12], kmeans, cluster_to_class
 
 
 def apply_grouped_pca(data):
@@ -474,6 +530,7 @@ def unsupervised_cluster_assessment(input, output, epochs = 15):
     centroid_distances = []
     for i in range(epochs):
         [clust_1, clust_2, clust_3], [dist_01, dist_02, dist_12], k_model, cluster_map = k_means_experiment(data)
+        print("what are these: ", clust_1, clust_2, clust_3)
         feature_counts[0][clust_1[0]] += 1
         feature_counts[1][clust_2[0]] += 1
         feature_counts[2][clust_3[0]] += 1

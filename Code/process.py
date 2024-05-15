@@ -207,8 +207,8 @@ def load_datasets(types, folder, multi_dim = False, class_loc = 2, num_classes =
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/rel_data', 
             #                            'rel_data.csv',             
             #                                joint_connections=Render.joint_connections_n_head))   
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/2_people', 
-                            '2_people.csv',             
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/5_people', 
+                            '5_people.csv',             
                                 joint_connections=Render.bottom_joint_connection, class_loc=class_loc, num_classes=num_classes))   
             #2s ST-GCN
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "no_sub_1_stream" + f'/{num_people}_people', 
@@ -663,7 +663,7 @@ if __name__ == '__main__':
     ##apply_standard_scaler('./code/datasets/joint_Data/erin/5_Absolute_Data(scaled)/raw/5_Absolute_Data(scaled).csv',
      #                      './code/datasets/joint_Data/erin/5_Absolute_Data(scaled)')
 
-    clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/5_people_4/raw/5_people_4.csv", './code/datasets/joint_data/embed_data/proximities', epochs=50)
+    clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/10_people_4/raw/10_people_4.csv", './code/datasets/joint_data/embed_data/proximities', epochs=50)
     stop = 5/0
     
     start = time.time()
