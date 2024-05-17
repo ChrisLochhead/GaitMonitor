@@ -11,6 +11,7 @@ import Programs.Machine_Learning.GCN.GCN_GraphNetwork as stgcn
 import Programs.Machine_Learning.GCN.Utilities as graph_utils
 import Programs.Machine_Learning.GCN.vae_utils as vae_utils
 import Programs.Machine_Learning.Clustering.clustering as clustering
+
 #imports
 import time
 import random
@@ -207,8 +208,8 @@ def load_datasets(types, folder, multi_dim = False, class_loc = 2, num_classes =
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/rel_data', 
             #                            'rel_data.csv',             
             #                                joint_connections=Render.joint_connections_n_head))   
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/5_people', 
-                            '5_people.csv',             
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/13_people', 
+                            '13_people.csv',             
                                 joint_connections=Render.bottom_joint_connection, class_loc=class_loc, num_classes=num_classes))   
             #2s ST-GCN
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "no_sub_1_stream" + f'/{num_people}_people', 
@@ -414,17 +415,10 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
         
     if save_embedding:
         print("saving outputs ")
-        print("embed data 1: ", len(embed_data), len(embed_data[0]))
-        Utilities.save_dataset(embed_data, './code/datasets/joint_data/embed_data/10_people_1')
         embed_data = sorted(embed_data, key=lambda x: x[2])
-        print("embed data 2: ", len(embed_data), len(embed_data[0]))
-        Utilities.save_dataset(embed_data, './code/datasets/joint_data/embed_data/10_people_2')
         embed_data = reorder_instance_numbers(embed_data)
-        print("embed data 3: ", len(embed_data), len(embed_data[0]))
-        Utilities.save_dataset(embed_data, './code/datasets/joint_data/embed_data/10_people_3')
         embed_data = extract_embed_data(embed_data)
-        print("embed data 4: ", len(embed_data), len(embed_data[0]))
-        Utilities.save_dataset(embed_data, './code/datasets/joint_data/embed_data/10_people_4')
+        Utilities.save_dataset(embed_data, './code/datasets/joint_data/embed_data/13_people_4')
 
     if save != None:
         print("saving model")
@@ -657,24 +651,91 @@ def unwrap_dataset(data):
     return unwrapped
 
 
+def calculate_distances(centroid_A, centroid_B, point_x):
+    # Calculate Euclidean distance from point_x to centroid_A
+    d_A = np.linalg.norm(np.array(point_x) - np.array(centroid_A))
+    
+    # Calculate Euclidean distance from point_x to centroid_B
+    d_B = np.linalg.norm(np.array(point_x) - np.array(centroid_B))
+    
+    return d_A, d_B
+
+def calculate_percentage_closer(d_A, d_B):
+    # Determine the closer centroid and calculate the percentage closer
+    if d_A < d_B:
+        d_min = d_A
+        d_max = d_B
+        closer_to = "A"
+    else:
+        d_min = d_B
+        d_max = d_A
+        closer_to = "B"
+    
+    percentage_closer = ((d_max - d_min) / d_max) * 100
+    
+    return closer_to, percentage_closer
+
+def convert_to_percentage(data_dict):
+    # Calculate the total sum of all values
+    total_sum = sum(data_dict.values())
+    
+    # Create a new dictionary with percentage values
+    percentage_dict = {k: (v / total_sum) * 100 for k, v in data_dict.items()}
+    
+    return percentage_dict
+
+from sklearn.preprocessing import StandardScaler
+def predict_and_display(data, embed_data, image_data, model):
+    #First load in the raw data of 5 people
+    raw_joints, raw_images = Utilities.process_data_input(data, image_data)
+    #load in corresponding embedding data 
+    embed_joints = Utilities.process_data_input(embed_data, None)
+
+    #split the raw data and images into blocks of 7 the same way the embedding data is set up
+    predictions, model, cluster_map, feature_counts = clustering.unsupervised_cluster_assessment(embed_joints, './code/datasets/joint_data/embed_data/proximities', epochs= 20)
+    segmented_joints = clustering.stitch_data_for_kmeans(raw_joints)
+    segmented_images = clustering.stitch_data_for_kmeans(raw_images)
+
+    centroids = model.cluster_centers_
+    #calculate their relative distance to both the normal centroid and the prediction centroid 
+    #predict confidence by inverse closeness (if it's 75% closer to 1 than 0, its 75% confidence), raw distance from normal centroid is severity, compare with outermost range of normal and innermost
+    #print the importance vectors for this cluster and the individual example
+    
+    #draw the person with their skeleton
+    print("same length?? ", len(segmented_images), len(segmented_joints))
+    for i in range(len(segmented_joints)):
+        print("prediction for this clip is class: ", predictions[i][-2], " and the degree of difference from the regular class: ", predictions[i][-1][0])
+        print("Predicted severity ", predictions[i][-1][predictions[i][-2]])
+        #importance vector for this cluster here printed
+        #calculate distance from both centroids 
+        d_a, d_b = calculate_distances(centroids[cluster_map[0]], centroids[cluster_map[predictions[i][-2]]], segmented_joints[i])
+        closeness = calculate_percentage_closer(d_a, d_b)
+        print("Confidence as a percentage: ", closeness)
+        print("The DIMWISE scores for this cluster are: ", convert_to_percentage(feature_counts))
+        Render.render_joints_series(raw_images[i*6], raw_joints[i*6], 6, True, False)
+
+    #draw persistent line from joints 0, 9, 10, 16 and 17 to show the shape of the gait 
+    pass
+
 ###########################################################################################################################################################################################
 if __name__ == '__main__':
     #create_datasets()
     ##apply_standard_scaler('./code/datasets/joint_Data/erin/5_Absolute_Data(scaled)/raw/5_Absolute_Data(scaled).csv',
      #                      './code/datasets/joint_Data/erin/5_Absolute_Data(scaled)')
 
-    clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/10_people_4/raw/10_people_4.csv", './code/datasets/joint_data/embed_data/proximities', epochs=50)
+    clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/13_people_4/raw/13_people_4.csv", './code/datasets/joint_data/embed_data/proximities', epochs=50)
     stop = 5/0
     
     start = time.time()
     #New_Embedding_Weights
     run_model(dataset_types= [1], hcf=False,
             batch_size = 128, epochs =80, folder="big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/",
-            save ='10_people', load=None, leave_one_out=False, dim_out=3, class_loc=2, model_type='ST_TAGCN_Block', vae=False, save_embedding = True, embedding_size = 3, gen_data=True)
+            save ='12_people', load=None, leave_one_out=False, dim_out=3, class_loc=2, model_type='ST_TAGCN_Block', vae=False, save_embedding = True, embedding_size = 3, gen_data=True)
     end = time.time()
     print("time elapsed: ", end - start)
 
     #process_data("erin")
+
 
 
 #notes
@@ -686,8 +747,11 @@ if __name__ == '__main__':
 #
 #TODO Plan
 '''
--investigate more novel way of calculating importance in explainable way, the issue is these importances are relative to eachother, but should only be relative to 1st class
+-go through individual examples, print the video and show the analysis to get cluster prediction, closeness to centroid/distance from centroid, have line track movement of each limb and head for 
+ visualization of changes
 -test effectiveness on other datasets
+-produce program that can show videos and analysis, talk to bob about how to quantify it and turn it into a paper
+-compare it to other k-means importance mechanism? kmeansInterp for a starting point
 -done
 
 '''

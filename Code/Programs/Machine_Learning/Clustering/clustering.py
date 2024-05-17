@@ -42,24 +42,49 @@ def calculate_distance_ranges(cluster_data, first_cluster_data, dimension_x):
 
  
     return distances.min(), distances.max()
+from sklearn.metrics import adjusted_rand_score
+from scipy.spatial import distance
+def calculate_overlap_percentage(cluster_data, first_cluster_data, centroid_a, centroid_b, dimension):
+    # Extract the specified dimension from each dataframe
+    df1_dimension = cluster_data.iloc[:, dimension].values
+    df2_dimension = first_cluster_data.iloc[:, dimension].values
+    
+    # Calculate distances from each point to both centroids for dataframe A
+    distances_to_a = np.abs(df1_dimension - centroid_a[dimension])
+    distances_to_b = np.abs(df1_dimension - centroid_b[dimension])
+    
+    # Count points closer to centroid B than centroid A in dataframe A
+    count_a_to_b = np.sum(distances_to_b < distances_to_a)
+    
+    # Calculate distances from each point to both centroids for dataframe B
+    distances_to_a = np.abs(df2_dimension - centroid_a[dimension])
+    distances_to_b = np.abs(df2_dimension - centroid_b[dimension])
+    
+    # Count points closer to centroid B than centroid A in dataframe B
+    count_b_to_b = np.sum(distances_to_b < distances_to_a)
+    
+    # Calculate intersection count
+    intersection_count = min(count_a_to_b, count_b_to_b)
+    
+    # Calculate total number of points across both dataframes
+    total_points = len(df1_dimension) + len(df2_dimension)
+    
+    # Calculate intersection ratio
+    intersection_ratio = intersection_count / total_points
+    
+    return intersection_ratio
 
-def calculate_overlap_percentage(cluster_data, first_cluster_data, dimension_x):
-    # Calculate the closest distances from cluster_a to cluster_b and vice versa
-    min_distance, max_distance = calculate_distance_ranges(cluster_data, first_cluster_data, dimension_x)
-
-    # Find the total range of dimension_x across both clusters
-    all_points_a = cluster_data.iloc[:, dimension_x]
-    all_points_b = first_cluster_data.iloc[:, dimension_x]
-
-
-    min_value = min(np.min(all_points_a), np.min(all_points_b))
-    max_value = max(np.max(all_points_a), np.max(all_points_b))
-    total_range = max_value - min_value
-
-    # Calculate the overlap percentage for the pair of clusters
-    overlap_percentage_from_a_to_b = (total_range - min_distance) / total_range * 100
-
-    return overlap_percentage_from_a_to_b, max_distance
+from itertools import combinations
+def max_distance_between_centroids(centroids):
+    max_distance = 0
+    # Generate combinations of centroids
+    centroid_combinations = combinations(centroids, 2)
+    # Calculate distance between each pair of centroids
+    for centroid_pair in centroid_combinations:
+        distance = np.linalg.norm(centroid_pair[0] - centroid_pair[1])
+        if distance > max_distance:
+            max_distance = distance
+    return max_distance
 
 def k_means_experiment(data):
     print("In here??")
@@ -127,15 +152,18 @@ def k_means_experiment(data):
         #remove noise
         #if cluster_variance > 1000:
         #    cluster_variance = 0.0
+
         cluster_variances.append(cluster_variance)
         
 
-    print("cluster variances: ", cluster_variances)
+    print("cluster variances: ", type(cluster_variances[0]), cluster_variances[0][0])
+
 
     # Combine the feature differences and variabilities to rank features for each cluster
     # Create a dictionary to store the importance scores
     #feature_importance = {}
     all_importances  = []
+    max_dist = max_distance_between_centroids(centroids)
     for feature_index in range(18):
         print("FEATURE INDEX: ", feature_index)
         importance_scores = []
@@ -148,15 +176,21 @@ def k_means_experiment(data):
               + (abs(centroid_a - centroid_b) / the maximum feature value across clusters a and b - the minimum feature value across clusters a and b)
             '''
             print("variance: ", cluster, feature_index, cluster_variances[cluster][feature_index])
-            cluster_variance_inv = cluster_variances[cluster][feature_index]
-            cluster_overlap_f, max_distance = calculate_overlap_percentage(cluster_datasets[cluster], cluster_datasets[0], dimension_x=feature_index)
-            cluster_overlap_f += 1
+            w1 = 1.0
+            w2 = 0.5
+            w3 = 1.0
+            cluster_variance_inv = 1/cluster_variances[cluster][feature_index]
+            cluster_variance_inv *= w1
+            cluster_overlap_f = calculate_overlap_percentage(cluster_datasets[cluster], cluster_datasets[0], centroids[cluster], centroids[0], dimension=feature_index)
+            #cluster_overlap_f += 1
+            cluster_overlap_f *= w2
             centroid_dist_f = calculate_centroid_distance(centroids[cluster], centroids[0], feature_index) 
-            norm_centroid_dist_f = centroid_dist_f / max_distance
-            feature_importance_f = (cluster_variance_inv * cluster_overlap_f) + norm_centroid_dist_f
+            norm_centroid_dist_f = centroid_dist_f# / max_dist
+            norm_centroid_dist_f *= w3
+            feature_importance_f = (cluster_variance_inv * cluster_overlap_f) * norm_centroid_dist_f
             # Example usage:
 
-            print("Overlap percentages along dimension x for each cluster:", cluster_variance_inv, cluster_overlap_f, centroid_dist_f, max_distance)
+            print("Overlap percentages along dimension x for each cluster:", cluster_variance_inv, cluster_overlap_f, centroid_dist_f)
             print("final feature importance: ", feature_importance_f)
             if pd.isna(feature_importance_f):
                 feature_importance_f = 0.0
@@ -175,17 +209,17 @@ def k_means_experiment(data):
     limp_body_importance = {'head':0, 'torso': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0}
     for ind, importance in enumerate(limp_importance):
         print("ind and importance: ", ind, importance)
-        if ind in [1,2,3,4]:
-            limp_body_importance['head'] += importance[1]
-        elif ind in [0, 17]:
-            limp_body_importance['torso'] += importance[1]
-        elif ind in [5,7,9]:
+        if ind in [0,1,2,3,4]: #1,2,3,4
+            limp_body_importance['head'] += importance[1] * 0.4
+        elif ind in [3,6,11,17,12]: #0,17
+            limp_body_importance['torso'] += importance[1] * 0.4
+        elif ind in [7,9]:
             limp_body_importance['left_arm'] += importance[1]
-        elif ind in [6,8,10]:
+        elif ind in [8,10]:
             limp_body_importance['right_arm'] += importance[1]
-        elif ind in [11,13,15]:
+        elif ind in [13,15]:
             limp_body_importance['left_leg'] += importance[1]
-        elif ind in [12,14,16]:
+        elif ind in [14,16]:
             limp_body_importance['right_leg'] += importance[1]
         else:
             print("something gone wrong")
@@ -247,7 +281,7 @@ def k_means_experiment(data):
     print("cluster 1", kms.feature_importances_[1][:10])# Features here are words
     print("cluster 2", kms.feature_importances_[2][:10])# Features here are words
     print("Accuracy", accuracy)
-    return [kms.feature_importances_[0][0], (l_lk, l_lv), (l_sk, l_sv)], [distance_01, distance_02, distance_12], kmeans, cluster_to_class
+    return [kms.feature_importances_[0][0], percentage_limp, percentage_shuffle], [distance_01, distance_02, distance_12], kmeans, cluster_to_class
 
 
 def apply_grouped_pca(data):
@@ -351,12 +385,10 @@ def stitch_data_for_kmeans(data):
         
         counter += 1
     
-    #
     print("new row: ", len(new_data), len(new_data[0]), len(new_data[1]), len(new_data[-1]))
     print("row 0: ", new_data[0])
     print("row 1: ", new_data[1])
     print("last row: ", new_data[-1])
-    #stop = 5/0
     return new_data
 
 import random
@@ -530,14 +562,28 @@ def unsupervised_cluster_assessment(input, output, epochs = 15):
     centroid_distances = []
     for i in range(epochs):
         [clust_1, clust_2, clust_3], [dist_01, dist_02, dist_12], k_model, cluster_map = k_means_experiment(data)
-        print("what are these: ", clust_1, clust_2, clust_3)
+        print("what are these: ", clust_1, clust_2, clust_3, "space: ", clust_2[0], clust_2[0][0], clust_2[0][1], type(clust_2))
+        #stop = 5/0
+        for j in range(len(clust_2)):
+            feature_counts[1][clust_2[j][0]] += clust_2[j][1]/epochs
+        for j in range(len(clust_3)):
+            feature_counts[2][clust_3[j][0]] += clust_3[j][1]/epochs
         feature_counts[0][clust_1[0]] += 1
-        feature_counts[1][clust_2[0]] += 1
-        feature_counts[2][clust_3[0]] += 1
+        #feature_counts[1][clust_2[0]] += 1
+        #feature_counts[2][clust_3[0]] += 1
         centroid_distances.append([dist_01, dist_02, dist_12])
 
 
     averages = calculate_column_averages(centroid_distances)
+    feature_counts = {
+        outer_k: {inner_k: round(inner_v, 2) for inner_k, inner_v in outer_v.items()}
+        for outer_k, outer_v in feature_counts.items()
+    }
+    feature_counts = {
+        k: {ik: iv for ik, iv in sorted(v.items(), key=lambda item: item[1], reverse=True)}
+        for k, v in feature_counts.items()
+    }
+
     print("feature counts: ", feature_counts)
     print("centroid distances: ", averages)
 
@@ -551,3 +597,4 @@ def unsupervised_cluster_assessment(input, output, epochs = 15):
     print("cluster map", cluster_map)
     #Add column names
     Utilities.save_dataset(result_df, output)
+    return result_df, k_model, cluster_map, feature_counts

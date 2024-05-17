@@ -72,7 +72,7 @@ def cross_valid(m_model, test_dataset, datasets=None,k_fold=3, batch = 16,
 
     total_preds = []
     total_ys = []
-    model = copy.deepcopy(m_model)
+    model = m_model# copy.deepcopy(m_model)
     model = model.to(device)
     for fold in range(k_fold):
         if fold >= k_fold - 1:
@@ -200,19 +200,19 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device, gen
             data_i = [indice_batch[i][index] for i in range(len(loader))]
             data_b = [batch_batch[i][index] for i in range(len(loader))]
             data_y =  [ys_batch[i][index] for i in range(len(loader))]
-            with profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
-                        schedule=torch.profiler.schedule(wait=1, warmup=1, active=3),
-                        on_trace_ready=torch.profiler.tensorboard_trace_handler('./logs')) as prof:
-                for i in range(10):
-                    with record_function("model_inference"):
-                        out, embedding = model(data_x, data_i, data_b, train=True)
-                    prof.step()
+            #with profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+            #            schedule=torch.profiler.schedule(wait=1, warmup=1, active=3),
+            #            on_trace_ready=torch.profiler.tensorboard_trace_handler('./logs')) as prof:
+            #    for i in range(10):
+            #        with record_function("model_inference"):
+            #            out, embedding = model(data_x, data_i, data_b, train=True)
+            #        prof.step()
 
             # Access the profiler results
-            print(prof.key_averages().table(sort_by="self_cpu_time_total"))
-            #out, embedding = model(data_x, data_i, data_b, train=True)
+            #print(prof.key_averages().table(sort_by="self_cpu_time_total"))
+            out, embedding = model(data_x, data_i, data_b, train=True)
 
-            stop = 5/0
+
             if gen_data and epoch >= epochs:
                 print("IN HERE: ", epoch)
                 gen_test = True
