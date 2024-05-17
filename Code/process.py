@@ -685,12 +685,33 @@ def convert_to_percentage(data_dict):
     return percentage_dict
 
 from sklearn.preprocessing import StandardScaler
-def predict_and_display(data, embed_data, image_data, model):
+
+def list_immediate_subfolders(folder_path, limit):
+    subfolders = []
+    for name in os.listdir(folder_path):
+        full_path = os.path.join(folder_path, name)
+        if os.path.isdir(full_path):
+            subfolders.append(full_path)
+        if len(subfolders) >= limit:
+            break
+    return subfolders
+
+
+def predict_and_display(data, embed_data, image_data, limit):
     #First load in the raw data of 5 people
-    raw_joints, raw_images = Utilities.process_data_input(data, image_data)
+    sub_folders = list_immediate_subfolders(image_data, limit)
+    print("subfolders; ", sub_folders)
+    raw_images = []
+    for folder in sub_folders:
+        _, raw_images = Utilities.process_data_input(None, folder, add_to_existing=True, existing = raw_images)
+        print("len now: ", len(raw_images))
+
+    raw_joints, _ = Utilities.process_data_input(data, None)
     #load in corresponding embedding data 
     embed_joints = Utilities.process_data_input(embed_data, None)
 
+    print("all lens: ", len(raw_images), len(raw_joints), len(embed_joints))
+    stop = 5/0
     #split the raw data and images into blocks of 7 the same way the embedding data is set up
     predictions, model, cluster_map, feature_counts = clustering.unsupervised_cluster_assessment(embed_joints, './code/datasets/joint_data/embed_data/proximities', epochs= 20)
     segmented_joints = clustering.stitch_data_for_kmeans(raw_joints)
@@ -723,7 +744,11 @@ if __name__ == '__main__':
     ##apply_standard_scaler('./code/datasets/joint_Data/erin/5_Absolute_Data(scaled)/raw/5_Absolute_Data(scaled).csv',
      #                      './code/datasets/joint_Data/erin/5_Absolute_Data(scaled)')
 
-    clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/13_people_4/raw/13_people_4.csv", './code/datasets/joint_data/embed_data/proximities', epochs=50)
+    #clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/13_people_4/raw/13_people_4.csv", './code/datasets/joint_data/embed_data/proximities', epochs=50)
+    embed_path = "./Code/Datasets/Joint_Data/embed_data/2_people_4/raw/2_people_4.csv"
+    data_path = './Code/Datasets/Joint_Data/big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/2_people/raw/2_people.csv'
+    image_path = './Code/Datasets/WeightGait/Full_Dataset/'
+    predict_and_display(data_path, embed_path, image_path, 2)
     stop = 5/0
     
     start = time.time()

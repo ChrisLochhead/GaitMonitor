@@ -244,7 +244,7 @@ def plot_velocity_vectors(image, joints_previous, joints_current, joints_next, d
         joint_velocities.append(smoothed_direction)
     return joint_velocities
 
-def process_data_input(joint_source, image_source, ignore_depth = True, cols = colnames_midhip):
+def process_data_input(joint_source, image_source, ignore_depth = True, cols = colnames_midhip, add_to_existing = False, existing = False):
     '''
     Utility for optionally loading both images and joint data in one function call
 
@@ -271,7 +271,7 @@ def process_data_input(joint_source, image_source, ignore_depth = True, cols = c
         joints = joint_source
     
     if isinstance(image_source, str):
-        images = load_images(image_source, ignore_depth=ignore_depth)
+        images = load_images(image_source, ignore_depth=ignore_depth, add_to_existing=add_to_existing, existing=existing)
     else:
         images = image_source
 
@@ -341,7 +341,7 @@ def numericalSort(value):
     parts[1::2] = map(int, parts[1::2])
     return parts
 
-def load_images(folder, ignore_depth = True):
+def load_images(folder, ignore_depth = True, add_to_existing = False, existing = None):
     '''
     Function to load a series of images from a root folder.
 
@@ -358,7 +358,7 @@ def load_images(folder, ignore_depth = True):
         returns a list of image objects
 
     '''
-    image_data = []
+    image_data = [] if add_to_existing == False else existing
     directory = os.fsencode(folder)
     for subdir_iter, (subdir, dirs, files) in enumerate(os.walk(directory)):
         dirs.sort(key=numericalSort)
