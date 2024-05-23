@@ -653,11 +653,14 @@ def unwrap_dataset(data):
 
 def calculate_distances(centroid_A, centroid_B, point_x):
     # Calculate Euclidean distance from point_x to centroid_A
+    print("whats point x: ", len(point_x), point_x)
+    print("whars the centroid: ", len(centroid_A), centroid_A)
+    print("centroid b: ", len(centroid_B), centroid_B)
+    #the case for comparing the relative distance from normal to abnormal
     d_A = np.linalg.norm(np.array(point_x) - np.array(centroid_A))
-    
     # Calculate Euclidean distance from point_x to centroid_B
     d_B = np.linalg.norm(np.array(point_x) - np.array(centroid_B))
-    
+    print("distances: ", d_A, d_B, d_A == d_B)
     return d_A, d_B
 
 def calculate_percentage_closer(d_A, d_B):
@@ -670,18 +673,23 @@ def calculate_percentage_closer(d_A, d_B):
         d_min = d_B
         d_max = d_A
         closer_to = "B"
-    
+    print("what are all these: ", d_A, d_B, d_max, d_min )
     percentage_closer = ((d_max - d_min) / d_max) * 100
     
     return closer_to, percentage_closer
 
 def convert_to_percentage(data_dict):
     # Calculate the total sum of all values
-    total_sum = sum(data_dict.values())
-    
-    # Create a new dictionary with percentage values
-    percentage_dict = {k: (v / total_sum) * 100 for k, v in data_dict.items()}
-    
+    print("whats this: ", data_dict)
+    #sto = 5/0
+    percentage_dict = {}
+    for i, (key, sub_dict) in enumerate(data_dict.items()):
+        total_sum = sum(sub_dict.values())
+        
+        # Create a new dictionary with percentage values
+        sub_p_dict = {k: (v / total_sum) * 100 for k, v in sub_dict.items()}
+        percentage_dict[i] = sub_p_dict
+
     return percentage_dict
 
 from sklearn.preprocessing import StandardScaler
@@ -697,7 +705,7 @@ def list_immediate_subfolders(folder_path, limit):
     return subfolders
 
 
-def predict_and_display(data, embed_data, image_data, limit):
+def predict_and_display(data, embed_data, image_data, original_joints, limit):
     #First load in the raw data of 5 people
     sub_folders = list_immediate_subfolders(image_data, limit)
     print("subfolders; ", sub_folders)
@@ -707,14 +715,23 @@ def predict_and_display(data, embed_data, image_data, limit):
         print("len now: ", len(raw_images))
 
     raw_joints, _ = Utilities.process_data_input(data, None)
+    display_joints, _ = Utilities.process_data_input(original_joints, None)
     #load in corresponding embedding data 
-    embed_joints = Utilities.process_data_input(embed_data, None)
+    embed_joints, _ = Utilities.process_data_input(embed_data, None)
 
     print("all lens: ", len(raw_images), len(raw_joints), len(embed_joints))
-    stop = 5/0
+    print("embed joints: ", len(embed_joints[0]))
+
     #split the raw data and images into blocks of 7 the same way the embedding data is set up
     predictions, model, cluster_map, feature_counts = clustering.unsupervised_cluster_assessment(embed_joints, './code/datasets/joint_data/embed_data/proximities', epochs= 20)
-    segmented_joints = clustering.stitch_data_for_kmeans(raw_joints)
+    segmented_joints = clustering.stitch_data_for_kmeans(embed_joints)
+
+    segmented_joints  = pd.DataFrame(segmented_joints)
+    features = segmented_joints.iloc[:, 6:].values
+    scaler = StandardScaler()
+    features = scaler.fit_transform(features)
+    segmented_joints = clustering.apply_grouped_pca(pd.DataFrame(features))
+
     segmented_images = clustering.stitch_data_for_kmeans(raw_images)
 
     centroids = model.cluster_centers_
@@ -723,21 +740,41 @@ def predict_and_display(data, embed_data, image_data, limit):
     #print the importance vectors for this cluster and the individual example
     
     #draw the person with their skeleton
-    print("same length?? ", len(segmented_images), len(segmented_joints))
+    black_frame = [[0 for _ in inner_list] for inner_list in raw_images]
+    dimwise_scores = convert_to_percentage(feature_counts)
+    closeness_preds = []
     for i in range(len(segmented_joints)):
-        print("prediction for this clip is class: ", predictions[i][-2], " and the degree of difference from the regular class: ", predictions[i][-1][0])
-        print("Predicted severity ", predictions[i][-1][predictions[i][-2]])
+        print("\nPrediction for this clip is class: ", predictions[i][-2])
+        print("Predicted severity ", predictions[i][-1])
         #importance vector for this cluster here printed
         #calculate distance from both centroids 
-        d_a, d_b = calculate_distances(centroids[cluster_map[0]], centroids[cluster_map[predictions[i][-2]]], segmented_joints[i])
+        d_a, d_b = calculate_distances(centroids[cluster_map[0]], centroids[cluster_map[predictions[i][-2]]], segmented_joints.iloc[i])
         closeness = calculate_percentage_closer(d_a, d_b)
-        print("Confidence as a percentage: ", closeness)
-        print("The DIMWISE scores for this cluster are: ", convert_to_percentage(feature_counts))
-        Render.render_joints_series(raw_images[i*6], raw_joints[i*6], 6, True, False)
+        closeness_preds.append(closeness)
+        print("Confidence as a percentage: ", closeness if closeness != 0 else 1)
+        print("\nThe DIMWISE scores for this cluster are: ", dimwise_scores[predictions[i][-2]])
 
-    #draw persistent line from joints 0, 9, 10, 16 and 17 to show the shape of the gait 
-    pass
+        #if i < len(display_joints) - 6:
+        #    Render.render_joints_series(black_frame, display_joints[i*6:], 6, True, False)
 
+    print("all dimwise scores for clusters: ", dimwise_scores)
+    for row, new_value in zip(predictions, closeness_preds):
+        row.append(new_value[1])
+    #column names are: [instance, no_in_instance, class, freeze, obstacle, person, cluster_prediction, severity_prediction, confidence_prediction ] 9 items
+    df = pd.DataFrame(predictions, columns=['instance', 'no_in_instance', 'class', 'freeze', 'obstacle', 'person',
+                                             'cluster_prediction', 'severity_prediction', 'confidence_prediction'])
+    print(df.head(3))
+    grouped = df.groupby('class')
+    # Dictionary to store the mean DataFrame for each group
+    mean_dfs = {}
+    # Iterate over each group and calculate the mean
+    for name, group in grouped:
+        mean_dfs[name] = group.mean()
+    # Display the result for each group
+    for key, value in mean_dfs.items():
+        print(f"Group {key}:\n{value}\n")
+
+    Utilities.save_dataset(predictions, './Code/Datasets/Joint_Data/Results')
 ###########################################################################################################################################################################################
 if __name__ == '__main__':
     #create_datasets()
@@ -745,10 +782,11 @@ if __name__ == '__main__':
      #                      './code/datasets/joint_Data/erin/5_Absolute_Data(scaled)')
 
     #clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/13_people_4/raw/13_people_4.csv", './code/datasets/joint_data/embed_data/proximities', epochs=50)
-    embed_path = "./Code/Datasets/Joint_Data/embed_data/2_people_4/raw/2_people_4.csv"
-    data_path = './Code/Datasets/Joint_Data/big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/2_people/raw/2_people.csv'
+    embed_path = "./Code/Datasets/Joint_Data/embed_data/5_people_4/raw/5_people_4.csv"
+    data_path = './Code/Datasets/Joint_Data/big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/5_people/raw/5_people.csv'
+    original_joints_path = './Code/Datasets/Joint_Data/Ahmed/5_Absolute_Data(midhip)/raw/5_Absolute_Data(midhip).csv'
     image_path = './Code/Datasets/WeightGait/Full_Dataset/'
-    predict_and_display(data_path, embed_path, image_path, 2)
+    predict_and_display(data_path, embed_path, image_path, original_joints_path, 2)
     stop = 5/0
     
     start = time.time()
@@ -765,18 +803,11 @@ if __name__ == '__main__':
 
 #notes
 #CHANGE FOLD IN CROSS VALID TO REMOVE -2
-#if cluster centre distances are below a threshold, there's no discernable difference between the two states, meaning no degradation has occurred or recovery, threshold is accuracy, % chance
-#that their is a difference 
-
-#measure how much data this is based on, threshold for impact
-#
 #TODO Plan
 '''
--go through individual examples, print the video and show the analysis to get cluster prediction, closeness to centroid/distance from centroid, have line track movement of each limb and head for 
- visualization of changes
--test effectiveness on other datasets
--produce program that can show videos and analysis, talk to bob about how to quantify it and turn it into a paper
--compare it to other k-means importance mechanism? kmeansInterp for a starting point
--done
+-make sure results look right
+-analyse the results to find average distances, average confidences and severities
+-try on the other datasets to make sure it works 
+-think about how to form it into a paper
 
 '''

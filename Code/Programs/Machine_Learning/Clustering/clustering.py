@@ -384,11 +384,6 @@ def stitch_data_for_kmeans(data):
 
         
         counter += 1
-    
-    print("new row: ", len(new_data), len(new_data[0]), len(new_data[1]), len(new_data[-1]))
-    print("row 0: ", new_data[0])
-    print("row 1: ", new_data[1])
-    print("last row: ", new_data[-1])
     return new_data
 
 import random
@@ -489,39 +484,52 @@ def predict_and_calculate_proximity(kmeans_model, data_df, metadata, cluster_map
         distances = [np.linalg.norm(instance - centroid) for centroid in centroids]
         
         # Append the list of distances to the proximities list
-        proximities.append(distances)
+        print("appending: ", distances)
+        new_array = [None] * len(distances)
+        for key, value in cluster_map.items():
+            new_array[key] = distances[value]
+        proximities.append(new_array)
+    
+    print("what's the cluster map: ", cluster_map)
     
     # Create a new DataFrame with predictions and proximities
     result_df = metadata
+    print("len of proximities: ", len(proximities))
     for i, v in enumerate(proximities):
-        proximities[i] = gait_coefficient(v[0], v[1], v[2])
+        proximities[i] = gait_coefficient(v, cluster_predictions[i])
     result_df['Cluster'] = cluster_predictions
     result_df['Severity coefficient'] = proximities
     calculate_mean_variance(result_df['Cluster'], result_df['Severity coefficient'], cluster_map)
     return result_df.values.tolist()
 
-def gait_coefficient(d0, d1, d2, w1 = 0.5, w2 = 1.5):
+def gait_coefficient(distances, cluster_prediction, weights = [1.0, 1.0, 1.0]):#)w1 = 0.5, w2 = 1.5):
     """
     Calculate the coefficient representing how far an individual's gait pattern is from regular gait.
 
     Parameters:
-        d0 (float): Distance from the individual's gait pattern to the centroid of cluster 0 (regular gait).
-        d1 (float): Distance from the individual's gait pattern to the centroid of cluster 1 (first type of pathology).
-        d2 (float): Distance from the individual's gait pattern to the centroid of cluster 2 (more severe type of pathology).
-        w1 (float): Weight for the distance to cluster 1 (default is 0.5).
-        w2 (float): Weight for the distance to cluster 2 (default is 1.0).
+        distances: list(float)
+            Distance from the individual's gait pattern to the centroid of cluster 0 (regular gait).
+        cluster_prediction: list(int)
+            Predictions for each example
+        weights: list(float) (optional, default = [0.5, 1.5] )
+            weigths for each pathology (experimental)
 
     Returns:
         float: Coefficient representing how far the individual's gait pattern is from regular gait.
     """
     # Calculate the weighted distances to clusters 1 and 2 relative to the distance to cluster 0
-    weighted_d1 = w1 * (d1 / d0)
-    weighted_d2 = w2 * (d2 / d0)
+    print("what are these:", distances, cluster_prediction)
+
+    return distances[0]
+    if cluster_prediction == 0:
+        return distances[0]
+    else:
+        for i in range(1, len(distances)):
+            if cluster_prediction == i:
+                return weights[i] * (distances[i] / distances[0])
     
-    # Calculate the total coefficient as the sum of weighted distances
-    coefficient = weighted_d1 + weighted_d2
-    
-    return coefficient
+    print("error here, returning distances 0: ", cluster_prediction)
+    return distances[0]
 
 def calculate_mean_variance(labels, coefficients, cluster_map):
     """
