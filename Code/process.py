@@ -208,30 +208,12 @@ def load_datasets(types, folder, multi_dim = False, class_loc = 2, num_classes =
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/rel_data', 
             #                            'rel_data.csv',             
             #                                joint_connections=Render.joint_connections_n_head))   
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/13_people', 
-                            '13_people.csv',             
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/13_people', 
+            #                '13_people.csv',             
+            #                    joint_connections=Render.bottom_joint_connection, class_loc=class_loc, num_classes=num_classes))   
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/Velocity_Data', 
+                            'Velocity_Data.csv',             
                                 joint_connections=Render.bottom_joint_connection, class_loc=class_loc, num_classes=num_classes))   
-            #2s ST-GCN
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "no_sub_1_stream" + f'/{num_people}_people', 
-            #                            f'{num_people}_people.csv',             
-            #                                joint_connections=Render.joint_connections_n_head))      
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "no_sub_4_stream"+ f'/{num_people}_people', 
-            #                            f'{num_people}_people.csv',             
-            #                                joint_connections=Render.joint_connections_n_head))     
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "no_sub_2_stream"+ f'/{num_people}_people', 
-            #                            f'{num_people}_people.csv',             
-            #                                joint_connections=Render.joint_connections_n_head))     
-
-            #9d
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "/multi_dim_1_13/", 
-            #                'multi_dim_1_13.csv',             
-            #                    joint_connections=Render.joint_connections_n_head))   
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "/multi_dim_2_13/", 
-            #    'multi_dim_2_13.csv',             
-            #        joint_connections=Render.joint_connections_n_head))   
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + "/multi_dim_3_13/", 
-            #    'multi_dim_3_13.csv',             
-            #        joint_connections=Render.joint_connections_n_head))   
         #Type 2: HCF dataset (unused)
         elif t == 2:
             #This MUST have cycles, there's no non-cycles option
@@ -418,7 +400,7 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
         embed_data = sorted(embed_data, key=lambda x: x[2])
         embed_data = reorder_instance_numbers(embed_data)
         embed_data = extract_embed_data(embed_data)
-        Utilities.save_dataset(embed_data, './code/datasets/joint_data/embed_data/13_people_4')
+        Utilities.save_dataset(embed_data, './code/datasets/joint_data/embed_data/Pathological_people_4')
 
     if save != None:
         print("saving model")
@@ -782,18 +764,18 @@ if __name__ == '__main__':
      #                      './code/datasets/joint_Data/erin/5_Absolute_Data(scaled)')
 
     #clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/13_people_4/raw/13_people_4.csv", './code/datasets/joint_data/embed_data/proximities', epochs=50)
-    embed_path = "./Code/Datasets/Joint_Data/embed_data/5_people_4/raw/5_people_4.csv"
-    data_path = './Code/Datasets/Joint_Data/big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/5_people/raw/5_people.csv'
-    original_joints_path = './Code/Datasets/Joint_Data/Ahmed/5_Absolute_Data(midhip)/raw/5_Absolute_Data(midhip).csv'
-    image_path = './Code/Datasets/WeightGait/Full_Dataset/'
-    predict_and_display(data_path, embed_path, image_path, original_joints_path, 2)
-    stop = 5/0
+    #embed_path = "./Code/Datasets/Joint_Data/embed_data/5_people_4/raw/5_people_4.csv"
+    #data_path = './Code/Datasets/Joint_Data/big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/5_people/raw/5_people.csv'
+    #original_joints_path = './Code/Datasets/Joint_Data/Ahmed/5_Absolute_Data(midhip)/raw/5_Absolute_Data(midhip).csv'
+    #image_path = './Code/Datasets/WeightGait/Full_Dataset/'
+    #predict_and_display(data_path, embed_path, image_path, original_joints_path, 2)
+    #stop = 5/0
     
     start = time.time()
     #New_Embedding_Weights
     run_model(dataset_types= [1], hcf=False,
-            batch_size = 128, epochs =80, folder="big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/",
-            save ='12_people', load=None, leave_one_out=False, dim_out=3, class_loc=2, model_type='ST_TAGCN_Block', vae=False, save_embedding = True, embedding_size = 3, gen_data=True)
+            batch_size = 128, epochs =80, folder="Pathological", #this is weightgait"big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/",
+            save ='12_people', load=None, leave_one_out=False, dim_out=6, class_loc=2, model_type='ST_TAGCN_Block', vae=False, save_embedding = True, embedding_size = 3, gen_data=True)
     end = time.time()
     print("time elapsed: ", end - start)
 
@@ -805,9 +787,13 @@ if __name__ == '__main__':
 #CHANGE FOLD IN CROSS VALID TO REMOVE -2
 #TODO Plan
 '''
--make sure results look right
--analyse the results to find average distances, average confidences and severities
--try on the other datasets to make sure it works 
+-try on the other datasets to make sure it works
 -think about how to form it into a paper
+-   need to explain formula for calculating importance
+    - need to see difference in confidence between overlaps in weightgait
+    - need to see diff in explanation across datasets, and rationalize them with observations
+-   demonstrate that the data pipeline from embedding to k-means is novel
+-   not application focussed: applications in any realms of classification
+-Research Question: Can traditional clustering methods be described by importance in the interest of creating more trustworthy and explainable AI?
 
 '''
