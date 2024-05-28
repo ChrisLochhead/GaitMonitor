@@ -691,21 +691,21 @@ def predict_and_display(data, embed_data, image_data, original_joints, limit):
     #First load in the raw data of 5 people
     sub_folders = list_immediate_subfolders(image_data, limit)
     print("subfolders; ", sub_folders)
-    raw_images = []
-    for folder in sub_folders:
-        _, raw_images = Utilities.process_data_input(None, folder, add_to_existing=True, existing = raw_images)
-        print("len now: ", len(raw_images))
+    #raw_images = []
+    #for folder in sub_folders:
+    #    _, raw_images = Utilities.process_data_input(None, folder, add_to_existing=True, existing = raw_images)
+    #    print("len now: ", len(raw_images))
 
-    raw_joints, _ = Utilities.process_data_input(data, None)
-    display_joints, _ = Utilities.process_data_input(original_joints, None)
+    #raw_joints, _ = Utilities.process_data_input(data, None)
+    #display_joints, _ = Utilities.process_data_input(original_joints, None)
     #load in corresponding embedding data 
     embed_joints, _ = Utilities.process_data_input(embed_data, None)
 
-    print("all lens: ", len(raw_images), len(raw_joints), len(embed_joints))
+    #print("all lens: ", len(raw_images), len(raw_joints), len(embed_joints))
     print("embed joints: ", len(embed_joints[0]))
 
     #split the raw data and images into blocks of 7 the same way the embedding data is set up
-    predictions, model, cluster_map, feature_counts = clustering.unsupervised_cluster_assessment(embed_joints, './code/datasets/joint_data/embed_data/proximities', epochs= 20)
+    predictions, model, cluster_map, feature_counts = clustering.unsupervised_cluster_assessment(embed_joints, './code/datasets/joint_data/embed_data/proximities', epochs= 20, num_classes=6)
     segmented_joints = clustering.stitch_data_for_kmeans(embed_joints)
 
     segmented_joints  = pd.DataFrame(segmented_joints)
@@ -714,7 +714,7 @@ def predict_and_display(data, embed_data, image_data, original_joints, limit):
     features = scaler.fit_transform(features)
     segmented_joints = clustering.apply_grouped_pca(pd.DataFrame(features))
 
-    segmented_images = clustering.stitch_data_for_kmeans(raw_images)
+    #segmented_images = clustering.stitch_data_for_kmeans(raw_images)
 
     centroids = model.cluster_centers_
     #calculate their relative distance to both the normal centroid and the prediction centroid 
@@ -722,8 +722,12 @@ def predict_and_display(data, embed_data, image_data, original_joints, limit):
     #print the importance vectors for this cluster and the individual example
     
     #draw the person with their skeleton
-    black_frame = [[0 for _ in inner_list] for inner_list in raw_images]
+    #black_frame = [[0 for _ in inner_list] for inner_list in raw_images]
+    #print("how manyt: ", centroids, len(centroids)), len(feature_counts)
+
     dimwise_scores = convert_to_percentage(feature_counts)
+    #print("here?? ", len(dimwise_scores))
+    #stop = 5/0
     closeness_preds = []
     for i in range(len(segmented_joints)):
         print("\nPrediction for this clip is class: ", predictions[i][-2])
@@ -734,6 +738,8 @@ def predict_and_display(data, embed_data, image_data, original_joints, limit):
         closeness = calculate_percentage_closer(d_a, d_b)
         closeness_preds.append(closeness)
         print("Confidence as a percentage: ", closeness if closeness != 0 else 1)
+        print("what's this here: ", predictions[i][-2])
+        print("dimwise scores: ", dimwise_scores, len(dimwise_scores))
         print("\nThe DIMWISE scores for this cluster are: ", dimwise_scores[predictions[i][-2]])
 
         #if i < len(display_joints) - 6:
@@ -763,19 +769,31 @@ if __name__ == '__main__':
     ##apply_standard_scaler('./code/datasets/joint_Data/erin/5_Absolute_Data(scaled)/raw/5_Absolute_Data(scaled).csv',
      #                      './code/datasets/joint_Data/erin/5_Absolute_Data(scaled)')
 
-    #clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/13_people_4/raw/13_people_4.csv", './code/datasets/joint_data/embed_data/proximities', epochs=50)
-    #embed_path = "./Code/Datasets/Joint_Data/embed_data/5_people_4/raw/5_people_4.csv"
-    #data_path = './Code/Datasets/Joint_Data/big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/5_people/raw/5_people.csv'
+    #clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv",
+    #                                            './code/datasets/joint_data/embed_data/path_proximities', epochs=50, num_classes=6)
+
+    #embed_path = "./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv"
+    #data_path = './Code/Datasets/Joint_Data/Path/Velocity_Data/raw/Velocity_Data.csv'
     #original_joints_path = './Code/Datasets/Joint_Data/Ahmed/5_Absolute_Data(midhip)/raw/5_Absolute_Data(midhip).csv'
     #image_path = './Code/Datasets/WeightGait/Full_Dataset/'
     #predict_and_display(data_path, embed_path, image_path, original_joints_path, 2)
     #stop = 5/0
-    
+
+    #Path paths
+    '''
+    embed_path = "./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv"
+    data_path = './Code/Datasets/Joint_Data/Path/Velocity_Data/raw/Velocity_Data.csv'
+    original_joints_path = './Code/Datasets/Joint_Data/Ahmed/5_Absolute_Data(midhip)/raw/5_Absolute_Data(midhip).csv'
+    image_path = './Code/Datasets/WeightGait/Full_Dataset/'
+    change dim_out to 6
+    change path to 'Path'
+    change processing to "Velocity_Data"
+    '''
     start = time.time()
     #New_Embedding_Weights
     run_model(dataset_types= [1], hcf=False,
-            batch_size = 128, epochs =80, folder="Pathological", #this is weightgait"big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/",
-            save ='12_people', load=None, leave_one_out=False, dim_out=6, class_loc=2, model_type='ST_TAGCN_Block', vae=False, save_embedding = True, embedding_size = 3, gen_data=True)
+            batch_size = 128, epochs =80, folder="big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/", #"Path",
+            save ='12_people', load=None, leave_one_out=False, dim_out=3, class_loc=2, model_type='ST_TAGCN_Block', vae=False, save_embedding = True, embedding_size = 3, gen_data=True)
     end = time.time()
     print("time elapsed: ", end - start)
 

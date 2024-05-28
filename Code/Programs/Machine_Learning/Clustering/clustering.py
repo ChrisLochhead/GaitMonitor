@@ -86,8 +86,7 @@ def max_distance_between_centroids(centroids):
             max_distance = distance
     return max_distance
 
-def k_means_experiment(data):
-    print("In here??")
+def k_means_experiment(data, num_classes = 3):
     data = pd.DataFrame(data)
     # Remove metadata columns and keep only the features and class
     features = data.iloc[:, 6:].values
@@ -113,14 +112,14 @@ def k_means_experiment(data):
     print("feature shape: ", features.shape)
 
     # Initialize and fit KMeans model on the training data
-    kmeans = KMeans(n_clusters=3)  # Assuming 3 clusters for the three classes
+    kmeans = KMeans(n_clusters=num_classes)  # Assuming 3 clusters for the three classes
     kmeans.fit(features)
     cluster_labels = kmeans.labels_
 
     # Map clusters to the true class labels
     # For each cluster, find the most common true label
     cluster_to_class = {}
-    for i in range(3):
+    for i in range(num_classes):
         mask = cluster_labels == i
         cluster_to_class[i] = int(mode(labels[mask]).mode[0])
         
@@ -136,29 +135,22 @@ def k_means_experiment(data):
     for original_index, new_index in cluster_to_class.items():
         arranged_centroids[new_index] = centroids[original_index]
 
-    distance_01 = np.linalg.norm(centroids[0] - centroids[1])  # Distance between cluster 0 and 1
-    distance_02 = np.linalg.norm(centroids[0] - centroids[2])  # Distance between cluster 0 and 2
-    distance_12 = np.linalg.norm(centroids[1] - centroids[2])  # Distance between cluster 1 and 2
+    distances = [np.linalg.norm(centroids[0] - centroids[i]) for i in range(1, len(centroids)) ]
+    #distance_01 = np.linalg.norm(centroids[0] - centroids[1])  # Distance between cluster 0 and 1
+    #distance_02 = np.linalg.norm(centroids[0] - centroids[2])  # Distance between cluster 0 and 2
+    #distance_12 = np.linalg.norm(centroids[1] - centroids[2])  # Distance between cluster 1 and 2
 
     # Step 3: Calculate feature variability within each cluster
     cluster_variances = []
     cluster_datasets = []
-    for cluster in range(3):
+    for cluster in range(num_classes):
         #TODO: replace data labels in data with their predictions
         cluster_data = pca_data_table[pca_data_table.iloc[:, -1] == cluster]
-        print("what's this: ", type(cluster_data), cluster_data.shape)
         cluster_datasets.append(cluster_data.iloc[:, :-1])
         cluster_variance = cluster_data.var()
-        #remove noise
-        #if cluster_variance > 1000:
-        #    cluster_variance = 0.0
-
         cluster_variances.append(cluster_variance)
         
-
     print("cluster variances: ", type(cluster_variances[0]), cluster_variances[0][0])
-
-
     # Combine the feature differences and variabilities to rank features for each cluster
     # Create a dictionary to store the importance scores
     #feature_importance = {}
@@ -167,7 +159,7 @@ def k_means_experiment(data):
     for feature_index in range(18):
         print("FEATURE INDEX: ", feature_index)
         importance_scores = []
-        for cluster in range(1,3):
+        for cluster in range(1,num_classes):
             # calculate each abnormal cluster with initial cluster
             #f=σf2​1​(1+similarityf,α,β​)+max(⋅)−min(⋅)∣μα​−μβ​∣​
 
@@ -201,63 +193,54 @@ def k_means_experiment(data):
     for imp in all_importances:
         print("final importance scores: ", imp)
 
-    limp_importance = [row[0] for row in all_importances]
-    shuffle_importance = [row[1] for row in all_importances]
+    class_importances = []
+    for i in range(len(all_importances)):
+        for j in range(num_classes-1):
+            print("what's this: ", all_importances[j], num_classes, len(all_importances[j]), j)
+            class_importances.append([row[j] for row in all_importances])
+    #limp_importance = [row[0] for row in all_importances]
+    #shuffle_importance = [row[1] for row in all_importances]
 
+    print("class importances: ", class_importances)
     #features.columns = ['Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
     #'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', 'M_hip']
-    limp_body_importance = {'head':0, 'torso': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0}
-    for ind, importance in enumerate(limp_importance):
-        print("ind and importance: ", ind, importance)
-        if ind in [0,1,2,3,4]: #1,2,3,4
-            limp_body_importance['head'] += importance[1] * 0.4
-        elif ind in [3,6,11,17,12]: #0,17
-            limp_body_importance['torso'] += importance[1] * 0.4
-        elif ind in [7,9]:
-            limp_body_importance['left_arm'] += importance[1]
-        elif ind in [8,10]:
-            limp_body_importance['right_arm'] += importance[1]
-        elif ind in [13,15]:
-            limp_body_importance['left_leg'] += importance[1]
-        elif ind in [14,16]:
-            limp_body_importance['right_leg'] += importance[1]
-        else:
-            print("something gone wrong")
+    region_importances = [{'head':0, 'torso': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0} for i in range(len(all_importances))]
+    #limp_body_importance = {'head':0, 'torso': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0}
+    for i, region_importance in enumerate(region_importances):
+            for ind, importance in enumerate(class_importances[i]):
+                print("ind and importance: ", ind, importance)
+                if ind in [1,2,3,4]: #1,2,3,4
+                    region_importances[i]['head'] += importance[1] * 0.4
+                elif ind in [0,17]: #0,17
+                    region_importances[i]['torso'] += importance[1] * 0.4
+                elif ind in [5, 7,9]:
+                    region_importances[i]['left_arm'] += importance[1]
+                elif ind in [6, 8,10]:
+                    region_importances[i]['right_arm'] += importance[1]
+                elif ind in [11,13,15]:
+                    region_importances[i]['left_leg'] += importance[1]
+                elif ind in [12,14,16]:
+                    region_importances[i]['right_leg'] += importance[1]
+                else:
+                    print("something gone wrong")
 
 
-    shuffle_body_importance = {'head':0, 'torso': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0}
-    for ind, importance in enumerate(shuffle_importance):
-        print("ind and importance: ", ind, importance)
-        if ind in [1,2,3,4]:
-            shuffle_body_importance['head'] += importance[1]
-        elif ind in [0, 17]:
-            shuffle_body_importance['torso'] += importance[1]
-        elif ind in [5,7,9]:
-            shuffle_body_importance['left_arm'] += importance[1]
-        elif ind in [6,8,10]:
-            shuffle_body_importance['right_arm'] += importance[1]
-        elif ind in [11,13,15]:
-            shuffle_body_importance['left_leg'] += importance[1]
-        elif ind in [12,14,16]:
-            shuffle_body_importance['right_leg'] += importance[1]
-        else:
-            print("something gone wrong")
-
-    total_sum = sum(limp_body_importance.values())
+    total_sums = [sum(region_importances[i].values()) for i in range(len(region_importances))]
     # Replace each value with its percentage of the total sum
-    percentage_limp = {k: (v / total_sum) * 100 for k, v in limp_body_importance.items()}
-    total_sum = sum(limp_body_importance.values())
+    total_percentages = {k: (v / total_sums[i]) * 100 for k, v in region_importances[i].items() for i in range(len(region_importances))}
+    #total_sum = sum(limp_body_importance.values())
     # Replace each value with its percentage of the total sum
-    percentage_shuffle = {k: (v / total_sum) * 100 for k, v in shuffle_body_importance.items()}
+    #percentage_shuffle = {k: (v / total_sum) * 100 for k, v in shuffle_body_importance.items()}
 
-    percentage_limp = sorted(percentage_limp.items(), key=lambda item: item[1])
-    percentage_shuffle = sorted(percentage_shuffle.items(), key=lambda item: item[1])
-    print(percentage_limp)
-    print(percentage_shuffle)
-    (l_lk, l_lv) = percentage_limp[-1]
-    (l_sk, l_sv) = percentage_shuffle[-1]
-    print("what are these: ", (l_lk, l_lv) , "separeate", (l_sk, l_sv) )
-    #Need to do PCA on original features 
+    total_percentages = [sorted(region_importances[i].items(), key=lambda item: item[1]) for i in range(len(region_importances))]
+    #percentage_limp = sorted(percentage_limp.items(), key=lambda item: item[1])
+    #percentage_shuffle = sorted(percentage_shuffle.items(), key=lambda item: item[1])
+    #print(percentage_limp)
+    #print(percentage_shuffle)
+    #(l_lk, l_lv) = percentage_limp[-1]
+    #(l_sk, l_sv) = percentage_shuffle[-1]
+    #print("what are these: ", (l_lk, l_lv) , "separeate", (l_sk, l_sv) )
+    ##Need to do PCA on original features 
     features.columns = ['Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
     'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', 'M_hip']
 
@@ -271,7 +254,7 @@ def k_means_experiment(data):
     # Create a new DataFrame with the combined columns
     X = features[['head', 'left_arm', 'right_arm', 'left_leg', 'right_leg', 'torso']]
     kms = KMeansInterp(
-        n_clusters=3,
+        n_clusters=num_classes,
         ordered_feature_names=X.columns.tolist(), 
         feature_importance_method='wcss_min', # or 'unsup2sup'
     ).fit(X.values)
@@ -281,7 +264,7 @@ def k_means_experiment(data):
     print("cluster 1", kms.feature_importances_[1][:10])# Features here are words
     print("cluster 2", kms.feature_importances_[2][:10])# Features here are words
     print("Accuracy", accuracy)
-    return [kms.feature_importances_[0][0], percentage_limp, percentage_shuffle], [distance_01, distance_02, distance_12], kmeans, cluster_to_class
+    return total_percentages, distances, kmeans, cluster_to_class
 
 
 def apply_grouped_pca(data):
@@ -555,32 +538,24 @@ def calculate_mean_variance(labels, coefficients, cluster_map):
     for i, (mean, var) in enumerate(mean_vars):
         print(f"Label {i}: Mean = {mean:.4f}, Variance = {var:.4f}")
 
-def unsupervised_cluster_assessment(input, output, epochs = 15):
-    print("starting")
 
+def create_feature_counts(n):
+    features = ['head', 'left_arm', 'right_arm', 'left_leg', 'right_leg', 'torso']
+    feature_counts = {i: {feature: 0 for feature in features} for i in range(n)}
+    return feature_counts
+
+def unsupervised_cluster_assessment(input, output, epochs = 15, num_classes = 3):
     data, _ = Utilities.process_data_input(input, None)
     data = stitch_data_for_kmeans(data)
     Utilities.save_dataset(data, './code/datasets/joint_data/embed_data/2_people_fixed')
-
-    feature_counts ={0: {'head': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0, 'torso': 0},
-                     1: {'head': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0, 'torso': 0},
-                     2: {'head': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0, 'torso': 0}
-                     }
-    
+    feature_counts = create_feature_counts(num_classes)
     centroid_distances = []
     for i in range(epochs):
-        [clust_1, clust_2, clust_3], [dist_01, dist_02, dist_12], k_model, cluster_map = k_means_experiment(data)
-        print("what are these: ", clust_1, clust_2, clust_3, "space: ", clust_2[0], clust_2[0][0], clust_2[0][1], type(clust_2))
-        #stop = 5/0
-        for j in range(len(clust_2)):
-            feature_counts[1][clust_2[j][0]] += clust_2[j][1]/epochs
-        for j in range(len(clust_3)):
-            feature_counts[2][clust_3[j][0]] += clust_3[j][1]/epochs
-        feature_counts[0][clust_1[0]] += 1
-        #feature_counts[1][clust_2[0]] += 1
-        #feature_counts[2][clust_3[0]] += 1
-        centroid_distances.append([dist_01, dist_02, dist_12])
-
+        cluster_percentages, distances, k_model, cluster_map = k_means_experiment(data, num_classes=num_classes) # used to be clust1,2,3
+        for j in range(len(feature_counts)):
+            for k in range(len(cluster_percentages[j])):
+                feature_counts[j][cluster_percentages[j][k][0]] += cluster_percentages[j][k][1]/epochs
+        centroid_distances.append(distances)
 
     averages = calculate_column_averages(centroid_distances)
     feature_counts = {
