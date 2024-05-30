@@ -19,6 +19,7 @@ import math
 import pandas as pd
 random.seed(42)
 import torch
+from sklearn.preprocessing import StandardScaler
 torch.manual_seed(42)
 torch.cuda.empty_cache()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -205,12 +206,11 @@ def load_datasets(types, folder, multi_dim = False, class_loc = 2, num_classes =
         print("loading dataset {} of {}. ".format(i + 1, len(types)), t)
         #Type 1: Normal, full dataset
         if t == 1:  
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/rel_data', 
-            #                            'rel_data.csv',             
-            #                                joint_connections=Render.joint_connections_n_head))   
+            #weightgait dataset
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/13_people', 
             #                '13_people.csv',             
             #                    joint_connections=Render.bottom_joint_connection, class_loc=class_loc, num_classes=num_classes))   
+            #pathological dataset and shoedata
             datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/Velocity_Data', 
                             'Velocity_Data.csv',             
                                 joint_connections=Render.bottom_joint_connection, class_loc=class_loc, num_classes=num_classes))   
@@ -308,7 +308,7 @@ def process_results(train_scores, val_scores, test_scores):
     print("mean, std and variance: {:.2f}%, {:.2f}% {:.5f}".format(mean, math.sqrt(var), var))
 
 def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load = None, leave_one_out = False, dim_out = 3, class_loc = 2, model_type = 'VAE', vae=False,
-              save_embedding = False, embedding_size = 3, gen_data = False):
+              save_embedding = False, embedding_size = 3, gen_data = False, dataset_name='shoe_data'):
     '''
     Runs the model configuration
 
@@ -400,7 +400,7 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
         embed_data = sorted(embed_data, key=lambda x: x[2])
         embed_data = reorder_instance_numbers(embed_data)
         embed_data = extract_embed_data(embed_data)
-        Utilities.save_dataset(embed_data, './code/datasets/joint_data/embed_data/Pathological_people_4')
+        Utilities.save_dataset(embed_data, f'./code/datasets/joint_data/embed_data/{dataset_name}_people_4')
 
     if save != None:
         print("saving model")
@@ -489,323 +489,48 @@ def make_comb(folder, rel_path, vel_path, bone_path):
     Creator.combine_datasets(rel, vel, None, None,
                                                 joints_output="./Code/Datasets/Joint_Data/" + str(folder) + "/comb_data_rel_vel")
     
-
 #TEMP FUNCTIONS HERE
 ########################################################################################################################################################################################### 
-def reorder_instance_numbers(data):
-    curr = -1
-    instance_no = 0
-    for i, row in enumerate(data):
-        if row[0] != curr:
-            if curr != -1:
-                instance_no += 1
-            curr = row[0]
-        data[i][0] = instance_no
 
-    return data
-
-def extract_embed_data(data):
-    new_data = []
-    for i, row in enumerate(data):
-        new_row = []
-        for j, val in enumerate(row):
-            if j <= 5: 
-                new_row.append(val)
-            else:
-                for embed in val:
-                    new_row.append(embed)
-        new_data.append(new_row)
-    return new_data
-
-def remove_z(joint_source, joint_output):
-    joints, _ = Utilities.process_data_input(joint_source, None)
-
-    for i, row in enumerate(joints):
-        for j, coord in enumerate(row):
-            if j > 5:
-                joints[i][j][2] = 0
-    
-    Utilities.save_dataset(joints, joint_output)
-    #81 vs 
-
-def replace_nans(joint_source, joint_output):
-    data, _ = Utilities.process_data_input(joint_source, None)
-    Utilities.save_dataset(data, joint_output)
-
-def convert_shoe_to_format():
-    '''Example of Python code reading the skeletons'''
-    loaded = np.load('./code/datasets/shoedata/DIRO_skeletons.npz')
-
-    #get skeleton data of size (n_subject, n_gait, n_frame, 25*3)
-    data = loaded['data']
-
-    #get joint coordinates of a specific skeleton
-    skel = data[0,0,0,:]
-    x = [skel[i] for i in range(0, len(skel), 3)]
-    y = [skel[i] for i in range(1, len(skel), 3)]
-    z = [skel[i] for i in range(2, len(skel), 3)]
-
-    #get default separation
-    separation = loaded['split']
-
-    #print information
-    print(data.shape)
-    print(separation)
-    #iterate through subjects
-    instance = 0
-    frames = []
-    for i, subject in enumerate(data):
-        print(f"subject {i} of {len(data)}")
-        for j, abnormality in enumerate(subject):
-            print(f"abnormality {j} of {len(subject)}")
-            for k, frame in enumerate(abnormality):
-                print(f"frame {k} of {len(abnormality)}")
-                meta_data = [instance, k, j, 0, 0, i]
-                sublists = [frame[i:i+3] for i in range(0, len(frame), 3)]
-                for l, coords in enumerate(sublists):
-                    #print(f"value {l} of {len(frame)}")
-                    if l < 21 and l != 1 and l != 15 and l != 19:
-                        meta_data.append([coords[0], coords[1], coords[2]])
-                #iterate instance after every series of frames
-                frames.append(meta_data)
-            instance += 1
-
-    Utilities.save_dataset(frames, './code/datasets/joint_data/shoedata/3_Absolute_Data(trimmed instances)', colnames=Utilities.colnames_midhip)
-    #try making dataframe
-
-    #expected results:
-    #(9, 9, 1200, 75)
-    #['train' 'test' 'train' 'test' 'train' 'train' 'test' 'test' 'train']
-
-def scale_values_in_data(data):
-    for i, row in enumerate(data):
-        print(f"row {i} of {len(data)}")
-        for j, coord in enumerate(row):
-            #print("in here: ", j, coord)
-            if j > 5:
-                #print("before: ", data[i][j])
-                data[i][j][0] *= 100
-                data[i][j][1] *= 100
-                data[i][j][2] *= 100
-                #print("after: ", data[i][j])
-        #stop = 5/0
-    return data
-
-import pandas as pd
-from sklearn.manifold import TSNE
-import matplotlib.pyplot as plt
-
-
-def dimensionality_reduction(data):
-    # Load sample data (digits dataset)
-    data = pd.DataFrame(data)
-    # Assuming df is your pandas DataFrame with the first 6 columns as metadata and the last column as class
-    # Remove metadata columns and keep only the features and class
-    print("data: ", data)
-    features = data.iloc[:, 6:].values
-    labels = data.iloc[:, 2].values  # Assuming class is the 3rd column
-    
-    # Initialize and fit TSNE
-    tsne = TSNE(n_components=3, random_state=42)  # Reduce to 2D
-    X_reduced = tsne.fit_transform(features)
-
-    # Plot the reduced data
-    plt.figure(figsize=(8, 8))
-    scatter = plt.scatter(X_reduced[:, 0], X_reduced[:, 1], c=labels, cmap='tab10', alpha=0.5)
-    plt.title('TSNE visualization of digits dataset')
-    plt.colorbar(scatter, label='Digit Label')
-    plt.xlabel('TSNE 1')
-    plt.ylabel('TSNE 2')
-    plt.show()
-
-def unwrap_dataset(data):
-    unwrapped = []
-    for i, row in enumerate(data):
-        unwrapped_row = []
-        for j, val in enumerate(row):
-            if j <= 5:
-                unwrapped_row.append(val)
-            else:
-                for k, coord in enumerate(val):
-                    unwrapped_row.append(coord)
-        
-        unwrapped.append(unwrapped_row)
-    return unwrapped
-
-
-def calculate_distances(centroid_A, centroid_B, point_x):
-    # Calculate Euclidean distance from point_x to centroid_A
-    print("whats point x: ", len(point_x), point_x)
-    print("whars the centroid: ", len(centroid_A), centroid_A)
-    print("centroid b: ", len(centroid_B), centroid_B)
-    #the case for comparing the relative distance from normal to abnormal
-    d_A = np.linalg.norm(np.array(point_x) - np.array(centroid_A))
-    # Calculate Euclidean distance from point_x to centroid_B
-    d_B = np.linalg.norm(np.array(point_x) - np.array(centroid_B))
-    print("distances: ", d_A, d_B, d_A == d_B)
-    return d_A, d_B
-
-def calculate_percentage_closer(d_A, d_B):
-    # Determine the closer centroid and calculate the percentage closer
-    if d_A < d_B:
-        d_min = d_A
-        d_max = d_B
-        closer_to = "A"
-    else:
-        d_min = d_B
-        d_max = d_A
-        closer_to = "B"
-    print("what are all these: ", d_A, d_B, d_max, d_min )
-    percentage_closer = ((d_max - d_min) / d_max) * 100
-    
-    return closer_to, percentage_closer
-
-def convert_to_percentage(data_dict):
-    # Calculate the total sum of all values
-    print("whats this: ", data_dict)
-    #sto = 5/0
-    percentage_dict = {}
-    for i, (key, sub_dict) in enumerate(data_dict.items()):
-        total_sum = sum(sub_dict.values())
-        
-        # Create a new dictionary with percentage values
-        sub_p_dict = {k: (v / total_sum) * 100 for k, v in sub_dict.items()}
-        percentage_dict[i] = sub_p_dict
-
-    return percentage_dict
-
-from sklearn.preprocessing import StandardScaler
-
-def list_immediate_subfolders(folder_path, limit):
-    subfolders = []
-    for name in os.listdir(folder_path):
-        full_path = os.path.join(folder_path, name)
-        if os.path.isdir(full_path):
-            subfolders.append(full_path)
-        if len(subfolders) >= limit:
-            break
-    return subfolders
-
-
-def predict_and_display(data, embed_data, image_data, original_joints, limit):
-    #First load in the raw data of 5 people
-    sub_folders = list_immediate_subfolders(image_data, limit)
-    print("subfolders; ", sub_folders)
-    #raw_images = []
-    #for folder in sub_folders:
-    #    _, raw_images = Utilities.process_data_input(None, folder, add_to_existing=True, existing = raw_images)
-    #    print("len now: ", len(raw_images))
-
-    #raw_joints, _ = Utilities.process_data_input(data, None)
-    #display_joints, _ = Utilities.process_data_input(original_joints, None)
-    #load in corresponding embedding data 
-    embed_joints, _ = Utilities.process_data_input(embed_data, None)
-
-    #print("all lens: ", len(raw_images), len(raw_joints), len(embed_joints))
-    print("embed joints: ", len(embed_joints[0]))
-
-    #split the raw data and images into blocks of 7 the same way the embedding data is set up
-    predictions, model, cluster_map, feature_counts = clustering.unsupervised_cluster_assessment(embed_joints, './code/datasets/joint_data/embed_data/proximities', epochs= 20, num_classes=6)
-    segmented_joints = clustering.stitch_data_for_kmeans(embed_joints)
-
-    segmented_joints  = pd.DataFrame(segmented_joints)
-    features = segmented_joints.iloc[:, 6:].values
-    scaler = StandardScaler()
-    features = scaler.fit_transform(features)
-    segmented_joints = clustering.apply_grouped_pca(pd.DataFrame(features))
-
-    #segmented_images = clustering.stitch_data_for_kmeans(raw_images)
-
-    centroids = model.cluster_centers_
-    #calculate their relative distance to both the normal centroid and the prediction centroid 
-    #predict confidence by inverse closeness (if it's 75% closer to 1 than 0, its 75% confidence), raw distance from normal centroid is severity, compare with outermost range of normal and innermost
-    #print the importance vectors for this cluster and the individual example
-    
-    #draw the person with their skeleton
-    #black_frame = [[0 for _ in inner_list] for inner_list in raw_images]
-    #print("how manyt: ", centroids, len(centroids)), len(feature_counts)
-
-    dimwise_scores = convert_to_percentage(feature_counts)
-    #print("here?? ", len(dimwise_scores))
-    #stop = 5/0
-    closeness_preds = []
-    for i in range(len(segmented_joints)):
-        print("\nPrediction for this clip is class: ", predictions[i][-2])
-        print("Predicted severity ", predictions[i][-1])
-        #importance vector for this cluster here printed
-        #calculate distance from both centroids 
-        d_a, d_b = calculate_distances(centroids[cluster_map[0]], centroids[cluster_map[predictions[i][-2]]], segmented_joints.iloc[i])
-        closeness = calculate_percentage_closer(d_a, d_b)
-        closeness_preds.append(closeness)
-        print("Confidence as a percentage: ", closeness if closeness != 0 else 1)
-        print("what's this here: ", predictions[i][-2])
-        print("dimwise scores: ", dimwise_scores, len(dimwise_scores))
-        print("\nThe DIMWISE scores for this cluster are: ", dimwise_scores[predictions[i][-2]])
-
-        #if i < len(display_joints) - 6:
-        #    Render.render_joints_series(black_frame, display_joints[i*6:], 6, True, False)
-
-    print("all dimwise scores for clusters: ", dimwise_scores)
-    for row, new_value in zip(predictions, closeness_preds):
-        row.append(new_value[1])
-    #column names are: [instance, no_in_instance, class, freeze, obstacle, person, cluster_prediction, severity_prediction, confidence_prediction ] 9 items
-    df = pd.DataFrame(predictions, columns=['instance', 'no_in_instance', 'class', 'freeze', 'obstacle', 'person',
-                                             'cluster_prediction', 'severity_prediction', 'confidence_prediction'])
-    print(df.head(3))
-    grouped = df.groupby('class')
-    # Dictionary to store the mean DataFrame for each group
-    mean_dfs = {}
-    # Iterate over each group and calculate the mean
-    for name, group in grouped:
-        mean_dfs[name] = group.mean()
-    # Display the result for each group
-    for key, value in mean_dfs.items():
-        print(f"Group {key}:\n{value}\n")
-
-    Utilities.save_dataset(predictions, './Code/Datasets/Joint_Data/Results')
 ###########################################################################################################################################################################################
 if __name__ == '__main__':
     #create_datasets()
-    ##apply_standard_scaler('./code/datasets/joint_Data/erin/5_Absolute_Data(scaled)/raw/5_Absolute_Data(scaled).csv',
-     #                      './code/datasets/joint_Data/erin/5_Absolute_Data(scaled)')
-
     #clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv",
     #                                            './code/datasets/joint_data/embed_data/path_proximities', epochs=50, num_classes=6)
-
-    #embed_path = "./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv"
-    #data_path = './Code/Datasets/Joint_Data/Path/Velocity_Data/raw/Velocity_Data.csv'
-    #original_joints_path = './Code/Datasets/Joint_Data/Ahmed/5_Absolute_Data(midhip)/raw/5_Absolute_Data(midhip).csv'
-    #image_path = './Code/Datasets/WeightGait/Full_Dataset/'
-    #predict_and_display(data_path, embed_path, image_path, original_joints_path, 2)
-    #stop = 5/0
-
+    embed_path = "./Code/Datasets/Joint_Data/embed_data/shoe_data_people_4/raw/shoe_data_people_4.csv"
+    data_path = './Code/Datasets/Joint_Data/Shoe_data/Velocity_Data/raw/Velocity_Data.csv'
+    image_path = './Code/Datasets/WeightGait/Full_Dataset/'
+    clustering.predict_and_display(data_path, embed_path, image_path, 2, num_classes=9, normal_class=0)
+    stop = 5/0
     #Path paths
     '''
     embed_path = "./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv"
     data_path = './Code/Datasets/Joint_Data/Path/Velocity_Data/raw/Velocity_Data.csv'
-    original_joints_path = './Code/Datasets/Joint_Data/Ahmed/5_Absolute_Data(midhip)/raw/5_Absolute_Data(midhip).csv'
     image_path = './Code/Datasets/WeightGait/Full_Dataset/'
     change dim_out to 6
     change path to 'Path'
     change processing to "Velocity_Data"
+
+    shoe data
+    embed_path = "./Code/Datasets/Joint_Data/embed_data/shoe_data_people_4/raw/shoe_data_people_4.csv"
+    data_path = './Code/Datasets/Joint_Data/Shoe_data/Velocity_Data/raw/Velocity_Data.csv'
+    image_path = './Code/Datasets/WeightGait/Full_Dataset/'
+    num classes is 9, 
+    change path to "shoedata"
+    change processing to velocity_data
     '''
     start = time.time()
     #New_Embedding_Weights
     run_model(dataset_types= [1], hcf=False,
-            batch_size = 128, epochs =80, folder="big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/", #"Path",
-            save ='12_people', load=None, leave_one_out=False, dim_out=3, class_loc=2, model_type='ST_TAGCN_Block', vae=False, save_embedding = True, embedding_size = 3, gen_data=True)
+            batch_size = 128, epochs =80, folder="Path",
+            save ='12_people', load=None, leave_one_out=False, dim_out=6, class_loc=2, model_type='ST_TAGCN_Block',
+              vae=False, save_embedding = True, embedding_size = 3, gen_data=True, dataset_name='pathological')
     end = time.time()
     print("time elapsed: ", end - start)
 
-    #process_data("erin")
 
-
-
-#notes
-#CHANGE FOLD IN CROSS VALID TO REMOVE -2
 #TODO Plan
 '''
--try on the other datasets to make sure it works
 -think about how to form it into a paper
 -   need to explain formula for calculating importance
     - need to see difference in confidence between overlaps in weightgait

@@ -4,112 +4,148 @@ This file contains all the methods related to the semi and unsupervised clusteri
 #libraries
 import numpy as np
 import copy
+import os
+import random
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.metrics import accuracy_score
 from scipy.stats import mode
+from itertools import combinations
 #dependencies
 from Programs.Data_Processing.kmeans_interp.kmeans_feature_imp import KMeansInterp
 import Programs.Data_Processing.Utilities as Utilities
 
-
-from scipy.spatial.distance import cdist
-from scipy.spatial.distance import euclidean
-
 def calculate_centroid_distance(cluster_a_centroid, cluster_b_centroid, dimension_x):
+    '''
+    Calculates the difference between the centroid of the normal cluster from all other clusters along a specific feature dimension.
+
+    Arguments
+    ---------
+    cluster_a_centroid: list(float)
+        centroid of the "normal" cluster
+    cluster_b_centroid: list(float)
+        centroid of a different cluster
+    dimension_x: int
+        index of the feature to calculate the distance between
+
+    Returns
+    -------
+    Float
+        Returns the euclidean distance between the two centroids on dimension x
+
+    '''
     # Extract the centroids of cluster_a and cluster_b
     centroid_a = cluster_a_centroid[dimension_x]
     centroid_b = cluster_b_centroid[dimension_x]
     print("centroid distances: ", centroid_a, centroid_b)
     # Calculate the absolute distance between the centroids along dimension_x
     distance = np.abs(centroid_a - centroid_b)
-
     return distance
 
 def calculate_distance_ranges(cluster_data, first_cluster_data, dimension_x):
+    '''
+    Calculates the maximum and minimum distances of instances in two clusters along a specified dimension
+
+    Arguments
+    ---------
+    cluster_data: Pandas.Dataframe
+        dataframe for all instances in a cluster
+    first_cluster_data: Pandas.Dataframe
+        dataframe for all instances in the "normal" cluster
+    dimension_x: int
+        index of the feature to calculate the distances between
+
+    Returns
+    -------
+    Float, Float
+        Returns the maximum and minimum euclidean distances between the two clusters on dimension x
+
+    '''
     # Select data points belonging to cluster_a and cluster_b
-    cluster_a_points = cluster_data.values.tolist()# cluster_data[cluster_labels == cluster_a]
+    cluster_a_points = cluster_data.values.tolist()
     first_cluster_points = first_cluster_data.values.tolist()
     # Compute distances from cluster_a to cluster_b and vice versa along dimension_x
-    print("CLUSTER DATA RANGE: ", cluster_data.shape)
     cluster_a_points = cluster_data.iloc[:, dimension_x].values  # Assuming x is the index, use .values to get the numpy array
     first_cluster_points = first_cluster_data.iloc[:, dimension_x].values  # Assuming x is the index, use .values to get the numpy array
-
     # Compute pairwise distances
     distances = np.abs(cluster_a_points[:, np.newaxis] - first_cluster_points)
-
- 
     return distances.min(), distances.max()
-from sklearn.metrics import adjusted_rand_score
-from scipy.spatial import distance
+
 def calculate_overlap_percentage(cluster_data, first_cluster_data, centroid_a, centroid_b, dimension):
+    '''
+    Calculates the overlap between two clusters along a specified dimension
+
+    Arguments
+    ---------
+    cluster_data: Pandas.Dataframe
+        dataframe for all instances in a cluster
+    first_cluster_data: Pandas.Dataframe
+        dataframe for all instances in the "normal" cluster
+    centroid_a: Pandas.Series
+        centroid of cluster data
+    centroid_b: Pandas.Series
+        centroid of first_cluster_data
+    dimension: int
+        index of the feature to calculate the overlap between
+
+    Returns
+    -------
+    Float
+        Returns the intersection ratio between the two clusters on the specified dimensional plane
+
+    '''
     # Extract the specified dimension from each dataframe
     df1_dimension = cluster_data.iloc[:, dimension].values
     df2_dimension = first_cluster_data.iloc[:, dimension].values
-    
     # Calculate distances from each point to both centroids for dataframe A
     distances_to_a = np.abs(df1_dimension - centroid_a[dimension])
     distances_to_b = np.abs(df1_dimension - centroid_b[dimension])
-    
     # Count points closer to centroid B than centroid A in dataframe A
     count_a_to_b = np.sum(distances_to_b < distances_to_a)
-    
     # Calculate distances from each point to both centroids for dataframe B
     distances_to_a = np.abs(df2_dimension - centroid_a[dimension])
     distances_to_b = np.abs(df2_dimension - centroid_b[dimension])
-    
     # Count points closer to centroid B than centroid A in dataframe B
     count_b_to_b = np.sum(distances_to_b < distances_to_a)
-    
     # Calculate intersection count
     intersection_count = min(count_a_to_b, count_b_to_b)
-    
     # Calculate total number of points across both dataframes
     total_points = len(df1_dimension) + len(df2_dimension)
-    
     # Calculate intersection ratio
     intersection_ratio = intersection_count / total_points
-    
     return intersection_ratio
 
-from itertools import combinations
-def max_distance_between_centroids(centroids):
-    max_distance = 0
-    # Generate combinations of centroids
-    centroid_combinations = combinations(centroids, 2)
-    # Calculate distance between each pair of centroids
-    for centroid_pair in centroid_combinations:
-        distance = np.linalg.norm(centroid_pair[0] - centroid_pair[1])
-        if distance > max_distance:
-            max_distance = distance
-    return max_distance
-
 def k_means_experiment(data, num_classes = 3):
+    '''
+    Runs a single k-means model on the data to get the clustered predictions
+
+    Arguments
+    ---------
+    data: List(List)
+        input data in the correct format 
+    num_classes: int (optional: default = 3)
+        number of output classes to expect and to initialize the k-means model to.
+
+    Returns
+    -------
+    List(int), List(float), K-means.model, dict(int:int)
+        Returns the percentage importance of each feature, their distance values from the "normal" centroid, the trained model and a 
+        dictionary indicating the mapping from the models predicted classes from 0-n to the actual order of those classes in the data.
+    '''
     data = pd.DataFrame(data)
     # Remove metadata columns and keep only the features and class
     features = data.iloc[:, 6:].values
     labels = data.iloc[:, 2].values 
 
+    # Standardize the features
     scaler = StandardScaler()
     features = scaler.fit_transform(features)
-
-    # Standardize the features
     # Separate the data into labeled and unlabeled based on the class label
-    '''
-    labeled_indices = np.where(labels == 0)[0]
-    unlabeled_indices = np.where(labels != 0)[0]
-
-    labeled_data = features[labeled_indices]
-    unlabeled_data = features[unlabeled_indices]
-    labeled_data  = labeled_data.tolist()
-    '''
     features = apply_grouped_pca(pd.DataFrame(features))
     pca_data_table = features.copy()
     pca_data_table['labels'] = labels
-
-    print("feature shape: ", features.shape)
 
     # Initialize and fit KMeans model on the training data
     kmeans = KMeans(n_clusters=num_classes)  # Assuming 3 clusters for the three classes
@@ -123,7 +159,6 @@ def k_means_experiment(data, num_classes = 3):
         mask = cluster_labels == i
         cluster_to_class[i] = int(mode(labels[mask]).mode[0])
         
-
     # Map the cluster labels to the true class labels
     predicted_labels = np.array([cluster_to_class[cluster] for cluster in cluster_labels])
     accuracy = accuracy_score(labels, predicted_labels)
@@ -136,10 +171,6 @@ def k_means_experiment(data, num_classes = 3):
         arranged_centroids[new_index] = centroids[original_index]
 
     distances = [np.linalg.norm(centroids[0] - centroids[i]) for i in range(1, len(centroids)) ]
-    #distance_01 = np.linalg.norm(centroids[0] - centroids[1])  # Distance between cluster 0 and 1
-    #distance_02 = np.linalg.norm(centroids[0] - centroids[2])  # Distance between cluster 0 and 2
-    #distance_12 = np.linalg.norm(centroids[1] - centroids[2])  # Distance between cluster 1 and 2
-
     # Step 3: Calculate feature variability within each cluster
     cluster_variances = []
     cluster_datasets = []
@@ -150,31 +181,20 @@ def k_means_experiment(data, num_classes = 3):
         cluster_variance = cluster_data.var()
         cluster_variances.append(cluster_variance)
         
-    print("cluster variances: ", type(cluster_variances[0]), cluster_variances[0][0])
-    # Combine the feature differences and variabilities to rank features for each cluster
-    # Create a dictionary to store the importance scores
-    #feature_importance = {}
     all_importances  = []
-    max_dist = max_distance_between_centroids(centroids)
     for feature_index in range(18):
-        print("FEATURE INDEX: ", feature_index)
         importance_scores = []
         for cluster in range(1,num_classes):
-            # calculate each abnormal cluster with initial cluster
-            #f=σf2​1​(1+similarityf,α,β​)+max(⋅)−min(⋅)∣μα​−μβ​∣​
-
             '''
             Feature importance f = 1/cluster_variance_f  * (1 + cluster_overlap for feature f between cluster a and b)
               + (abs(centroid_a - centroid_b) / the maximum feature value across clusters a and b - the minimum feature value across clusters a and b)
             '''
-            print("variance: ", cluster, feature_index, cluster_variances[cluster][feature_index])
             w1 = 1.0
             w2 = 0.5
             w3 = 1.0
             cluster_variance_inv = 1/cluster_variances[cluster][feature_index]
             cluster_variance_inv *= w1
             cluster_overlap_f = calculate_overlap_percentage(cluster_datasets[cluster], cluster_datasets[0], centroids[cluster], centroids[0], dimension=feature_index)
-            #cluster_overlap_f += 1
             cluster_overlap_f *= w2
             centroid_dist_f = calculate_centroid_distance(centroids[cluster], centroids[0], feature_index) 
             norm_centroid_dist_f = centroid_dist_f# / max_dist
@@ -182,30 +202,20 @@ def k_means_experiment(data, num_classes = 3):
             feature_importance_f = (cluster_variance_inv * cluster_overlap_f) * norm_centroid_dist_f
             # Example usage:
 
-            print("Overlap percentages along dimension x for each cluster:", cluster_variance_inv, cluster_overlap_f, centroid_dist_f)
-            print("final feature importance: ", feature_importance_f)
             if pd.isna(feature_importance_f):
                 feature_importance_f = 0.0
-            #importance = 1 / ((cluster_variances[cluster][feature_index] * centroid_differences[feature_index]) + 0.0001)
 
             importance_scores.append([cluster, feature_importance_f])
         all_importances.append(importance_scores)
-    for imp in all_importances:
-        print("final importance scores: ", imp)
 
     class_importances = []
     for i in range(len(all_importances)):
         for j in range(num_classes-1):
-            print("what's this: ", all_importances[j], num_classes, len(all_importances[j]), j)
             class_importances.append([row[j] for row in all_importances])
-    #limp_importance = [row[0] for row in all_importances]
-    #shuffle_importance = [row[1] for row in all_importances]
 
-    print("class importances: ", class_importances)
     #features.columns = ['Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
     #'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', 'M_hip']
     region_importances = [{'head':0, 'torso': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0} for i in range(len(all_importances))]
-    #limp_body_importance = {'head':0, 'torso': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0}
     for i, region_importance in enumerate(region_importances):
             for ind, importance in enumerate(class_importances[i]):
                 print("ind and importance: ", ind, importance)
@@ -227,20 +237,9 @@ def k_means_experiment(data, num_classes = 3):
 
     total_sums = [sum(region_importances[i].values()) for i in range(len(region_importances))]
     # Replace each value with its percentage of the total sum
-    total_percentages = {k: (v / total_sums[i]) * 100 for k, v in region_importances[i].items() for i in range(len(region_importances))}
-    #total_sum = sum(limp_body_importance.values())
-    # Replace each value with its percentage of the total sum
-    #percentage_shuffle = {k: (v / total_sum) * 100 for k, v in shuffle_body_importance.items()}
+    total_percentages = {k: (v / (total_sums[i] + 0.0001)) * 100 for k, v in region_importances[i].items() for i in range(len(region_importances))}
 
     total_percentages = [sorted(region_importances[i].items(), key=lambda item: item[1]) for i in range(len(region_importances))]
-    #percentage_limp = sorted(percentage_limp.items(), key=lambda item: item[1])
-    #percentage_shuffle = sorted(percentage_shuffle.items(), key=lambda item: item[1])
-    #print(percentage_limp)
-    #print(percentage_shuffle)
-    #(l_lk, l_lv) = percentage_limp[-1]
-    #(l_sk, l_sv) = percentage_shuffle[-1]
-    #print("what are these: ", (l_lk, l_lv) , "separeate", (l_sk, l_sv) )
-    ##Need to do PCA on original features 
     features.columns = ['Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
     'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', 'M_hip']
 
@@ -260,61 +259,72 @@ def k_means_experiment(data, num_classes = 3):
     ).fit(X.values)
 
     # A dictionary where the key [0] is the cluster label, and [:10] will refer to the first 10 most important features
-    print("cluster 0", kms.feature_importances_[0][:10])# Features here are words
-    print("cluster 1", kms.feature_importances_[1][:10])# Features here are words
-    print("cluster 2", kms.feature_importances_[2][:10])# Features here are words
     print("Accuracy", accuracy)
     return total_percentages, distances, kmeans, cluster_to_class
 
 
-def apply_grouped_pca(data):
+def apply_grouped_pca(data, num_groups = 18):
+    '''
+    Apply Principal Component Analysis to the grouped data, converting embedded 7-frame long pieces of data into a single frame embedding
+
+    Arguments
+    ---------
+    data: List(List)
+        input data in the correct format 
+    num_groups: int (optional, default = 18)
+        number of nodes to expect per-frame
+
+    Returns
+    -------
+    Pandas.Dataframe
+        A dataframe of the newly converted PCA data.
+    '''
    # Initialize a list to store the PCA features for each group
     pca_features = []
-
-    # Number of groups
-    num_groups = 18
 
     # Apply PCA to each group of 6 features
     for group_num in range(num_groups):
         # Calculate the indices for the current group
         feature_indices = [group_num + i * num_groups for i in range(6)]
-        
         # Select the group of 6 features
         feature_group = data.iloc[:, feature_indices]
-        
         # Initialize PCA
         pca = PCA(n_components=1)  # Assuming you want to keep 1 principal component per group
-        
         # Fit PCA to the feature group and transform it
         pca_result = pca.fit_transform(feature_group)
-        
         # Append the PCA feature to the list
         pca_features.append(pca_result.flatten())
 
     # Concatenate the PCA features into a DataFrame
     pca_df = pd.DataFrame(pca_features).T
-
     # Rename the columns to represent the PCA features
     pca_df.columns = [f'PCA_Feature_{group_num + 1}' for group_num in range(num_groups)]
-
-    # Display the resulting DataFrame
     return pca_df
 
-
 def apply_standard_scaler(data, output):
+    '''
+    Apply a standard scaler to the data to assist in k-means convergence
+
+    Arguments
+    ---------
+    data: List(List)
+        input data in the correct format 
+    output : str
+        the file location for the outputted data
+
+    Returns
+    -------
+    Pandas.Dataframe
+        A dataframe of the newly converted PCA data.
+    '''
     data, _ = Utilities.process_data_input(data, None)
     #remove all metadata
     meta_data = [row[:6] for row in data]
     joints_data = [row[6:] for row in data]
-    print("correct?, ", meta_data[0])
-    print("and this: ", joints_data[0])
     #unwrap all joints
     unwrapped_joints = [[value for sublist in row for value in sublist] for row in joints_data]
-    print("unwrap: ", unwrapped_joints[0], len(unwrapped_joints[0]))
     #apply scaler
-    # Initialize StandardScaler
     scaler =  MinMaxScaler(feature_range=(0, 1))
-
     # Fit the scaler to your data (calculate mean and standard deviation)
     scaler.fit(unwrapped_joints)
 
@@ -333,89 +343,41 @@ def apply_standard_scaler(data, output):
         joints_row.append(copy.deepcopy(coord))
         rewrapped_joints.append(joints_row)
 
-    #print("rewrapped: ", rewrapped_joints[0], len(rewrapped_joints[0]))
-    #stop = 5/0
-    #readd metadata
     for i, row in enumerate(rewrapped_joints):
-        #print("prior:", rewrapped_joints[i])
-        #print("sizes? ", len(rewrapped_joints[i]))
         rewrapped_joints[i][:0] = meta_data[i]
-        #print("readded:", rewrapped_joints[i])
-        #print("sizes? ", len(rewrapped_joints[i]))
-        #stop = 5/0
-
     Utilities.save_dataset(rewrapped_joints, output)
 
 def stitch_data_for_kmeans(data):
+    '''
+    Stitches the per-frame dataset into sequences of 7 frames, essentially turning them into the same format as they are in the
+    custom datasets based on pytorch datasets in this codebase.
+
+    Arguments
+    ---------
+    data: List(List)
+        input data in the correct format 
+
+    Returns
+    -------
+    List(List)
+        The data in the new sequential format.
+    '''
     new_data = []
     new_row = []
     counter = 0
     for i, row in enumerate(data):
-        #print("length after row: ", i , len(new_row))
         if counter == 6 and i != 0:
-            #print("counter called at :", i, len(new_row))
             new_data.append(copy.deepcopy(new_row))
             new_row = []
             counter = 0
 
-        #print("row len: ", i, len(row))
         for j, val in enumerate(row):
             if len(new_row) < 6:
                 new_row.append(val)
             elif j > 5: 
                 new_row.append(val)
-
-        
         counter += 1
     return new_data
-
-import random
-
-def remove_incorrect_predictions(data):
-    new_data = []
-    print("original : ", len(data))
-    for i, row in enumerate(data):
-        if row[2] == 0 and data[i][6] == 1:
-            new_data.append(row)
-        elif row[2] == 1 and data[i][7] == 1:
-            new_data.append(row)
-        elif row[2] == 2 and data[i][8] == 1:
-            new_data.append(row)
-    print("final: ", len(new_data))
-    return new_data
-
-def fix_incorrect_data(data):
-    for i, row in enumerate(data):
-        if row[2] == 0:
-            data[i][6] = random.uniform(0.7, 1.0)
-            data[i][7] = random.uniform(0.2, 0.6)
-            data[i][8] = random.uniform(0.0, 0.8)
-        elif row[2] == 1:
-            data[i][6] = random.uniform(0.2, 0.6)
-            data[i][7] = random.uniform(0.7, 1.0)
-            data[i][8] = random.uniform(0.0, 0.8)
-        elif row[2] == 2:  
-            data[i][6] = random.uniform(0.0, 0.8)
-            data[i][7] = random.uniform(0.2, 0.6)
-            data[i][8] = random.uniform(0.7, 1.0)
-    return data
-
-def calculate_column_averages(data):
-    # Initialize sums for each column
-    col_sums = [0, 0, 0]
-
-    # Iterate through each sublist (row)
-    for row in data:
-        # Accumulate the sum for each column
-        col_sums[0] += row[0]
-        col_sums[1] += row[1]
-        col_sums[2] += row[2]
-
-    # Calculate the average for each column
-    num_rows = len(data)
-    col_averages = [col_sums[i] / num_rows for i in range(3)]
-
-    return col_averages
 
 def map_predictions(predictions, cluster_map):
     """
@@ -445,39 +407,26 @@ def predict_and_calculate_proximity(kmeans_model, data_df, metadata, cluster_map
     Returns:
     DataFrame: A DataFrame with the predictions and proximity values.
     """
-    # Convert the DataFrame to a NumPy array for efficient calculation
     data_array = data_df.to_numpy()
-    
     # Predict the clusters for each instance using the KMeans model
     cluster_predictions = kmeans_model.predict(data_array)
-
     cluster_predictions = map_predictions(cluster_predictions, cluster_map)
-    #cluster_accuracy = accuracy_score(labels, cluster_predictions)
-    ##print("accuracy in here: ", cluster_accuracy)
     
     # Get the centroids from the KMeans model
     centroids = kmeans_model.cluster_centers_
-    
-    # List to store the proximity values for each instance
     proximities = []
-
     # Calculate proximity to each centroid for each data instance
     for instance in data_array:
         # Calculate distances to each centroid
         distances = [np.linalg.norm(instance - centroid) for centroid in centroids]
-        
         # Append the list of distances to the proximities list
-        print("appending: ", distances)
         new_array = [None] * len(distances)
         for key, value in cluster_map.items():
             new_array[key] = distances[value]
         proximities.append(new_array)
-    
-    print("what's the cluster map: ", cluster_map)
-    
+       
     # Create a new DataFrame with predictions and proximities
     result_df = metadata
-    print("len of proximities: ", len(proximities))
     for i, v in enumerate(proximities):
         proximities[i] = gait_coefficient(v, cluster_predictions[i])
     result_df['Cluster'] = cluster_predictions
@@ -501,17 +450,8 @@ def gait_coefficient(distances, cluster_prediction, weights = [1.0, 1.0, 1.0]):#
         float: Coefficient representing how far the individual's gait pattern is from regular gait.
     """
     # Calculate the weighted distances to clusters 1 and 2 relative to the distance to cluster 0
-    print("what are these:", distances, cluster_prediction)
+    #print("what are these:", distances, cluster_prediction)
 
-    return distances[0]
-    if cluster_prediction == 0:
-        return distances[0]
-    else:
-        for i in range(1, len(distances)):
-            if cluster_prediction == i:
-                return weights[i] * (distances[i] / distances[0])
-    
-    print("error here, returning distances 0: ", cluster_prediction)
     return distances[0]
 
 def calculate_mean_variance(labels, coefficients, cluster_map):
@@ -538,13 +478,45 @@ def calculate_mean_variance(labels, coefficients, cluster_map):
     for i, (mean, var) in enumerate(mean_vars):
         print(f"Label {i}: Mean = {mean:.4f}, Variance = {var:.4f}")
 
-
 def create_feature_counts(n):
+    '''
+    Utility function to create an empty container in the format required for the feature importance calculations
+
+    Arguments
+    ---------
+    n: int
+        number of classes, generating one unique row for each.
+
+    Returns
+    -------
+    Dict(Dict)
+        An empty container ready for feature importance aggregation.
+    '''
     features = ['head', 'left_arm', 'right_arm', 'left_leg', 'right_leg', 'torso']
     feature_counts = {i: {feature: 0 for feature in features} for i in range(n)}
     return feature_counts
 
 def unsupervised_cluster_assessment(input, output, epochs = 15, num_classes = 3):
+    '''
+    Main function for running n k-means models and calculating the mean importances of groups of features.
+
+    Arguments
+    ---------
+    input: str
+        file string for the input data
+    output: str
+        file string location for the outputted results
+    epochs: int (optional, default = 15)
+        number of experiments to run to get the mean from
+    num_classes: int (optional, default = 3)
+        number of classes in the data
+
+    Returns
+    -------
+    Pandas.Dataframe, K_means.model, dict(dict), dict(dict)
+        returns the results in a dataframe, the latest k-means model for further analysis, the mapping dictionary for the cluster-to-class
+        and the feature importances 
+    '''
     data, _ = Utilities.process_data_input(input, None)
     data = stitch_data_for_kmeans(data)
     Utilities.save_dataset(data, './code/datasets/joint_data/embed_data/2_people_fixed')
@@ -557,7 +529,7 @@ def unsupervised_cluster_assessment(input, output, epochs = 15, num_classes = 3)
                 feature_counts[j][cluster_percentages[j][k][0]] += cluster_percentages[j][k][1]/epochs
         centroid_distances.append(distances)
 
-    averages = calculate_column_averages(centroid_distances)
+    #averages = calculate_column_averages(centroid_distances)
     feature_counts = {
         outer_k: {inner_k: round(inner_v, 2) for inner_k, inner_v in outer_v.items()}
         for outer_k, outer_v in feature_counts.items()
@@ -566,9 +538,6 @@ def unsupervised_cluster_assessment(input, output, epochs = 15, num_classes = 3)
         k: {ik: iv for ik, iv in sorted(v.items(), key=lambda item: item[1], reverse=True)}
         for k, v in feature_counts.items()
     }
-
-    print("feature counts: ", feature_counts)
-    print("centroid distances: ", averages)
 
     #process data for k-means experiments
     data  = pd.DataFrame(data)
@@ -581,3 +550,182 @@ def unsupervised_cluster_assessment(input, output, epochs = 15, num_classes = 3)
     #Add column names
     Utilities.save_dataset(result_df, output)
     return result_df, k_model, cluster_map, feature_counts
+
+def calculate_distances(centroid_A, centroid_B, point_x):
+    '''
+    Utility function to calculate the distance of an instance from both the normal class and its designated class.
+
+    Arguments
+    ---------
+    centroid_A: List(float)
+        Co-ordinates of the normal centroid
+    centroid_B: List(float)
+        Co-ordinates of the designated cluster centroid of point_x
+    point_x: List(float)
+        The instance being examined
+
+    Returns
+    -------
+    Float, Float
+        The distances between A and B and point x in euclidean terms.
+    '''
+    # Calculate Euclidean distance from point_x to centroid_A
+    #the case for comparing the relative distance from normal to abnormal
+    d_A = np.linalg.norm(np.array(point_x) - np.array(centroid_A))
+    # Calculate Euclidean distance from point_x to centroid_B
+    d_B = np.linalg.norm(np.array(point_x) - np.array(centroid_B))
+    return d_A, d_B
+
+def calculate_percentage_closer(d_A, d_B):
+    '''
+    Utility function to calculate which of the two centroids are closer, and assigning values accordingly.
+
+    Arguments
+    ---------
+    d_A: float
+        distance from the normal centroid
+    d_b: float
+        distance from the designated centroid
+
+    Returns
+    -------
+    str, float
+        returns which of the two the point is closer to, and by what percentage ratio.
+    '''
+    # Determine the closer centroid and calculate the percentage closer
+    if d_A < d_B:
+        d_min = d_A
+        d_max = d_B
+        closer_to = "A"
+    else:
+        d_min = d_B
+        d_max = d_A
+        closer_to = "B"
+    percentage_closer = ((d_max - d_min) / d_max) * 100
+    return closer_to, percentage_closer
+
+def convert_to_percentage(data_dict):
+    '''
+    Utility function to relativize feature importance scores so they add up to 1
+
+    Arguments
+    ---------
+    data_dict: Dict(dict)
+        dictionary of feature importances
+
+    Returns
+    -------
+    Dict(Dict)
+        the same dictionary with their values replaced from raw values to percentage values
+    '''
+    # Calculate the total sum of all values
+    percentage_dict = {}
+    for i, (key, sub_dict) in enumerate(data_dict.items()):
+        total_sum = sum(sub_dict.values())
+        # Create a new dictionary with percentage values
+        sub_p_dict = {k: (v / (total_sum + 0.0001)) * 100 for k, v in sub_dict.items()}
+        percentage_dict[i] = sub_p_dict
+    return percentage_dict
+
+def list_immediate_subfolders(folder_path, limit):
+    '''
+    Utility function to extract n subfolders of images to prevent loading all or any of them depending on use case.
+
+    Arguments
+    ---------
+    folder_path: str
+        Root directory for the images associated to the dataset if they exist.
+    limit: int
+        The number of subfolders to include
+
+    Returns
+    -------
+    List(str)
+        the list of selected subfolders by their path
+    '''
+    subfolders = []
+    for name in os.listdir(folder_path):
+        full_path = os.path.join(folder_path, name)
+        if os.path.isdir(full_path):
+            subfolders.append(full_path)
+        if len(subfolders) >= limit:
+            break
+    return subfolders
+
+def predict_and_display(data, embed_data, image_data, limit, num_classes = 3, normal_class = 0):
+    '''
+    Function to carry out and (in future) display examples of gait sequences with their predicted cluster and said gaits level of 
+    severity.
+
+    Arguments
+    ---------
+    data: List(List)
+        un-changed input data prior to embedding or other transformation
+    embed_data: List(List)
+        corresponding data after being passed into embedding space by ST-TAGCN
+    image_data: List(List)
+        Image data to display along with examples if needed
+    num_classes: int (optional, default = 3)
+        Number of classes exhibited in the data
+    normal_class: int (optional, default = 0)
+        Index in the data denoting "normal" gait. Usually but not always the first example
+
+    Returns
+    -------
+    None
+    '''
+    #First load in the raw data of 5 people
+    sub_folders = list_immediate_subfolders(image_data, limit)
+    #load in corresponding embedding data 
+    embed_joints, _ = Utilities.process_data_input(embed_data, None)
+
+    #split the raw data and images into blocks of 7 the same way the embedding data is set up
+    predictions, model, cluster_map, feature_counts = unsupervised_cluster_assessment(embed_joints, './code/datasets/joint_data/embed_data/proximities', epochs= 20, num_classes=num_classes)
+    segmented_joints = stitch_data_for_kmeans(embed_joints)
+
+    segmented_joints  = pd.DataFrame(segmented_joints)
+    features = segmented_joints.iloc[:, 6:].values
+    scaler = StandardScaler()
+    features = scaler.fit_transform(features)
+    segmented_joints = apply_grouped_pca(pd.DataFrame(features))
+    centroids = model.cluster_centers_
+    #calculate their relative distance to both the normal centroid and the prediction centroid 
+    #predict confidence by inverse closeness (if it's 75% closer to 1 than 0, its 75% confidence), raw distance from normal centroid is severity, 
+    #compare with outermost range of normal and innermost
+    #print the importance vectors for this cluster and the individual example
+    
+    #draw the person with their skeleton
+    #black_frame = [[0 for _ in inner_list] for inner_list in raw_images]
+    dimwise_scores = convert_to_percentage(feature_counts)
+    closeness_preds = []
+    for i in range(len(segmented_joints)):
+        print("\nPrediction for this clip is class: ", predictions[i][-2])
+        print("Predicted severity ", predictions[i][-1])
+        #importance vector for this cluster here printed
+        #calculate distance from both centroids 
+        d_a, d_b = calculate_distances(centroids[cluster_map[normal_class]], centroids[cluster_map[predictions[i][-2]]], segmented_joints.iloc[i])
+        closeness = calculate_percentage_closer(d_a, d_b)
+        closeness_preds.append(closeness)
+        print("Confidence as a percentage: ", closeness if closeness != 0 else 1)
+        print("what's this here: ", predictions[i][-2])
+        print("dimwise scores: ", dimwise_scores, len(dimwise_scores))
+        print("\nThe DIMWISE scores for this cluster are: ", dimwise_scores[predictions[i][-2]])
+
+    print("all dimwise scores for clusters: ", dimwise_scores)
+    for row, new_value in zip(predictions, closeness_preds):
+        row.append(new_value[1])
+    #column names are: [instance, no_in_instance, class, freeze, obstacle, person, cluster_prediction, severity_prediction, confidence_prediction ] 9 items
+    df = pd.DataFrame(predictions, columns=['instance', 'no_in_instance', 'class', 'freeze', 'obstacle', 'person',
+                                             'cluster_prediction', 'severity_prediction', 'confidence_prediction'])
+    print(df.head(3))
+    grouped = df.groupby('class')
+    # Dictionary to store the mean DataFrame for each group
+    mean_dfs = {}
+    # Iterate over each group and calculate the mean
+    for name, group in grouped:
+        mean_dfs[name] = group.mean()
+    # Display the result for each group
+    for key, value in mean_dfs.items():
+        print(f"Group {key}:\n{value}\n")
+
+    Utilities.save_dataset(predictions, './Code/Datasets/Joint_Data/Results')

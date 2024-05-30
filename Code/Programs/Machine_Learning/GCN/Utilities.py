@@ -344,7 +344,6 @@ def test(model, loaders, generator, validation, train = False, device = 'cuda', 
 
     return total_loss, acc, all_pred, all_y
 
-
 def load_whole_dataset(folder_names, file_name, col_names = Utilities.colnames_midhip):
     '''
     Load one or a series of datasets
@@ -462,47 +461,80 @@ def get_gait_segments(joint_data):
             segment.append(frame)
     return segments
 
-
 def convert_embed_to_reg_data(data, ys, batch_size):
+    '''
+    Converts embedded feature data files into gait graphs for processing
+
+    Arguments
+    ---------
+    data: List(List())
+        embedded data
+    ys: List(int)
+        corresponding class labels
+    batch_size: int
+        size of torch batches to segment the data into
+    
+    Returns
+    -------
+    List(List())
+        returns the embedded feature dataset in the form of gait segments
+    '''
     output_data = []
     instance_count = 0
     for i, batch in enumerate(data):
-        #print(f'batch {i} of {len(data)}')
         #Split tensor into 32 sections of size [108, 3]
         data_cycles = torch.chunk(batch, batch_size, dim=0)
-        #print("data cycles: ", len(data_cycles), type(data_cycles))
-        print("full ", len(data_cycles), len(ys[i][0]), len(batch))
         y_cycle = torch.chunk(ys[i][0], batch_size, dim=0)
-        print("ys: ", len(y_cycle))
-        #print("y: ", ys)
-        # Split each of the 32 sections into 6 sections of size [18, 3]
-
-        #INVESTIGATE THIS TO SEE IF THIS IS WHERE THE PROBLEM OCCURS 
         frames = [torch.chunk(section, 6, dim=0) for section in data_cycles]
-        #print("frames: ", len(frames), frames[0])
         curr_y = 0
         for j, frame_batch in enumerate(frames):
-            #print("frame batch: ", len(frame_batch))
             curr_y += 1
             for k, frame in enumerate(frame_batch):
                 list_frame = frame.tolist()
-                #print("frame now: ", list_frame, list_frame[0])
-                m_val = max(list_frame[0])
-                #for l, t in enumerate(list_frame[0]):
-                    #print("t: ", t)
-                #    if list_frame[0][l] != m_val:
-                #        list_frame[0][l] = 0
-                #    else:
-                #        list_frame[0][l] = 1
-                #print("after transformation: ", list_frame)
-                #print("issue: ", y_cycle[j])
-                #print("full: ", y_cycle)
                 meta_data = [instance_count,k,y_cycle[j].item(), 0,0,0]
                 for val in list_frame:
                     meta_data.append(val)
-                #print("final metadata: ", meta_data, len(meta_data))
-                #stop = 5/0
 
                 output_data.append(meta_data)
             instance_count += 1
     return output_data
+
+def convert_shoe_to_format(input_file ='./code/datasets/shoedata/DIRO_skeletons.npz'):
+    '''
+    Converts the shoe padding dataset into a format processable by this platform
+
+    Arguments
+    ---------
+    input_file: str (optional, default: './code/datasets/shoedata/DIRO_skeletons.npz')
+        location for the npz file containing the skeletal information
+    
+    Returns
+    -------
+    List(List())
+        returns the shoe dataset in the standard multi-dimensional python list form used by this platform.
+    '''
+    loaded = np.load(input_file)
+    #get skeleton data of size (n_subject, n_gait, n_frame, 25*3)
+    data = loaded['data']
+    #print information
+    print(data.shape)
+    #iterate through subjects
+    instance = 0
+    frames = []
+    for i, subject in enumerate(data):
+        print(f"subject {i} of {len(data)}")
+        for j, abnormality in enumerate(subject):
+            print(f"abnormality {j} of {len(subject)}")
+            for k, frame in enumerate(abnormality):
+                print(f"frame {k} of {len(abnormality)}")
+                meta_data = [instance, k, j, 0, 0, i]
+                sublists = [frame[i:i+3] for i in range(0, len(frame), 3)]
+                for l, coords in enumerate(sublists):
+                    #print(f"value {l} of {len(frame)}")
+                    if l < 21 and l != 1 and l != 15 and l != 19:
+                        meta_data.append([coords[0], coords[1], coords[2]])
+                #iterate instance after every series of frames
+                frames.append(meta_data)
+            instance += 1
+
+    Utilities.save_dataset(frames, './code/datasets/joint_data/shoedata/3_Absolute_Data(trimmed instances)', colnames=Utilities.colnames_midhip)
