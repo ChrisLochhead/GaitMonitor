@@ -220,9 +220,9 @@ def k_means_experiment(data, num_classes = 3):
             for ind, importance in enumerate(class_importances[i]):
                 print("ind and importance: ", ind, importance)
                 if ind in [1,2,3,4]: #1,2,3,4
-                    region_importances[i]['head'] += importance[1] * 0.4
+                    region_importances[i]['head'] += importance[1]# * 0.4
                 elif ind in [0,17]: #0,17
-                    region_importances[i]['torso'] += importance[1] * 0.4
+                    region_importances[i]['torso'] += importance[1]# * 0.4
                 elif ind in [5, 7,9]:
                     region_importances[i]['left_arm'] += importance[1]
                 elif ind in [6, 8,10]:
@@ -395,16 +395,22 @@ def map_predictions(predictions, cluster_map):
     
     return mapped_predictions
 
-def predict_and_calculate_proximity(kmeans_model, data_df, metadata, cluster_map):
+def predict_and_calculate_proximity(kmeans_model, data_df, metadata, cluster_map, feature_counts, normal_class):
     """
     Predicts the cluster each data instance belongs to and calculates the proximity (distance)
     to each of the k-means model's centroids.
     
-    Parameters:
-    kmeans_model (KMeans): The trained KMeans model.
-    data_df (DataFrame): The DataFrame containing data instances.
+    Parameters
+    -----------------------
+    kmeans_model (KMeans):
+        The trained KMeans model.
+    data_df (DataFrame):
+        The DataFrame containing data instances.
+    normal_class: int (optional, default = 0)
+        Index in the data denoting "normal" gait. Usually but not always the first example
 
-    Returns:
+    Returns
+    -----------------------
     DataFrame: A DataFrame with the predictions and proximity values.
     """
     data_array = data_df.to_numpy()
@@ -428,13 +434,14 @@ def predict_and_calculate_proximity(kmeans_model, data_df, metadata, cluster_map
     # Create a new DataFrame with predictions and proximities
     result_df = metadata
     for i, v in enumerate(proximities):
-        proximities[i] = gait_coefficient(v, cluster_predictions[i])
+        print("proximityL: ", len(proximities))
+        proximities[i] = gait_coefficient(v, cluster_predictions[i], feature_importances=feature_counts, normal_class=normal_class)
     result_df['Cluster'] = cluster_predictions
     result_df['Severity coefficient'] = proximities
     calculate_mean_variance(result_df['Cluster'], result_df['Severity coefficient'], cluster_map)
     return result_df.values.tolist()
 
-def gait_coefficient(distances, cluster_prediction, weights = [1.0, 1.0, 1.0]):#)w1 = 0.5, w2 = 1.5):
+def gait_coefficient(distances, cluster_prediction, weights = [1.0, 1.0, 1.0], feature_importances = None, normal_class = 0):
     """
     Calculate the coefficient representing how far an individual's gait pattern is from regular gait.
 
@@ -445,15 +452,35 @@ def gait_coefficient(distances, cluster_prediction, weights = [1.0, 1.0, 1.0]):#
             Predictions for each example
         weights: list(float) (optional, default = [0.5, 1.5] )
             weigths for each pathology (experimental)
-
+        normal_class: int (optional, default = 0)
+            Index in the data denoting "normal" gait. Usually but not always the first example
     Returns:
         float: Coefficient representing how far the individual's gait pattern is from regular gait.
     """
     # Calculate the weighted distances to clusters 1 and 2 relative to the distance to cluster 0
-    #print("what are these:", distances, cluster_prediction)
 
-    return distances[0]
+    #this has to be imbued with context, k-means aims to maximize difference across all features, so features need to be weighted by importance to calculate the real severity co-efficient.
+    #importance class 0 feature n - importance class 1 feature n to get co-efficient and multiply by distances
+    return distances[normal_class]
 
+def aggregate_distances(distance, n):
+    distance_aggregate = [0 for i in range(6)]
+    for ind, value in enumerate(distance):
+        if ind in [1,2,3,4]: #1,2,3,4
+            distance_aggregate[0] += value
+        elif ind in [0,17]: #0,17
+            distance_aggregate[1] += value
+        elif ind in [5, 7,9]:
+            distance_aggregate[2] += value
+        elif ind in [6, 8,10]:
+            distance_aggregate[3] += value
+        elif ind in [11,13,15]:
+            distance_aggregate[4] += value
+        elif ind in [12,14,16]:
+            distance_aggregate[5] += value
+        else:
+            print("something gone wrong")
+    return distance_aggregate
 def calculate_mean_variance(labels, coefficients, cluster_map):
     """
     Calculate and print the mean and variance of coefficients for each unique label.
@@ -496,7 +523,7 @@ def create_feature_counts(n):
     feature_counts = {i: {feature: 0 for feature in features} for i in range(n)}
     return feature_counts
 
-def unsupervised_cluster_assessment(input, output, epochs = 15, num_classes = 3):
+def unsupervised_cluster_assessment(input, output, epochs = 15, num_classes = 3, normal_class = 0):
     '''
     Main function for running n k-means models and calculating the mean importances of groups of features.
 
@@ -510,6 +537,8 @@ def unsupervised_cluster_assessment(input, output, epochs = 15, num_classes = 3)
         number of experiments to run to get the mean from
     num_classes: int (optional, default = 3)
         number of classes in the data
+    normal_class: int (optional, default = 0)
+        Index in the data denoting "normal" gait. Usually but not always the first example
 
     Returns
     -------
@@ -545,13 +574,13 @@ def unsupervised_cluster_assessment(input, output, epochs = 15, num_classes = 3)
     scaler = StandardScaler()
     features = scaler.fit_transform(features)
     features = apply_grouped_pca(pd.DataFrame(features))
-    result_df = predict_and_calculate_proximity(k_model, features, data.iloc[:, :6], cluster_map)
+    result_df = predict_and_calculate_proximity(k_model, features, data.iloc[:, :6], cluster_map, feature_counts, normal_class)
     print("cluster map", cluster_map)
     #Add column names
     Utilities.save_dataset(result_df, output)
     return result_df, k_model, cluster_map, feature_counts
 
-def calculate_distances(centroid_A, centroid_B, point_x):
+def calculate_distances(centroid_A, centroid_B, point_x, weights):
     '''
     Utility function to calculate the distance of an instance from both the normal class and its designated class.
 
@@ -563,6 +592,9 @@ def calculate_distances(centroid_A, centroid_B, point_x):
         Co-ordinates of the designated cluster centroid of point_x
     point_x: List(float)
         The instance being examined
+    weights: List(float)
+        Importance scores for each dimension
+
 
     Returns
     -------
@@ -571,10 +603,34 @@ def calculate_distances(centroid_A, centroid_B, point_x):
     '''
     # Calculate Euclidean distance from point_x to centroid_A
     #the case for comparing the relative distance from normal to abnormal
-    d_A = np.linalg.norm(np.array(point_x) - np.array(centroid_A))
+    #d_A = np.linalg.norm(np.array(point_x) - np.array(centroid_A))
+    #print("what's this weights values dimwise score: ", weights)
+    converted_weights = convert_region_to_joints(weights)
+    #print("now? ", converted_weights)
+    d_A = sum(np.abs(np.array(point_x) - np.array(centroid_A)) * np.array(converted_weights))
     # Calculate Euclidean distance from point_x to centroid_B
-    d_B = np.linalg.norm(np.array(point_x) - np.array(centroid_B))
+    #d_B = np.linalg.norm(np.array(point_x) - np.array(centroid_B))
+    d_B = sum(np.abs(np.array(point_x) - np.array(centroid_B)) * np.array(converted_weights))
     return d_A, d_B
+
+def convert_region_to_joints(region_values):
+    joints = [0 for i in range(18)]
+    for ind, val in enumerate(joints):
+        if ind in [1,2,3,4]: #1,2,3,4
+            joints[ind] = region_values['head'] / 4
+        elif ind in [0,17]: #0,17
+            joints[ind] = region_values['torso']  / 2
+        elif ind in [5, 7,9]:
+            joints[ind] = region_values['left_arm']  / 3
+        elif ind in [6, 8,10]:
+            joints[ind] = region_values['right_arm'] / 3
+        elif ind in [11,13,15]:
+            joints[ind] = region_values['left_leg']  / 3
+        elif ind in [12,14,16]:
+            joints[ind] = region_values['right_leg'] / 3
+        else:
+            print("something gone wrong")
+    return joints
 
 def calculate_percentage_closer(d_A, d_B):
     '''
@@ -652,7 +708,7 @@ def list_immediate_subfolders(folder_path, limit):
             break
     return subfolders
 
-def predict_and_display(data, embed_data, image_data, limit, num_classes = 3, normal_class = 0):
+def predict_and_display(data, embed_data, image_data, limit, num_classes = 3, normal_class = 0, dataset_name = 'weightgait'):
     '''
     Function to carry out and (in future) display examples of gait sequences with their predicted cluster and said gaits level of 
     severity.
@@ -669,6 +725,8 @@ def predict_and_display(data, embed_data, image_data, limit, num_classes = 3, no
         Number of classes exhibited in the data
     normal_class: int (optional, default = 0)
         Index in the data denoting "normal" gait. Usually but not always the first example
+    dataset_name: str (optional, default = 'weightgait')
+        folder to save the results to
 
     Returns
     -------
@@ -680,7 +738,8 @@ def predict_and_display(data, embed_data, image_data, limit, num_classes = 3, no
     embed_joints, _ = Utilities.process_data_input(embed_data, None)
 
     #split the raw data and images into blocks of 7 the same way the embedding data is set up
-    predictions, model, cluster_map, feature_counts = unsupervised_cluster_assessment(embed_joints, './code/datasets/joint_data/embed_data/proximities', epochs= 20, num_classes=num_classes)
+    predictions, model, cluster_map, feature_counts = unsupervised_cluster_assessment(embed_joints, './code/datasets/joint_data/embed_data/proximities',
+                                                                                       epochs= 20, num_classes=num_classes, normal_class=normal_class)
     segmented_joints = stitch_data_for_kmeans(embed_joints)
 
     segmented_joints  = pd.DataFrame(segmented_joints)
@@ -699,11 +758,13 @@ def predict_and_display(data, embed_data, image_data, limit, num_classes = 3, no
     dimwise_scores = convert_to_percentage(feature_counts)
     closeness_preds = []
     for i in range(len(segmented_joints)):
+        #calculate severity here:
+        #percentage score of importance * 
         print("\nPrediction for this clip is class: ", predictions[i][-2])
         print("Predicted severity ", predictions[i][-1])
         #importance vector for this cluster here printed
         #calculate distance from both centroids 
-        d_a, d_b = calculate_distances(centroids[cluster_map[normal_class]], centroids[cluster_map[predictions[i][-2]]], segmented_joints.iloc[i])
+        d_a, d_b = calculate_distances(centroids[cluster_map[normal_class]], centroids[cluster_map[predictions[i][-2]]], segmented_joints.iloc[i], dimwise_scores[predictions[i][-2]])
         closeness = calculate_percentage_closer(d_a, d_b)
         closeness_preds.append(closeness)
         print("Confidence as a percentage: ", closeness if closeness != 0 else 1)
@@ -728,4 +789,6 @@ def predict_and_display(data, embed_data, image_data, limit, num_classes = 3, no
     for key, value in mean_dfs.items():
         print(f"Group {key}:\n{value}\n")
 
-    Utilities.save_dataset(predictions, './Code/Datasets/Joint_Data/Results')
+    Utilities.save_dataset(predictions, f'./Code/Datasets/Joint_Data/Results/{dataset_name}')
+    print("this: ", {key: df['confidence_prediction'].tolist() for key, df in mean_dfs.items()})
+    return {key: df['confidence_prediction'].tolist() for key, df in mean_dfs.items()}

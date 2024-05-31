@@ -17,6 +17,7 @@ import time
 import random
 import math
 import pandas as pd
+from scipy.stats import mstats
 random.seed(42)
 import torch
 from sklearn.preprocessing import StandardScaler
@@ -497,10 +498,20 @@ if __name__ == '__main__':
     #create_datasets()
     #clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv",
     #                                            './code/datasets/joint_data/embed_data/path_proximities', epochs=50, num_classes=6)
-    embed_path = "./Code/Datasets/Joint_Data/embed_data/shoe_data_people_4/raw/shoe_data_people_4.csv"
-    data_path = './Code/Datasets/Joint_Data/Shoe_data/Velocity_Data/raw/Velocity_Data.csv'
+    embed_path = "./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv"
+    data_path = './Code/Datasets/Joint_Data/Path/Velocity_Data/raw/Velocity_Data.csv'
     image_path = './Code/Datasets/WeightGait/Full_Dataset/'
-    clustering.predict_and_display(data_path, embed_path, image_path, 2, num_classes=9, normal_class=0)
+    means = [[] for i in range(6)]
+    for i in range(10):
+        epoch_means = clustering.predict_and_display(data_path, embed_path, image_path, 2, num_classes=6, normal_class=2, dataset_name='pathological')
+        for j in range(len(means)):
+            means[j].append(epoch_means[j])
+
+    print("final mean severities: ", means)
+    for i, m in enumerate(means):
+        means[i] = mstats.winsorize(np.array(m), limits=[0.3, 0.1]).mean()
+
+    print("final mean severities: ", means)
     stop = 5/0
     #Path paths
     '''
@@ -518,6 +529,11 @@ if __name__ == '__main__':
     num classes is 9, 
     change path to "shoedata"
     change processing to velocity_data
+
+    weightgait
+    embed_path = "./Code/Datasets/Joint_Data/embed_data/2_people_4/raw/2_people_4.csv"
+    data_path = './Code/Datasets/Joint_Data/big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/5_people/raw/5_people.csv'
+    image_path = './Code/Datasets/WeightGait/Full_Dataset/'
     '''
     start = time.time()
     #New_Embedding_Weights
@@ -531,12 +547,15 @@ if __name__ == '__main__':
 
 #TODO Plan
 '''
+-confidence prediction is distance percentage from normal to it's prediction. Higher values correspond to more severe changes 
+-accuracy is higher than just ST-TAGCN
+-Importance scores tell you which joint groups are most important 
+
 -think about how to form it into a paper
 -   need to explain formula for calculating importance
     - need to see difference in confidence between overlaps in weightgait
     - need to see diff in explanation across datasets, and rationalize them with observations
 -   demonstrate that the data pipeline from embedding to k-means is novel
 -   not application focussed: applications in any realms of classification
--Research Question: Can traditional clustering methods be described by importance in the interest of creating more trustworthy and explainable AI?
-
+-Research Question: Can traditional clustering methods be described by importance in the interest of creating more trustworthy and explainable AI
 '''
