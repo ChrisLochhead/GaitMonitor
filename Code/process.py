@@ -409,6 +409,31 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
     #Process and display results
     process_results(train_scores, val_scores, test_scores)
 
+def reorder_instance_numbers(data):
+    curr = -1
+    instance_no = 0
+    for i, row in enumerate(data):
+        if row[0] != curr:
+            if curr != -1:
+                instance_no += 1
+            curr = row[0]
+        data[i][0] = instance_no
+
+    return data
+
+def extract_embed_data(data):
+    new_data = []
+    for i, row in enumerate(data):
+        new_row = []
+        for j, val in enumerate(row):
+            if j <= 5: 
+                new_row.append(val)
+            else:
+                for embed in val:
+                    new_row.append(embed)
+        new_data.append(new_row)
+    return new_data
+
 def convert_directory_to_videos(parent_folder, output, depth = False):
     '''
     creates a series of videos from source images
