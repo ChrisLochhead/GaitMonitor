@@ -523,12 +523,12 @@ if __name__ == '__main__':
     #create_datasets()
     #clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv",
     #                                            './code/datasets/joint_data/embed_data/path_proximities', epochs=50, num_classes=6)
-    embed_path = "./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv"
-    data_path = './Code/Datasets/Joint_Data/Path/Velocity_Data/raw/Velocity_Data.csv'
+    embed_path = "./Code/Datasets/Joint_Data/embed_data/shoe_data_people_4/raw/shoe_data_people_4.csv"
+    data_path = './Code/Datasets/Joint_Data/Shoe_data/Velocity_Data/raw/Velocity_Data.csv'
     image_path = './Code/Datasets/WeightGait/Full_Dataset/'
     means = [[] for i in range(6)]
     for i in range(10):
-        epoch_means = clustering.predict_and_display(data_path, embed_path, image_path, 2, num_classes=6, normal_class=2, dataset_name='pathological')
+        epoch_means = clustering.predict_and_display(data_path, embed_path, image_path, 2, num_classes=9, normal_class=0, dataset_name='shoedata')
         for j in range(len(means)):
             means[j].append(epoch_means[j])
 

@@ -260,6 +260,7 @@ def k_means_experiment(data, num_classes = 3):
 
     # A dictionary where the key [0] is the cluster label, and [:10] will refer to the first 10 most important features
     print("Accuracy", accuracy)
+    stop = 5/0
     return total_percentages, distances, kmeans, cluster_to_class
 
 
