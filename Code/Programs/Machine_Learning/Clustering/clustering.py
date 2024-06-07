@@ -115,9 +115,9 @@ def calculate_overlap_percentage(cluster_data, first_cluster_data, centroid_a, c
     total_points = len(df1_dimension) + len(df2_dimension)
     # Calculate intersection ratio
     intersection_ratio = intersection_count / total_points
-    return intersection_ratio
+    return 1 - intersection_ratio
 
-def k_means_experiment(data, num_classes = 3):
+def k_means_experiment(data, num_classes = 3, normal_class = 0):
     '''
     Runs a single k-means model on the data to get the clustered predictions
 
@@ -184,19 +184,19 @@ def k_means_experiment(data, num_classes = 3):
     all_importances  = []
     for feature_index in range(18):
         importance_scores = []
-        for cluster in range(1,num_classes):
+        for cluster in range(num_classes):
             '''
             Feature importance f = 1/cluster_variance_f  * (1 + cluster_overlap for feature f between cluster a and b)
               + (abs(centroid_a - centroid_b) / the maximum feature value across clusters a and b - the minimum feature value across clusters a and b)
             '''
             w1 = 1.0
-            w2 = 0.5
+            w2 = 1.0
             w3 = 1.0
             cluster_variance_inv = 1/cluster_variances[cluster][feature_index]
             cluster_variance_inv *= w1
-            cluster_overlap_f = calculate_overlap_percentage(cluster_datasets[cluster], cluster_datasets[0], centroids[cluster], centroids[0], dimension=feature_index)
+            cluster_overlap_f = calculate_overlap_percentage(cluster_datasets[cluster], cluster_datasets[normal_class], centroids[cluster], centroids[normal_class], dimension=feature_index)
             cluster_overlap_f *= w2
-            centroid_dist_f = calculate_centroid_distance(centroids[cluster], centroids[0], feature_index) 
+            centroid_dist_f = calculate_centroid_distance(centroids[cluster], centroids[normal_class], feature_index) 
             norm_centroid_dist_f = centroid_dist_f# / max_dist
             norm_centroid_dist_f *= w3
             feature_importance_f = (cluster_variance_inv * cluster_overlap_f) * norm_centroid_dist_f
@@ -208,59 +208,69 @@ def k_means_experiment(data, num_classes = 3):
             importance_scores.append([cluster, feature_importance_f])
         all_importances.append(importance_scores)
 
-    class_importances = []
+    class_importances = [[] for i in range(num_classes)]
+    print("class lens:", len(class_importances))
     for i in range(len(all_importances)):
-        for j in range(num_classes-1):
-            class_importances.append([row[j] for row in all_importances])
+        for j in range(num_classes):
+            print("£in here : ", j)
+            print("class: ", class_importances[j])
+            class_importances[j].append([row[j] for row in all_importances])
+
+    print("only two right?", len(class_importances), class_importances[0], len(class_importances[0]))
 
     #features.columns = ['Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
     #'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', 'M_hip']
-    region_importances = [{'head':0, 'torso': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0} for i in range(len(all_importances))]
+    region_importances = [{'head':0, 'torso': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0} for i in range(num_classes)]
+    print("iterators: ", len(region_importances), len(class_importances))
     for i, region_importance in enumerate(region_importances):
             for ind, importance in enumerate(class_importances[i]):
                 print("ind and importance: ", ind, importance)
-                if ind in [1,2,3,4]: #1,2,3,4
-                    region_importances[i]['head'] += importance[1]# * 0.4
-                elif ind in [0,17]: #0,17
-                    region_importances[i]['torso'] += importance[1]# * 0.4
-                elif ind in [5, 7,9]:
-                    region_importances[i]['left_arm'] += importance[1]
-                elif ind in [6, 8,10]:
-                    region_importances[i]['right_arm'] += importance[1]
-                elif ind in [11,13,15]:
-                    region_importances[i]['left_leg'] += importance[1]
-                elif ind in [12,14,16]:
-                    region_importances[i]['right_leg'] += importance[1]
-                else:
-                    print("something gone wrong")
+                for ind_i, feature_importance in enumerate(importance):
+                    #stop = 5/0
+                    if ind_i in [1,2,3,4]: #1,2,3,4
+                        region_importances[i]['head'] += feature_importance[1] / 4# * 0.4
+                    elif ind_i in [0,17]: #0,17
+                        region_importances[i]['torso'] += feature_importance[1] / 2# * 0.4
+                    elif ind_i in [5, 7,9]:
+                        region_importances[i]['left_arm'] += feature_importance[1] / 3
+                    elif ind_i in [6, 8,10]:
+                        region_importances[i]['right_arm'] += feature_importance[1] / 3
+                    elif ind_i in [11,13,15]:
+                        region_importances[i]['left_leg'] += feature_importance[1] / 3
+                    elif ind_i in [12,14,16]:
+                        region_importances[i]['right_leg'] += feature_importance[1] / 3
+                    else:
+                        print("something gone wrong")
 
 
     total_sums = [sum(region_importances[i].values()) for i in range(len(region_importances))]
     # Replace each value with its percentage of the total sum
     total_percentages = {k: (v / (total_sums[i] + 0.0001)) * 100 for k, v in region_importances[i].items() for i in range(len(region_importances))}
-
     total_percentages = [sorted(region_importances[i].items(), key=lambda item: item[1]) for i in range(len(region_importances))]
-    features.columns = ['Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
-    'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', 'M_hip']
+
+    #print("what's this: ", total_percentages)
+    #stp = 5/0
+    #features.columns = ['Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
+    #'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', 'M_hip']
 
     # Combine Joints into joint-groups
-    features['head'] = features[['L_eye', 'R_eye', 'L_ear', 'R_ear']].sum(axis=1)
-    features['torso'] = features[['Nose', 'M_hip']].sum(axis=1)
-    features['left_arm'] = features[['L_shoulder', 'L_elbow', 'L_hand']].sum(axis=1)
-    features['right_arm'] = features[['R_shoulder', 'R_elbow', 'R_hand']].sum(axis=1)
-    features['left_leg'] = features[['L_hip', 'L_knee', 'L_foot']].sum(axis=1)
-    features['right_leg'] = features[['R_hip', 'R_knee', 'R_foot']].sum(axis=1)
+    #features['head'] = features[['L_eye', 'R_eye', 'L_ear', 'R_ear']].sum(axis=1)
+    #features['torso'] = features[['Nose', 'M_hip']].sum(axis=1)
+    #features['left_arm'] = features[['L_shoulder', 'L_elbow', 'L_hand']].sum(axis=1)
+    #features['right_arm'] = features[['R_shoulder', 'R_elbow', 'R_hand']].sum(axis=1)
+    #features['left_leg'] = features[['L_hip', 'L_knee', 'L_foot']].sum(axis=1)
+    #features['right_leg'] = features[['R_hip', 'R_knee', 'R_foot']].sum(axis=1)
     # Create a new DataFrame with the combined columns
-    X = features[['head', 'left_arm', 'right_arm', 'left_leg', 'right_leg', 'torso']]
-    kms = KMeansInterp(
-        n_clusters=num_classes,
-        ordered_feature_names=X.columns.tolist(), 
-        feature_importance_method='wcss_min', # or 'unsup2sup'
-    ).fit(X.values)
+    #X = features[['head', 'left_arm', 'right_arm', 'left_leg', 'right_leg', 'torso']]
+    #kms = KMeansInterp(
+    #    n_clusters=num_classes,
+    #    ordered_feature_names=X.columns.tolist(), 
+    #    feature_importance_method='wcss_min', # or 'unsup2sup'
+    #).fit(X.values)
 
     # A dictionary where the key [0] is the cluster label, and [:10] will refer to the first 10 most important features
     print("Accuracy", accuracy)
-    stop = 5/0
+    #stop = 5/0
     return total_percentages, distances, kmeans, cluster_to_class
 
 
@@ -435,8 +445,10 @@ def predict_and_calculate_proximity(kmeans_model, data_df, metadata, cluster_map
     # Create a new DataFrame with predictions and proximities
     result_df = metadata
     for i, v in enumerate(proximities):
-        print("proximityL: ", len(proximities))
         proximities[i] = gait_coefficient(v, cluster_predictions[i], feature_importances=feature_counts, normal_class=normal_class)
+        print("severity prediction: ", proximities[i], cluster_predictions[i], v)
+    print("cluster map:", cluster_map)
+    #stop = 5/0
     result_df['Cluster'] = cluster_predictions
     result_df['Severity coefficient'] = proximities
     calculate_mean_variance(result_df['Cluster'], result_df['Severity coefficient'], cluster_map)
@@ -462,23 +474,32 @@ def gait_coefficient(distances, cluster_prediction, weights = [1.0, 1.0, 1.0], f
 
     #this has to be imbued with context, k-means aims to maximize difference across all features, so features need to be weighted by importance to calculate the real severity co-efficient.
     #importance class 0 feature n - importance class 1 feature n to get co-efficient and multiply by distances
-    return distances[normal_class]
+    #print("distances: ", distances, normal_class, cluster_prediction, distances[normal_class], distances[cluster_prediction])
+    #stop = 5/0
+    num_classes = len(distances)
+    regularizer = 0
+    for i in range(num_classes):
+        if i not in [normal_class, cluster_prediction]:
+            regularizer += distances[i] / num_classes
+    print("regulariser: ", regularizer)
+    #stop = 5/0
+    return (distances[normal_class]) + regularizer if normal_class != cluster_prediction else distances[normal_class]# + regularizer
 
 def aggregate_distances(distance, n):
     distance_aggregate = [0 for i in range(6)]
     for ind, value in enumerate(distance):
         if ind in [1,2,3,4]: #1,2,3,4
-            distance_aggregate[0] += value
+            distance_aggregate[0] += value / 4
         elif ind in [0,17]: #0,17
-            distance_aggregate[1] += value
+            distance_aggregate[1] += value / 2
         elif ind in [5, 7,9]:
-            distance_aggregate[2] += value
+            distance_aggregate[2] += value / 3
         elif ind in [6, 8,10]:
-            distance_aggregate[3] += value
+            distance_aggregate[3] += value / 3
         elif ind in [11,13,15]:
-            distance_aggregate[4] += value
+            distance_aggregate[4] += value / 3
         elif ind in [12,14,16]:
-            distance_aggregate[5] += value
+            distance_aggregate[5] += value / 3
         else:
             print("something gone wrong")
     return distance_aggregate
@@ -553,10 +574,15 @@ def unsupervised_cluster_assessment(input, output, epochs = 15, num_classes = 3,
     feature_counts = create_feature_counts(num_classes)
     centroid_distances = []
     for i in range(epochs):
-        cluster_percentages, distances, k_model, cluster_map = k_means_experiment(data, num_classes=num_classes) # used to be clust1,2,3
+        cluster_percentages, distances, k_model, cluster_map = k_means_experiment(data, num_classes=num_classes, normal_class=normal_class) # used to be clust1,2,3
+        print("whats this here: ", cluster_percentages)
+
         for j in range(len(feature_counts)):
             for k in range(len(cluster_percentages[j])):
                 feature_counts[j][cluster_percentages[j][k][0]] += cluster_percentages[j][k][1]/epochs
+            
+        #print("and the end: ", feature_counts)
+        #stop = 5/0
         centroid_distances.append(distances)
 
     #averages = calculate_column_averages(centroid_distances)
@@ -604,31 +630,32 @@ def calculate_distances(centroid_A, centroid_B, point_x, weights):
     '''
     # Calculate Euclidean distance from point_x to centroid_A
     #the case for comparing the relative distance from normal to abnormal
-    #d_A = np.linalg.norm(np.array(point_x) - np.array(centroid_A))
+    d_A = np.linalg.norm(np.array(point_x) - np.array(centroid_A))
     #print("what's this weights values dimwise score: ", weights)
-    converted_weights = convert_region_to_joints(weights)
+    #converted_weights = convert_region_to_joints(weights)
     #print("now? ", converted_weights)
-    d_A = sum(np.abs(np.array(point_x) - np.array(centroid_A)) * np.array(converted_weights))
+    #d_A = sum(np.abs(np.array(point_x) - np.array(centroid_A)) * np.array(converted_weights))
     # Calculate Euclidean distance from point_x to centroid_B
-    #d_B = np.linalg.norm(np.array(point_x) - np.array(centroid_B))
-    d_B = sum(np.abs(np.array(point_x) - np.array(centroid_B)) * np.array(converted_weights))
+    d_B = np.linalg.norm(np.array(point_x) - np.array(centroid_B))
+    #d_B = sum(np.abs(np.array(point_x) - np.array(centroid_B)) * np.array(converted_weights))
+    print("distances: ", d_A, d_B)
     return d_A, d_B
 
 def convert_region_to_joints(region_values):
     joints = [0 for i in range(18)]
     for ind, val in enumerate(joints):
         if ind in [1,2,3,4]: #1,2,3,4
-            joints[ind] = region_values['head'] / 4
+            joints[ind] = region_values['head']# / 4
         elif ind in [0,17]: #0,17
-            joints[ind] = region_values['torso']  / 2
+            joints[ind] = region_values['torso']#  / 2
         elif ind in [5, 7,9]:
-            joints[ind] = region_values['left_arm']  / 3
+            joints[ind] = region_values['left_arm']#  / 3
         elif ind in [6, 8,10]:
-            joints[ind] = region_values['right_arm'] / 3
+            joints[ind] = region_values['right_arm']# / 3
         elif ind in [11,13,15]:
-            joints[ind] = region_values['left_leg']  / 3
+            joints[ind] = region_values['left_leg']#  / 3
         elif ind in [12,14,16]:
-            joints[ind] = region_values['right_leg'] / 3
+            joints[ind] = region_values['right_leg']# / 3
         else:
             print("something gone wrong")
     return joints
@@ -658,7 +685,8 @@ def calculate_percentage_closer(d_A, d_B):
         d_min = d_B
         d_max = d_A
         closer_to = "B"
-    percentage_closer = ((d_max - d_min) / d_max) * 100
+    percentage_closer = (d_max/ (d_max + d_min)) * 100
+    percentage_further = (d_min / (d_max + d_min)) * 100
     return closer_to, percentage_closer
 
 def convert_to_percentage(data_dict):
@@ -765,7 +793,10 @@ def predict_and_display(data, embed_data, image_data, limit, num_classes = 3, no
         print("Predicted severity ", predictions[i][-1])
         #importance vector for this cluster here printed
         #calculate distance from both centroids 
-        d_a, d_b = calculate_distances(centroids[cluster_map[normal_class]], centroids[cluster_map[predictions[i][-2]]], segmented_joints.iloc[i], dimwise_scores[predictions[i][-2]])
+        if cluster_map[normal_class] != cluster_map[predictions[i][-2]]:
+            d_a, d_b = calculate_distances(centroids[cluster_map[normal_class]], centroids[cluster_map[predictions[i][-2]]], segmented_joints.iloc[i], dimwise_scores[predictions[i][-2]])
+        else:
+            d_a, d_b = calculate_distances(centroids[cluster_map[normal_class]], centroids[cluster_map[normal_class + 1]], segmented_joints.iloc[i], dimwise_scores[predictions[i][-2]])
         closeness = calculate_percentage_closer(d_a, d_b)
         closeness_preds.append(closeness)
         print("Confidence as a percentage: ", closeness if closeness != 0 else 1)
@@ -773,7 +804,9 @@ def predict_and_display(data, embed_data, image_data, limit, num_classes = 3, no
         print("dimwise scores: ", dimwise_scores, len(dimwise_scores))
         print("\nThe DIMWISE scores for this cluster are: ", dimwise_scores[predictions[i][-2]])
 
+
     print("all dimwise scores for clusters: ", dimwise_scores)
+    print("cluster map: ", cluster_map)
     for row, new_value in zip(predictions, closeness_preds):
         row.append(new_value[1])
     #column names are: [instance, no_in_instance, class, freeze, obstacle, person, cluster_prediction, severity_prediction, confidence_prediction ] 9 items
