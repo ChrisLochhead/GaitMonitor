@@ -10,7 +10,7 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, f1_score
 from scipy.stats import mode
 from itertools import combinations
 #dependencies
@@ -162,6 +162,10 @@ def k_means_experiment(data, num_classes = 3, normal_class = 0):
     # Map the cluster labels to the true class labels
     predicted_labels = np.array([cluster_to_class[cluster] for cluster in cluster_labels])
     accuracy = accuracy_score(labels, predicted_labels)
+    f1 = f1_score(labels, predicted_labels, average='weighted')
+    #for i, val in enumerate(zip(labels, predicted_labels)):
+    #    print("key value pair: ", val)
+    #print("are these right: ", len(labels), len(predicted_labels))
 
     #Re-arrange the cluster centroids to correspond to the classes 
     centroids = kmeans.cluster_centers_
@@ -170,7 +174,7 @@ def k_means_experiment(data, num_classes = 3, normal_class = 0):
     for original_index, new_index in cluster_to_class.items():
         arranged_centroids[new_index] = centroids[original_index]
 
-    distances = [np.linalg.norm(centroids[0] - centroids[i]) for i in range(1, len(centroids)) ]
+    distances = [np.linalg.norm(centroids[0] - centroids[i]) for i in range(len(centroids)) ]
     # Step 3: Calculate feature variability within each cluster
     cluster_variances = []
     cluster_datasets = []
@@ -197,9 +201,12 @@ def k_means_experiment(data, num_classes = 3, normal_class = 0):
             cluster_overlap_f = calculate_overlap_percentage(cluster_datasets[cluster], cluster_datasets[normal_class], centroids[cluster], centroids[normal_class], dimension=feature_index)
             cluster_overlap_f *= w2
             centroid_dist_f = calculate_centroid_distance(centroids[cluster], centroids[normal_class], feature_index) 
-            norm_centroid_dist_f = centroid_dist_f# / max_dist
+            #max_dist = calculate_distance_ranges(pd.DataFrame(centroids[cluster]), pd.DataFrame(centroids[normal_class]), feature_index)
+            norm_centroid_dist_f = centroid_dist_f#/ max_dist
             norm_centroid_dist_f *= w3
-            feature_importance_f = (cluster_variance_inv * cluster_overlap_f) * norm_centroid_dist_f
+
+            feature_importance_f = (cluster_variance_inv * cluster_overlap_f)  * (1 + norm_centroid_dist_f)
+
             # Example usage:
 
             if pd.isna(feature_importance_f):
@@ -269,8 +276,8 @@ def k_means_experiment(data, num_classes = 3, normal_class = 0):
     #).fit(X.values)
 
     # A dictionary where the key [0] is the cluster label, and [:10] will refer to the first 10 most important features
-    print("Accuracy", accuracy)
-    #stop = 5/0
+    print("Accuracy", accuracy, f1)
+    stop = 5/0
     return total_percentages, distances, kmeans, cluster_to_class
 
 
@@ -304,7 +311,10 @@ def apply_grouped_pca(data, num_groups = 18):
         # Fit PCA to the feature group and transform it
         pca_result = pca.fit_transform(feature_group)
         # Append the PCA feature to the list
-        pca_features.append(pca_result.flatten())
+        #print("shapes: ", len(pca_result), len(pca_result[0]), feature_group.shape, feature_group.iloc[:, 2].shape)
+        #pca_features.append(pca_result.flatten())
+        pca_features.append(feature_group.iloc[:, 1])
+        #stop = 5/0
 
     # Concatenate the PCA features into a DataFrame
     pca_df = pd.DataFrame(pca_features).T
@@ -479,11 +489,10 @@ def gait_coefficient(distances, cluster_prediction, weights = [1.0, 1.0, 1.0], f
     num_classes = len(distances)
     regularizer = 0
     for i in range(num_classes):
-        if i not in [normal_class, cluster_prediction]:
-            regularizer += distances[i] / num_classes
-    print("regulariser: ", regularizer)
-    #stop = 5/0
-    return (distances[normal_class]) + regularizer if normal_class != cluster_prediction else distances[normal_class]# + regularizer
+        if i not in [normal_class]:
+            regularizer += (distances[i] / num_classes)
+
+    return (distances[normal_class]) / regularizer 
 
 def aggregate_distances(distance, n):
     distance_aggregate = [0 for i in range(6)]

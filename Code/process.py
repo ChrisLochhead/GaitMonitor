@@ -391,10 +391,10 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
     model = model.to(device)
     if vae == False:
         model, train_scores, val_scores, test_scores, embed_data = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                     k_fold=2, batch=batch_size, epochs=epochs, device = device, gen_data = gen_data)
+                                                                     k_fold=3, batch=batch_size, epochs=epochs, device = device, gen_data = gen_data)
     else:
         model, train_scores, val_scores, test_scores, embed_data = vae_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                k_fold=2, batch=batch_size, epochs=epochs, device = device)
+                                                                k_fold=3, batch=batch_size, epochs=epochs, device = device)
         
     if save_embedding:
         print("saving outputs ")
@@ -523,12 +523,14 @@ if __name__ == '__main__':
     #create_datasets()
     #clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv",
     #                                            './code/datasets/joint_data/embed_data/path_proximities', epochs=50, num_classes=6)
-    embed_path = "./Code/Datasets/Joint_Data/embed_data/2_people_4/raw/2_people_4.csv"
-    data_path = './Code/Datasets/Joint_Data/big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/5_people/raw/5_people.csv'
+
+    '''
+    embed_path = "./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv"
+    data_path = './Code/Datasets/Joint_Data/Path/Velocity_Data/raw/Velocity_Data.csv'
     image_path = './Code/Datasets/WeightGait/Full_Dataset/'
     means = [[] for i in range(3)]
-    for i in range(5):
-        epoch_means = clustering.predict_and_display(data_path, embed_path, image_path, 2, num_classes=3, normal_class=0, dataset_name='path')
+    for i in range(1):
+        epoch_means = clustering.predict_and_display(data_path, embed_path, image_path, 2, num_classes=6, normal_class=2, dataset_name='Path')
         for j in range(len(means)):
             means[j].append(epoch_means[j])
 
@@ -538,6 +540,8 @@ if __name__ == '__main__':
 
     print("final mean severities: ", means)
     stop = 5/0
+    '''
+
     #Path paths
     '''
     embed_path = "./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv"
@@ -563,13 +567,19 @@ if __name__ == '__main__':
     start = time.time()
     #New_Embedding_Weights
     run_model(dataset_types= [1], hcf=False,
-            batch_size = 128, epochs =80, folder="Path",
-            save ='12_people', load=None, leave_one_out=False, dim_out=6, class_loc=2, model_type='ST_TAGCN_Block',
-              vae=False, save_embedding = True, embedding_size = 3, gen_data=True, dataset_name='pathological')
+            batch_size = 128, epochs =100, folder="path",
+            save ='13_people', load=None, leave_one_out=False, dim_out=6, class_loc=5, model_type='ST_TAGCN_Block',
+              vae=False, save_embedding = True, embedding_size = 3, gen_data=True, dataset_name='final_path')
     end = time.time()
     print("time elapsed: ", end - start)
 
+    '''
+    Folders
+    weightgait: "big/scale_1_norm_1_subtr_1/no_sub_2_stream/"
+    pathological
+    shoe
 
+    '''
 #TODO Plan
 '''
 -confidence prediction is distance percentage from normal to it's prediction. Higher values correspond to more severe changes 
