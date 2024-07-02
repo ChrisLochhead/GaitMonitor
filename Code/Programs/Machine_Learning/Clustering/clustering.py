@@ -204,7 +204,7 @@ def k_means_experiment(data, num_classes = 3, normal_class = 0):
             #max_dist = calculate_distance_ranges(pd.DataFrame(centroids[cluster]), pd.DataFrame(centroids[normal_class]), feature_index)
             norm_centroid_dist_f = centroid_dist_f#/ max_dist
             norm_centroid_dist_f *= w3
-
+            print("wtaf are these: ", norm_centroid_dist_f, cluster_variance_inv, cluster_overlap_f)
             feature_importance_f = (cluster_variance_inv * cluster_overlap_f)  * (1 + norm_centroid_dist_f)
 
             # Example usage:
@@ -235,17 +235,17 @@ def k_means_experiment(data, num_classes = 3, normal_class = 0):
                 for ind_i, feature_importance in enumerate(importance):
                     #stop = 5/0
                     if ind_i in [1,2,3,4]: #1,2,3,4
-                        region_importances[i]['head'] += feature_importance[1] / 4# * 0.4
+                        region_importances[i]['head'] += feature_importance[1] / 2.5# * 0.4
                     elif ind_i in [0,17]: #0,17
-                        region_importances[i]['torso'] += feature_importance[1] / 2# * 0.4
+                        region_importances[i]['torso'] += feature_importance[1] / 1.25# * 0.4
                     elif ind_i in [5, 7,9]:
                         region_importances[i]['left_arm'] += feature_importance[1] / 3
                     elif ind_i in [6, 8,10]:
                         region_importances[i]['right_arm'] += feature_importance[1] / 3
                     elif ind_i in [11,13,15]:
-                        region_importances[i]['left_leg'] += feature_importance[1] / 3
+                        region_importances[i]['left_leg'] += feature_importance[1] /1.5
                     elif ind_i in [12,14,16]:
-                        region_importances[i]['right_leg'] += feature_importance[1] / 3
+                        region_importances[i]['right_leg'] += feature_importance[1] /1.5
                     else:
                         print("something gone wrong")
 
@@ -277,7 +277,7 @@ def k_means_experiment(data, num_classes = 3, normal_class = 0):
 
     # A dictionary where the key [0] is the cluster label, and [:10] will refer to the first 10 most important features
     print("Accuracy", accuracy, f1)
-    stop = 5/0
+    #stop = 5/0
     return total_percentages, distances, kmeans, cluster_to_class
 
 
@@ -312,8 +312,8 @@ def apply_grouped_pca(data, num_groups = 18):
         pca_result = pca.fit_transform(feature_group)
         # Append the PCA feature to the list
         #print("shapes: ", len(pca_result), len(pca_result[0]), feature_group.shape, feature_group.iloc[:, 2].shape)
-        #pca_features.append(pca_result.flatten())
-        pca_features.append(feature_group.iloc[:, 1])
+        pca_features.append(pca_result.flatten())
+        #pca_features.append(feature_group.iloc[:, 1])
         #stop = 5/0
 
     # Concatenate the PCA features into a DataFrame

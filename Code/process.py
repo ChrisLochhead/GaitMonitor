@@ -208,13 +208,13 @@ def load_datasets(types, folder, multi_dim = False, class_loc = 2, num_classes =
         #Type 1: Normal, full dataset
         if t == 1:  
             #weightgait dataset
-            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/13_people', 
-            #                '13_people.csv',             
-            #                    joint_connections=Render.bottom_joint_connection, class_loc=class_loc, num_classes=num_classes))   
-            #pathological dataset and shoedata
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/Velocity_Data', 
-                            'Velocity_Data.csv',             
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/13_people', 
+                            '13_people.csv',             
                                 joint_connections=Render.bottom_joint_connection, class_loc=class_loc, num_classes=num_classes))   
+            #pathological dataset and shoedata
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/Velocity_Data', 
+            #                'Velocity_Data.csv',             
+            #                    joint_connections=Render.bottom_joint_connection, class_loc=class_loc, num_classes=num_classes))   
         #Type 2: HCF dataset (unused)
         elif t == 2:
             #This MUST have cycles, there's no non-cycles option
@@ -524,13 +524,13 @@ if __name__ == '__main__':
     #clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv",
     #                                            './code/datasets/joint_data/embed_data/path_proximities', epochs=50, num_classes=6)
 
-    '''
-    embed_path = "./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv"
-    data_path = './Code/Datasets/Joint_Data/Path/Velocity_Data/raw/Velocity_Data.csv'
+
+    embed_path = "./Code/Datasets/Joint_Data/embed_data/13_people_weightgait_people_4/raw/13_people_weightgait_people_4.csv"
+    data_path = './Code/Datasets/Joint_Data/big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/5_people/raw/5_people.csv'
     image_path = './Code/Datasets/WeightGait/Full_Dataset/'
     means = [[] for i in range(3)]
     for i in range(1):
-        epoch_means = clustering.predict_and_display(data_path, embed_path, image_path, 2, num_classes=6, normal_class=2, dataset_name='Path')
+        epoch_means = clustering.predict_and_display(data_path, embed_path, image_path, 2, num_classes=3, normal_class=0, dataset_name='WeightGait')
         for j in range(len(means)):
             means[j].append(epoch_means[j])
 
@@ -540,8 +540,7 @@ if __name__ == '__main__':
 
     print("final mean severities: ", means)
     stop = 5/0
-    '''
-
+ 
     #Path paths
     '''
     embed_path = "./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv"
