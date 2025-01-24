@@ -112,7 +112,7 @@ def run_images(folder_name, out_folder, write_mode = "w+", start_point = 0):
     None
 
     '''
-    model = SimpleHigherHRNet.SimpleHigherHRNet(32, 17, "./Code/Programs/Machine_Learning/Model_Based/Simple_HigherHRNet/weights/pose_higher_hrnet_w32_512.pth")
+    model = SimpleHigherHRNet.SimpleHigherHRNet(32, 17, "./Code/Programs/Machine_Learning/Simple_HigherHRNet/weights/pose_higher_hrnet_w32_512.pth")
         #Location info for the dataset
     file_iter = 0
     subdir_iter = 0

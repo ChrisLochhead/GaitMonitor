@@ -105,7 +105,11 @@ def on_press(key):
                 main()
             elif current_menu == 0:
                 print("reordering folders")
-                reorder_folders("./Code/Datasets/Individuals/Full_Dataset/Ahmed")
+                reorder_folders("./Code/Datasets/Home/Bob_Home")
+                reorder_folders("./Code/Datasets/Home/Mies_Home")
+                reorder_folders("./Code/Datasets/Home/Helen_Home")
+                reorder_folders("./Code/Datasets/Home/Karen_Home")
+                reorder_folders("./Code/Datasets/Home/Stephen_Home")
         if key.char == '3':
             if current_menu == 2:
                 main()

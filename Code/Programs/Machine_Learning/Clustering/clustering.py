@@ -16,6 +16,9 @@ from itertools import combinations
 #dependencies
 from Programs.Data_Processing.kmeans_interp.kmeans_feature_imp import KMeansInterp
 import Programs.Data_Processing.Utilities as Utilities
+import warnings
+warnings.filterwarnings("ignore")
+
 
 def calculate_centroid_distance(cluster_a_centroid, cluster_b_centroid, dimension_x):
     '''
@@ -39,7 +42,7 @@ def calculate_centroid_distance(cluster_a_centroid, cluster_b_centroid, dimensio
     # Extract the centroids of cluster_a and cluster_b
     centroid_a = cluster_a_centroid[dimension_x]
     centroid_b = cluster_b_centroid[dimension_x]
-    print("centroid distances: ", centroid_a, centroid_b)
+    #print("centroid distances: ", centroid_a, centroid_b)
     # Calculate the absolute distance between the centroids along dimension_x
     distance = np.abs(centroid_a - centroid_b)
     return distance
@@ -164,8 +167,8 @@ def k_means_experiment(data, num_classes = 3, normal_class = 0):
     accuracy = accuracy_score(labels, predicted_labels)
     f1 = f1_score(labels, predicted_labels, average='weighted')
     #for i, val in enumerate(zip(labels, predicted_labels)):
-    #    print("key value pair: ", val)
-    #print("are these right: ", len(labels), len(predicted_labels))
+    #    #print("key value pair: ", val)
+    ##print("are these right: ", len(labels), len(predicted_labels))
 
     #Re-arrange the cluster centroids to correspond to the classes 
     centroids = kmeans.cluster_centers_
@@ -204,7 +207,7 @@ def k_means_experiment(data, num_classes = 3, normal_class = 0):
             #max_dist = calculate_distance_ranges(pd.DataFrame(centroids[cluster]), pd.DataFrame(centroids[normal_class]), feature_index)
             norm_centroid_dist_f = centroid_dist_f#/ max_dist
             norm_centroid_dist_f *= w3
-            print("wtaf are these: ", norm_centroid_dist_f, cluster_variance_inv, cluster_overlap_f)
+            #print("wtaf are these: ", norm_centroid_dist_f, cluster_variance_inv, cluster_overlap_f)
             feature_importance_f = (cluster_variance_inv * cluster_overlap_f)  * (1 + norm_centroid_dist_f)
 
             # Example usage:
@@ -216,22 +219,22 @@ def k_means_experiment(data, num_classes = 3, normal_class = 0):
         all_importances.append(importance_scores)
 
     class_importances = [[] for i in range(num_classes)]
-    print("class lens:", len(class_importances))
+    #print("class lens:", len(class_importances))
     for i in range(len(all_importances)):
         for j in range(num_classes):
-            print("£in here : ", j)
-            print("class: ", class_importances[j])
+            #print("£in here : ", j)
+            #print("class: ", class_importances[j])
             class_importances[j].append([row[j] for row in all_importances])
 
-    print("only two right?", len(class_importances), class_importances[0], len(class_importances[0]))
+    #print("only two right?", len(class_importances), class_importances[0], len(class_importances[0]))
 
     #features.columns = ['Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
     #'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', 'M_hip']
     region_importances = [{'head':0, 'torso': 0, 'left_arm': 0, 'right_arm': 0, 'left_leg': 0, 'right_leg': 0} for i in range(num_classes)]
-    print("iterators: ", len(region_importances), len(class_importances))
+    #print("iterators: ", len(region_importances), len(class_importances))
     for i, region_importance in enumerate(region_importances):
             for ind, importance in enumerate(class_importances[i]):
-                print("ind and importance: ", ind, importance)
+                #print("ind and importance: ", ind, importance)
                 for ind_i, feature_importance in enumerate(importance):
                     #stop = 5/0
                     if ind_i in [1,2,3,4]: #1,2,3,4
@@ -255,7 +258,7 @@ def k_means_experiment(data, num_classes = 3, normal_class = 0):
     total_percentages = {k: (v / (total_sums[i] + 0.0001)) * 100 for k, v in region_importances[i].items() for i in range(len(region_importances))}
     total_percentages = [sorted(region_importances[i].items(), key=lambda item: item[1]) for i in range(len(region_importances))]
 
-    #print("what's this: ", total_percentages)
+    ##print("what's this: ", total_percentages)
     #stp = 5/0
     #features.columns = ['Nose','L_eye','R_eye','L_ear','R_ear','L_shoulder','R_shoulder',
     #'L_elbow','R_elbow','L_hand','R_hand','L_hip','R_hip','L_knee','R_knee','L_foot', 'R_foot', 'M_hip']
@@ -276,7 +279,7 @@ def k_means_experiment(data, num_classes = 3, normal_class = 0):
     #).fit(X.values)
 
     # A dictionary where the key [0] is the cluster label, and [:10] will refer to the first 10 most important features
-    print("Accuracy", accuracy, f1)
+    #print("Accuracy", accuracy, f1)
     #stop = 5/0
     return total_percentages, distances, kmeans, cluster_to_class
 
@@ -311,7 +314,7 @@ def apply_grouped_pca(data, num_groups = 18):
         # Fit PCA to the feature group and transform it
         pca_result = pca.fit_transform(feature_group)
         # Append the PCA feature to the list
-        #print("shapes: ", len(pca_result), len(pca_result[0]), feature_group.shape, feature_group.iloc[:, 2].shape)
+        ##print("shapes: ", len(pca_result), len(pca_result[0]), feature_group.shape, feature_group.iloc[:, 2].shape)
         pca_features.append(pca_result.flatten())
         #pca_features.append(feature_group.iloc[:, 1])
         #stop = 5/0
@@ -456,8 +459,8 @@ def predict_and_calculate_proximity(kmeans_model, data_df, metadata, cluster_map
     result_df = metadata
     for i, v in enumerate(proximities):
         proximities[i] = gait_coefficient(v, cluster_predictions[i], feature_importances=feature_counts, normal_class=normal_class)
-        print("severity prediction: ", proximities[i], cluster_predictions[i], v)
-    print("cluster map:", cluster_map)
+        #print("severity prediction: ", proximities[i], cluster_predictions[i], v)
+    #print("cluster map:", cluster_map)
     #stop = 5/0
     result_df['Cluster'] = cluster_predictions
     result_df['Severity coefficient'] = proximities
@@ -484,7 +487,7 @@ def gait_coefficient(distances, cluster_prediction, weights = [1.0, 1.0, 1.0], f
 
     #this has to be imbued with context, k-means aims to maximize difference across all features, so features need to be weighted by importance to calculate the real severity co-efficient.
     #importance class 0 feature n - importance class 1 feature n to get co-efficient and multiply by distances
-    #print("distances: ", distances, normal_class, cluster_prediction, distances[normal_class], distances[cluster_prediction])
+    ##print("distances: ", distances, normal_class, cluster_prediction, distances[normal_class], distances[cluster_prediction])
     #stop = 5/0
     num_classes = len(distances)
     regularizer = 0
@@ -514,7 +517,7 @@ def aggregate_distances(distance, n):
     return distance_aggregate
 def calculate_mean_variance(labels, coefficients, cluster_map):
     """
-    Calculate and print the mean and variance of coefficients for each unique label.
+    Calculate and #print the mean and variance of coefficients for each unique label.
 
     Parameters:
         labels (pandas Series): Series containing label values.
@@ -532,9 +535,9 @@ def calculate_mean_variance(labels, coefficients, cluster_map):
         mean = group['coefficient'].mean()
         variance = group['coefficient'].var()
         mean_vars[int(cluster_map[label])] = [mean, variance]
-        print("applying: ", mean, " to : ", cluster_map, cluster_map[label], label)
-    for i, (mean, var) in enumerate(mean_vars):
-        print(f"Label {i}: Mean = {mean:.4f}, Variance = {var:.4f}")
+        #print("applying: ", mean, " to : ", cluster_map, cluster_map[label], label)
+    #for i, (mean, var) in enumerate(mean_vars):
+     #   print(f"Label {i}: Mean = {mean:.4f}, Variance = {var:.4f}")
 
 def create_feature_counts(n):
     '''
@@ -584,13 +587,13 @@ def unsupervised_cluster_assessment(input, output, epochs = 15, num_classes = 3,
     centroid_distances = []
     for i in range(epochs):
         cluster_percentages, distances, k_model, cluster_map = k_means_experiment(data, num_classes=num_classes, normal_class=normal_class) # used to be clust1,2,3
-        print("whats this here: ", cluster_percentages)
+        #print("whats this here: ", cluster_percentages)
 
         for j in range(len(feature_counts)):
             for k in range(len(cluster_percentages[j])):
                 feature_counts[j][cluster_percentages[j][k][0]] += cluster_percentages[j][k][1]/epochs
             
-        #print("and the end: ", feature_counts)
+        ##print("and the end: ", feature_counts)
         #stop = 5/0
         centroid_distances.append(distances)
 
@@ -611,7 +614,7 @@ def unsupervised_cluster_assessment(input, output, epochs = 15, num_classes = 3,
     features = scaler.fit_transform(features)
     features = apply_grouped_pca(pd.DataFrame(features))
     result_df = predict_and_calculate_proximity(k_model, features, data.iloc[:, :6], cluster_map, feature_counts, normal_class)
-    print("cluster map", cluster_map)
+    #print("cluster map", cluster_map)
     #Add column names
     Utilities.save_dataset(result_df, output)
     return result_df, k_model, cluster_map, feature_counts
@@ -639,15 +642,15 @@ def calculate_distances(centroid_A, centroid_B, point_x, weights):
     '''
     # Calculate Euclidean distance from point_x to centroid_A
     #the case for comparing the relative distance from normal to abnormal
-    d_A = np.linalg.norm(np.array(point_x) - np.array(centroid_A))
-    #print("what's this weights values dimwise score: ", weights)
-    #converted_weights = convert_region_to_joints(weights)
-    #print("now? ", converted_weights)
-    #d_A = sum(np.abs(np.array(point_x) - np.array(centroid_A)) * np.array(converted_weights))
+    #d_A = np.linalg.norm(np.array(point_x) - np.array(centroid_A))
+    ##print("what's this weights values dimwise score: ", weights)
+    converted_weights = convert_region_to_joints(weights)
+    ##print("now? ", converted_weights)
+    d_A = sum(np.abs(np.array(point_x) - np.array(centroid_A))* np.array(converted_weights))
     # Calculate Euclidean distance from point_x to centroid_B
-    d_B = np.linalg.norm(np.array(point_x) - np.array(centroid_B))
-    #d_B = sum(np.abs(np.array(point_x) - np.array(centroid_B)) * np.array(converted_weights))
-    print("distances: ", d_A, d_B)
+    #d_B = np.linalg.norm(np.array(point_x) - np.array(centroid_B))
+    d_B = sum(np.abs(np.array(point_x) - np.array(centroid_B)) * np.array(converted_weights))
+    #print("distances: ", d_A, d_B)
     return d_A, d_B
 
 def convert_region_to_joints(region_values):
@@ -694,8 +697,18 @@ def calculate_percentage_closer(d_A, d_B):
         d_min = d_B
         d_max = d_A
         closer_to = "B"
-    percentage_closer = (d_max/ (d_max + d_min)) * 100
-    percentage_further = (d_min / (d_max + d_min)) * 100
+
+    mid = (d_max + d_min)# / 2
+
+
+    #percentage_closer = 100 * (1 - np.exp(-1 * (((d_B)/ mid))))
+    alpha = 0.1
+    percentage_closer =  2 * ((np.exp(-alpha * d_min) / (np.exp(-alpha * d_min) + np.exp(-alpha * d_max))) - 0.5)
+    #if d_min == d_B:
+    #    percentage_closer = 1- percentage_closer
+
+    #print(f"proximity to normal class: {d_A}, proximity to abnormal class: {d_B}, mid_point: {mid}, percentage closer: {percentage_closer}")
+    #sttop = 5/0
     return closer_to, percentage_closer
 
 def convert_to_percentage(data_dict):
@@ -786,42 +799,71 @@ def predict_and_display(data, embed_data, image_data, limit, num_classes = 3, no
     features = scaler.fit_transform(features)
     segmented_joints = apply_grouped_pca(pd.DataFrame(features))
     centroids = model.cluster_centers_
-    #calculate their relative distance to both the normal centroid and the prediction centroid 
-    #predict confidence by inverse closeness (if it's 75% closer to 1 than 0, its 75% confidence), raw distance from normal centroid is severity, 
-    #compare with outermost range of normal and innermost
-    #print the importance vectors for this cluster and the individual example
-    
-    #draw the person with their skeleton
-    #black_frame = [[0 for _ in inner_list] for inner_list in raw_images]
+
+
     dimwise_scores = convert_to_percentage(feature_counts)
     closeness_preds = []
     for i in range(len(segmented_joints)):
         #calculate severity here:
         #percentage score of importance * 
-        print("\nPrediction for this clip is class: ", predictions[i][-2])
-        print("Predicted severity ", predictions[i][-1])
-        #importance vector for this cluster here printed
+        
+        #print("\nPrediction for this clip is class: ", predictions[i][-2])
+        #print("Predicted severity ", predictions[i][-1])
+        #importance vector for this cluster here #printed
         #calculate distance from both centroids 
-        if cluster_map[normal_class] != cluster_map[predictions[i][-2]]:
-            d_a, d_b = calculate_distances(centroids[cluster_map[normal_class]], centroids[cluster_map[predictions[i][-2]]], segmented_joints.iloc[i], dimwise_scores[predictions[i][-2]])
-        else:
-            d_a, d_b = calculate_distances(centroids[cluster_map[normal_class]], centroids[cluster_map[normal_class + 1]], segmented_joints.iloc[i], dimwise_scores[predictions[i][-2]])
+        #if predictions[i][2] != predictions[i][-2]:
+        #   d_a, d_b = calculate_distances(centroids[cluster_map[predictions[i][2]]], centroids[cluster_map[predictions[i][-2]]],
+        #                                    segmented_joints.iloc[i], dimwise_scores[predictions[i][-2]])
+        #if cluster_map[normal_class] != cluster_map[predictions[i][-2]]:
+        d_a, d_b = calculate_distances(centroids[cluster_map[normal_class]], centroids[cluster_map[predictions[i][-2]]],
+                                        segmented_joints.iloc[i], dimwise_scores[predictions[i][-2]])
+        #else:
+        #    d_a, d_b = calculate_distances(centroids[cluster_map[normal_class]], centroids[cluster_map[normal_class]],
+        #                                    segmented_joints.iloc[i], dimwise_scores[predictions[i][-2]])
         closeness = calculate_percentage_closer(d_a, d_b)
+        #if predictions[i][2] == 2.0 and predictions[i][2] == predictions[i][-2]:
+        #print("prediction: ", predictions[i][-2], predictions[i][2], closeness, d_a, d_b)
+            
+        #if i > 3000:
+        #    stop = 5/0
         closeness_preds.append(closeness)
-        print("Confidence as a percentage: ", closeness if closeness != 0 else 1)
-        print("what's this here: ", predictions[i][-2])
-        print("dimwise scores: ", dimwise_scores, len(dimwise_scores))
-        print("\nThe DIMWISE scores for this cluster are: ", dimwise_scores[predictions[i][-2]])
+
+        #print("dimwise scores: ", dimwise_scores, len(dimwise_scores))
+        #print("\nThe DIMWISE scores for this cluster are: ", dimwise_scores[predictions[i][-2]])
 
 
-    print("all dimwise scores for clusters: ", dimwise_scores)
-    print("cluster map: ", cluster_map)
+    #print("all dimwise scores for clusters: ", dimwise_scores)
+    #print("cluster map: ", cluster_map)
     for row, new_value in zip(predictions, closeness_preds):
         row.append(new_value[1])
     #column names are: [instance, no_in_instance, class, freeze, obstacle, person, cluster_prediction, severity_prediction, confidence_prediction ] 9 items
     df = pd.DataFrame(predictions, columns=['instance', 'no_in_instance', 'class', 'freeze', 'obstacle', 'person',
                                              'cluster_prediction', 'severity_prediction', 'confidence_prediction'])
-    print(df.head(3))
+    print("how big is thisd: ", df.shape)
+    # Condition for correct predictions
+    correct_predictions = df['class'] == df['cluster_prediction']
+
+    # Mean confidence for correct predictions
+    mean_confidence_correct = df.loc[correct_predictions, 'confidence_prediction'].mean()
+
+    # Mean confidence for incorrect predictions
+    mean_confidence_incorrect = df.loc[~correct_predictions, 'confidence_prediction'].mean()
+
+    # Summing confidence values for correct predictions
+    sum_confidence_correct = df.loc[correct_predictions, 'confidence_prediction'].sum()
+
+    # Summing confidence values for incorrect predictions
+    sum_confidence_incorrect = df.loc[~correct_predictions, 'confidence_prediction'].sum()
+
+    # Output the results
+    print("Mean Confidence for Correct Predictions:", mean_confidence_correct)
+    print("Mean Confidence for Incorrect Predictions:", mean_confidence_incorrect)
+    print("Sum Confidence for Correct Predictions:", sum_confidence_correct)
+    print("Sum Confidence for Incorrect Predictions:", sum_confidence_incorrect)
+    mean_confidence_per_class = df.loc[correct_predictions].groupby('class')['confidence_prediction'].mean()
+    print("Mean confidence per class (please be good):", mean_confidence_per_class)
+    stop = 5/90
+
     grouped = df.groupby('class')
     # Dictionary to store the mean DataFrame for each group
     mean_dfs = {}
@@ -829,8 +871,8 @@ def predict_and_display(data, embed_data, image_data, limit, num_classes = 3, no
     for name, group in grouped:
         mean_dfs[name] = group.mean()
     # Display the result for each group
-    for key, value in mean_dfs.items():
-        print(f"Group {key}:\n{value}\n")
+    #for key, value in mean_dfs.items():
+        #print(f"Group {key}:\n{value}\n")
 
     Utilities.save_dataset(predictions, f'./Code/Datasets/Joint_Data/Results/{dataset_name}')
     print("this: ", {key: df['confidence_prediction'].tolist() for key, df in mean_dfs.items()})

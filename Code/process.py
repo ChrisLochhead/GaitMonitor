@@ -44,8 +44,10 @@ def process_images_into_joints(folder):
     This has its own function as, unlike the variable normalization functions which need to be experimented with in ablation studies, it should only be ran once per dataset.
     '''
     #Extract joints from images
-    run_images("./Code/Datasets/WeightGait/Full_Dataset/", out_folder="./Code/Datasets/Joint_Data/" + str(folder) + "/", exclude_2D=False, 
-              start_point=0)
+    run_images("./Code/Datasets/Home/" + str(folder) + "/", out_folder="./Code/Datasets/Joint_Data/" + str(folder) + "/", 
+            start_point=0)
+    #run_images("./Code/Datasets/WeightGait/Full_Dataset/", out_folder="./Code/Datasets/Joint_Data/" + str(folder) + "/", 
+    #          start_point=0)
     #Remove empty frames
     abs_joint_data, image_data = Creator.process_empty_frames(joint_file="./Code/Datasets/Joint_Data/" + str(folder) + "/Absolute_Data.csv",
                                                  image_file="./Code/Datasets/Individuals/" + str(folder) + "/Full_Dataset/",
@@ -477,11 +479,10 @@ def create_datasets(streams = [1,2,3,4,5,6]):
     None
     '''
         #Assign person numbers and uniform instance counts:
-    folder_names = ['ahmed', 'Amy', 'Anna', 'bob', 'cade', 'emma', 'erin', 
-                    'grant', 'pheobe', 'scarlett', 'sean c', 'sean g', 'wanok']
+    folder_names = ['Helen_home', 'Stephen_home', 'Karen_home']
     for p in folder_names:
         #Current run: 1, 0, 1
-        process_data(p, run_ims=False, norm_joints=True, scale_joints=True, subtract=True)
+        process_data(p, run_ims=True, norm_joints=True, scale_joints=True, subtract=True)
     
     for s in streams:
         graph_utils.stitch_dataset(folder_names=folder_names, stream=s)
@@ -520,17 +521,21 @@ def make_comb(folder, rel_path, vel_path, bone_path):
 
 ###########################################################################################################################################################################################
 if __name__ == '__main__':
-    #create_datasets()
+    create_datasets()
+    stop = 5/0
     #clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv",
     #                                            './code/datasets/joint_data/embed_data/path_proximities', epochs=50, num_classes=6)
 
 
-    embed_path = "./Code/Datasets/Joint_Data/embed_data/13_people_weightgait_people_4/raw/13_people_weightgait_people_4.csv"
-    data_path = './Code/Datasets/Joint_Data/big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream/5_people/raw/5_people.csv'
+
+    #
+
+    embed_path = "./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv"
+    data_path = './Code/Datasets/Joint_Data/Path/Velocity_Data/raw/Velocity_Data.csv'
     image_path = './Code/Datasets/WeightGait/Full_Dataset/'
-    means = [[] for i in range(3)]
-    for i in range(1):
-        epoch_means = clustering.predict_and_display(data_path, embed_path, image_path, 2, num_classes=3, normal_class=0, dataset_name='WeightGait')
+    means = [[] for i in range((6))]
+    for i in range(10):
+        epoch_means = clustering.predict_and_display(data_path, embed_path, image_path, 2, num_classes=6, normal_class=2, dataset_name='shoedata')
         for j in range(len(means)):
             means[j].append(epoch_means[j])
 
@@ -580,16 +585,6 @@ if __name__ == '__main__':
 
     '''
 #TODO Plan
-'''
--confidence prediction is distance percentage from normal to it's prediction. Higher values correspond to more severe changes 
--accuracy is higher than just ST-TAGCN
--Importance scores tell you which joint groups are most important 
 
--think about how to form it into a paper
--   need to explain formula for calculating importance
-    - need to see difference in confidence between overlaps in weightgait
-    - need to see diff in explanation across datasets, and rationalize them with observations
--   demonstrate that the data pipeline from embedding to k-means is novel
--   not application focussed: applications in any realms of classification
--Research Question: Can traditional clustering methods be described by importance in the interest of creating more trustworthy and explainable AI
-'''
+#set up file decimation and count removal of bad instances
+#different base and st-gcn models on simple classification accuracy, compared to other datasets of synthetic data tyo show similarity
