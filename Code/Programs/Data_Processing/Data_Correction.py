@@ -106,10 +106,17 @@ def normalize_joint_scales(joint_data, image_data = None, meta = 5, width = 424,
             max_x = max(all_x)
             min_y = min(all_y)
             max_y = max(all_y)
-            
+
+            #avoid division by zero from faulty data collection
+            if max_x == 0:
+                min_x += 1
+            if max_y == 0:
+                max_y += 1
+
+            #print("vals: ", width, height, joint[0], min_x, max_x)
             #If not using depth sensor
-            norm_joint = [round(((width * 2) * (joint[0] - min_x)/(max_x - min_x) )/10, 2),
-                          round(((height * 2) * (joint[1] - min_y)/(max_y - min_y))/10, 2),
+            norm_joint = [round((((width * 2) * (joint[0] - min_x)/(max_x - min_x)) + 1 )/10, 2),
+                          round((((height * 2) * (joint[1] - min_y)/(max_y - min_y)) + 1 )/10, 2),
                           round(joint[2], 2)]
             norm_joint_row.append(norm_joint)
         norm_joints.append(norm_joint_row)

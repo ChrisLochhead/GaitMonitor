@@ -47,16 +47,16 @@ def process_images_into_joints(folder):
     run_images("./Code/Datasets/Home/" + str(folder) + "/", out_folder="./Code/Datasets/Joint_Data/" + str(folder) + "/", 
             start_point=0)
     #run_images("./Code/Datasets/WeightGait/Full_Dataset/", out_folder="./Code/Datasets/Joint_Data/" + str(folder) + "/", 
-    #          start_point=0)
+     #         start_point=0)
     #Remove empty frames
     abs_joint_data, image_data = Creator.process_empty_frames(joint_file="./Code/Datasets/Joint_Data/" + str(folder) + "/Absolute_Data.csv",
-                                                 image_file="./Code/Datasets/Individuals/" + str(folder) + "/Full_Dataset/",
+                                                 image_file="./Code/Datasets/Home/" + str(folder),
                                                  joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/2_Absolute_Data(empty frames removed)",
-                                                  image_output="./Code/Datasets/Individuals/" + str(folder) + "/2_Empty Frames Removed/")
+                                                  image_output="./Code/Datasets/Home/" + str(folder) + "/2_Empty Frames Removed/")
     #Trim start and end frames where joints get confused by image borders
     abs_joint_data, image_data =Creator.process_trimmed_frames(abs_joint_data, image_data,
                                                         joint_output="./Code/Datasets/Joint_Data/" + str(folder) + "/3_Absolute_Data(trimmed instances)",
-                                                         image_output="./Code/Datasets/" + str(folder) + "/3_Trimmed Instances/", trim = 5, include_joints=True)
+                                                         image_output="./Code/Datasets/Home/" + str(folder) + "/3_Trimmed Instances/", trim = 5)
     return abs_joint_data, image_data
 
 
@@ -210,9 +210,13 @@ def load_datasets(types, folder, multi_dim = False, class_loc = 2, num_classes =
         #Type 1: Normal, full dataset
         if t == 1:  
             #weightgait dataset
-            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/13_people', 
-                            '13_people.csv',             
+            datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str("big/Scale_1_Norm_1_Subtr_1/No_Sub_2_Stream") + '/5_people', 
+                            '5_people.csv',             
                                 joint_connections=Render.bottom_joint_connection, class_loc=class_loc, num_classes=num_classes))   
+            #at-home dataset
+            #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/no_sub_2_stream/7_people', 
+            #    '7_people.csv',             
+            #        joint_connections=Render.bottom_joint_connection, class_loc=class_loc, num_classes=num_classes))   
             #pathological dataset and shoedata
             #datasets.append(Dataset_Obj.JointDataset('./Code/Datasets/Joint_Data/' + str(folder) + '/Velocity_Data', 
             #                'Velocity_Data.csv',             
@@ -257,7 +261,9 @@ def process_datasets(datasets, leave_one_out = False):
 
     #Uncomment this for standard train test split
     train_indices = random.sample(range(dataset_size), int(0.8 * dataset_size)) # check if some duplicates appear??????
+    #CHANGE THIS IF DOING MULTI-DATASET
     test_indices = random.sample(set(range(dataset_size)) - set(train_indices), int(0.2 * dataset_size)) # Just take from dataset without 
+    #test_indices = random.sample(range(len(datasets[1])), int(0.8 * len(datasets[1]))) # check if some duplicates appear??????
     print("start lens: ", len(train_indices), len(test_indices), len(train_indices) + len(test_indices))
     for dataset in datasets:
         if leave_one_out:
@@ -272,17 +278,20 @@ def process_datasets(datasets, leave_one_out = False):
                         test_indices.remove(i)
                         train_indices.append(i)
     
-        print("final lens: ", len(train_indices), len(test_indices), len(train_indices) + len(test_indices))
+
         train_indice_list.append(train_indices)
         test_indice_list.append(test_indices)
-
+    print("final lens: ", len(train_indices), len(test_indices), len(train_indices) + len(test_indices))
     #These regions will be the same for both datasets
     multi_input_train_val = []
     multi_input_test = []
+    #Change this BACK
+    print("train indice list: ", train_indice_list)
+    print("in question: ", train_indice_list[0], type(train_indice_list), type(train_indice_list[0]))
     for i, dataset in enumerate(datasets):
         multi_input_train_val.append(dataset[train_indice_list[i]])
         multi_input_test.append(dataset[test_indice_list[i]])
-
+    #stop = 5/0
     return multi_input_train_val, multi_input_test
 
 def process_results(train_scores, val_scores, test_scores):
@@ -360,6 +369,11 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
 
     print("number of datasets: ", num_datasets)
     multi_input_train_val, multi_input_test = process_datasets(datasets, leave_one_out=leave_one_out)
+
+    #multi-datasets
+    #multi_input_train_val, _ = process_datasets([datasets[0]], leave_one_out=leave_one_out)
+    #_, multi_input_test = process_datasets([datasets[1]], leave_one_out=leave_one_out)
+
     datasets = [datasets[0]]
     num_datasets = len(datasets)
 
@@ -391,12 +405,27 @@ def run_model(dataset_types, hcf, batch_size, epochs, folder, save = None, load 
         model.load_state_dict(second_weights)
 
     model = model.to(device)
+    print(type(multi_input_train_val[0]))
+
+    # Iterate through the dataset to collect all labels
+    all_labels = torch.tensor([data.y.item() for data in multi_input_train_val[0]])
+
+    # Get the number of unique classes
+    num_classes = all_labels.unique().size(0)
+    print(f"Number of classes: {num_classes}")
+
+    # Count the number of examples for each class
+    class_counts = torch.bincount(all_labels)
+    print("Number of examples per class:")
+    for class_idx, count in enumerate(class_counts):
+        print(f"Class {class_idx}: {count.item()} examples")
+
     if vae == False:
         model, train_scores, val_scores, test_scores, embed_data = graph_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                     k_fold=3, batch=batch_size, epochs=epochs, device = device, gen_data = gen_data)
+                                                                     k_fold=2, batch=batch_size, epochs=epochs, device = device, gen_data = gen_data)
     else:
         model, train_scores, val_scores, test_scores, embed_data = vae_utils.cross_valid(model, multi_input_test, datasets=multi_input_train_val,
-                                                                k_fold=3, batch=batch_size, epochs=epochs, device = device)
+                                                                k_fold=2, batch=batch_size, epochs=epochs, device = device)
         
     if save_embedding:
         print("saving outputs ")
@@ -465,7 +494,7 @@ def convert_directory_to_videos(parent_folder, output, depth = False):
             print("converting to vid")
             Utilities.convert_to_video(subdir.decode('utf-8'), output + split[-1], split[-1], depth=depth)
 
-def create_datasets(streams = [1,2,3,4,5,6]):
+def create_datasets(streams = [1,2,4]):
     '''
     creates a series of datasets from individual person datasets
 
@@ -479,11 +508,11 @@ def create_datasets(streams = [1,2,3,4,5,6]):
     None
     '''
         #Assign person numbers and uniform instance counts:
-    folder_names = ['Helen_home', 'Stephen_home', 'Karen_home']
+    folder_names = ['Mary_home', 'Rhona_Home', 'Douglas_Home'] 
     for p in folder_names:
-        #Current run: 1, 0, 1
-        process_data(p, run_ims=True, norm_joints=True, scale_joints=True, subtract=True)
-    
+        process_data(p, run_ims=True, norm_joints=True, scale_joints=True, subtract=False)
+        
+    folder_names = ['Karen_home', 'Helen_home', 'Mies_home', 'Bob_home', 'Stephen_home', 'Mary_home', 'Rhona_Home', 'Douglas_Home'] 
     for s in streams:
         graph_utils.stitch_dataset(folder_names=folder_names, stream=s)
 
@@ -521,15 +550,16 @@ def make_comb(folder, rel_path, vel_path, bone_path):
 
 ###########################################################################################################################################################################################
 if __name__ == '__main__':
-    create_datasets()
-    stop = 5/0
+    
+    #create_datasets()
+    #stop = 5/0
     #clustering.unsupervised_cluster_assessment("./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv",
     #                                            './code/datasets/joint_data/embed_data/path_proximities', epochs=50, num_classes=6)
 
 
 
     #
-
+    '''
     embed_path = "./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv"
     data_path = './Code/Datasets/Joint_Data/Path/Velocity_Data/raw/Velocity_Data.csv'
     image_path = './Code/Datasets/WeightGait/Full_Dataset/'
@@ -545,7 +575,8 @@ if __name__ == '__main__':
 
     print("final mean severities: ", means)
     stop = 5/0
- 
+    '''
+
     #Path paths
     '''
     embed_path = "./Code/Datasets/Joint_Data/embed_data/Pathological_people_4/raw/Pathological_people_4.csv"
@@ -571,9 +602,9 @@ if __name__ == '__main__':
     start = time.time()
     #New_Embedding_Weights
     run_model(dataset_types= [1], hcf=False,
-            batch_size = 128, epochs =100, folder="path",
-            save ='13_people', load=None, leave_one_out=False, dim_out=6, class_loc=5, model_type='ST_TAGCN_Block',
-              vae=False, save_embedding = True, embedding_size = 3, gen_data=True, dataset_name='final_path')
+            batch_size = 128, epochs =50, folder="home",
+            save ='13_people', load=None, leave_one_out=False, dim_out=3, class_loc=2, model_type='ST_TAGCN_Block',
+              vae=False, save_embedding = True, embedding_size = 8, gen_data=True, dataset_name='final_path')
     end = time.time()
     print("time elapsed: ", end - start)
 
@@ -584,7 +615,3 @@ if __name__ == '__main__':
     shoe
 
     '''
-#TODO Plan
-
-#set up file decimation and count removal of bad instances
-#different base and st-gcn models on simple classification accuracy, compared to other datasets of synthetic data tyo show similarity

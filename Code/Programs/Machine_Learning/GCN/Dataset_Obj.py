@@ -139,7 +139,7 @@ class JointDataset(Dataset):
             coo_matrix = get_COO_matrix(self.joint_connections)
             mod_coo_matrix = self.modify_COO_matrix(len(row), self.joint_connections, coo_matrix)
             #Convert the data into pytorch format 
-            data = data_to_graph(row, mod_coo_matrix)
+            data = data_to_graph(row, mod_coo_matrix, class_loc = self.class_loc)
             if self.test:
                 torch.save(data, 
                     os.path.join(self.processed_dir, 
@@ -231,7 +231,7 @@ def convert_to_literals(data, meta = 5):
     return data
 
 #Input here would be each row
-def data_to_graph(row, coo_matrix, meta = 5):
+def data_to_graph(row, coo_matrix, meta = 5, class_loc = 2):
     '''
     Transforms graph objects into Pytorch objects
 
@@ -257,11 +257,12 @@ def data_to_graph(row, coo_matrix, meta = 5):
         refined_row = cycle_part[meta + 1 :]   
         #refined_row = refined_row[-7:]
         row_as_array = np.array(refined_row)  
-        y = int(cycle_part[2])  
+        y = int(cycle_part[class_loc])  
         per_arr = int(cycle_part[5])
         #Remove certain parts of the body, just leave the legs 
 
         y_arr.append(y)
+        #print("y val: ", y)
         if len(gait_cycle) <= 0:
             gait_cycle = row_as_array
         else:   

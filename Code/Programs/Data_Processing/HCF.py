@@ -381,7 +381,7 @@ def sample_gait_cycles(data_cycles, num_classes = 9, class_loc = 2):
     for i, cycle in enumerate(cycles):
         #cycles[i] = cycles[i][0:min_length]
         cycles[i] = random.sample(cycles[i], min_length)
-    print("lens 2: ", len(cycles[0]),len(cycles[1]),len(cycles[2]))   
+    #print("lens 2: ", len(cycles[0]),len(cycles[3]),len(cycles[4]), len(cycles))   
     #Agglomerate into one list:
     gait_cycles = []
     for i, lst in enumerate(cycles):

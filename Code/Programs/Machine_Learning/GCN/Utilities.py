@@ -230,7 +230,7 @@ def train(model, loader, val_loader, test_loader, generator, epochs, device, gen
 
         # Validation
         generator.set_state(init)
-        val_loss, val_acc, _, _ = test(model, val_loader, generator, validation=True, device = device, gen_test = gen_test, embed_data=embed_data, ys=ys)
+        val_loss, val_acc, _, _ = test(model, val_loader, generator, train=True, validation=True, device = device, gen_test = gen_test, embed_data=embed_data, ys=ys)
         val_accs.append(val_acc)
 
         # Print metrics every 10 epochs
@@ -409,7 +409,7 @@ def stitch_dataset(folder_names, stream = 1):
     for i, dataset in enumerate(datasets):
         if i > 0:
             current_instance, whole_dataset = Utilities.assign_person_number(whole_dataset, dataset, 
-                                                                       "./Code/Datasets/Joint_Data/Big/no_Sub_" + str(stream) + "_stream/" + str(i + 1) + "_people",
+                                                                       "./Code/Datasets/Joint_Data/Home/no_Sub_" + str(stream) + "_stream/" + str(i + 1) + "_people",
                                                                        i, current_instance)
     print("completed.")
 

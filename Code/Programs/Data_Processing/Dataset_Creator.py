@@ -105,7 +105,7 @@ def process_empty_frames(joint_file, image_file, joint_output, image_output):
     '''
     print("\nProcessing Empty frames...")
     joint_data, image_data = Utilities.process_data_input(joint_file, image_file, cols=Utilities.colnames, ignore_depth=True)
-
+    print("sizes: ", len(joint_data), len(image_data))
     joint_data, image_data = Data_Correction.remove_empty_frames(joint_data, image_data)
     Utilities.save_dataset(joint_data, joint_output)
     Utilities.save_images(joint_data, image_data, image_output)

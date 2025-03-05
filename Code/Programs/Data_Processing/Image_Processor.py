@@ -170,7 +170,14 @@ def run_images(folder_name, out_folder, write_mode = "w+", start_point = 0):
             image, joints = run_image(sub_dir + "/" + file_name, single=False, save = False, 
                                       directory=out_directory + sub_dir, model=model, image_no = file_iter)
             # Get corresponding depth image, this is always same index += half the length of the instance
-            dep_image = cv2.imread(sub_dir + "/" + os.fsdecode(files[int(f + (len(files)/2))]), cv2.IMREAD_ANYDEPTH)
+
+            #dep_image = cv2.imread(sub_dir + "/" + os.fsdecode(files[int(f + (len(files)/2))]), cv2.IMREAD_ANYDEPTH)
+            dep_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            dep_image = dep_image.astype(np.uint16)  # Depth images are often 16-bit
+            # Create a zeroed depth image with the same shape and type
+            dep_image = np.zeros_like(dep_image, dtype=dep_image.dtype)
+
+            print("types: ", type(dep_image), type(image))
 
             if len(joints) > 0:
                 if len(joints[0]) < 1:
